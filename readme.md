@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🤖 J.A.R.V.I.S.-AI
 
 ### Personal AI Assistant
@@ -205,3 +206,6 @@ Current focus:
 The long-term goal is a practical AI assistant capable of connecting
 natural-language intent with real computer actions — safely, with the
 user always in control of what it's allowed to do.
+=======
+
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244

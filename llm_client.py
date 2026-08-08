@@ -179,12 +179,17 @@ def ask(
     model: str | None = None,
     max_tokens: int = 2048,
     temperature: float = 0.7,
+<<<<<<< HEAD
     prefer: str = "ollama",
+=======
+    prefer: str = "gemini",
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
 ) -> str:
     """
     Tries providers in order until one succeeds. Raises RuntimeError
     only if every provider fails, with all individual errors attached.
 
+<<<<<<< HEAD
     Chain (default): local Ollama -> Groq -> OpenRouter -> Gemini
       - Ollama: LOCAL-FIRST. Fully offline, unlimited, no API cost, no
         network dependency - but needs Ollama installed locally with a
@@ -214,6 +219,25 @@ def ask(
         "gemini":     ["gemini", "groq", "openrouter", "ollama"],
     }
     order  = orders.get(prefer, orders["ollama"])
+=======
+    Chain (default): Gemini -> Groq -> OpenRouter -> local Ollama
+      - Gemini: best quality, but a small free daily cap
+      - Groq: very high free-tier request limits, fast
+      - OpenRouter: large free-model pool, but a low per-model daily cap
+      - Ollama: fully offline, unlimited, needs local install + a pulled model
+
+    prefer="openrouter" -> OpenRouter first instead of Gemini
+    prefer="groq"        -> Groq first
+    prefer="ollama"       -> Ollama first (fully-offline mode)
+    """
+    orders = {
+        "gemini":     ["gemini", "groq", "openrouter", "ollama"],
+        "groq":       ["groq", "gemini", "openrouter", "ollama"],
+        "openrouter": ["openrouter", "groq", "gemini", "ollama"],
+        "ollama":     ["ollama", "groq", "openrouter", "gemini"],
+    }
+    order  = orders.get(prefer, orders["gemini"])
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
     errors = []
 
     for provider in order:
@@ -251,7 +275,11 @@ def ask_json(
     system: str = "Return ONLY valid JSON. No markdown, no extra text, no explanation.",
     model: str | None = None,
     max_tokens: int = 2048,
+<<<<<<< HEAD
     prefer: str = "ollama",
+=======
+    prefer: str = "gemini",
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
 ) -> dict | list:
     """Same fallback chain as ask(), but parses the result as JSON."""
     raw   = ask(prompt, system=system, model=model, max_tokens=max_tokens,

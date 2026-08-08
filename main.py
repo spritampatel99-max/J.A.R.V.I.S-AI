@@ -460,6 +460,7 @@ TOOL_DECLARATIONS = [
     }
     },
     {
+<<<<<<< HEAD
         "name": "wifi_bluetooth_control",
         "description": "Checks or changes WiFi/Bluetooth status. Use for ANY WiFi or Bluetooth status check or on/off request.",
         "parameters": {
@@ -550,6 +551,8 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+=======
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
         "name": "save_memory",
         "description": (
             "Save an important personal fact about the user to long-term memory. "
@@ -773,6 +776,7 @@ class JarvisLive:
             elif name == "flight_finder":
                 r = await loop.run_in_executor(None, lambda: flight_finder(parameters=args, player=self.ui))
                 result = r or "Done."
+<<<<<<< HEAD
             elif name == "wifi_bluetooth_control":
                 from actions.wifi_bluetooth import wifi_bluetooth_control
                 r = await loop.run_in_executor(None, lambda: wifi_bluetooth_control(parameters=args, player=self.ui))
@@ -813,6 +817,8 @@ class JarvisLive:
                 r = await loop.run_in_executor(None, lambda: app_catalog(parameters=args, player=self.ui))
                 result = r or "No new apps since last check."
 
+=======
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
             elif name == "shutdown_jarvis":
                 self.ui.write_log("SYS: Shutdown requested.")
                 self.speak("Goodbye, sir.")
@@ -1001,6 +1007,7 @@ class JarvisLive:
 def main():
     ui = JarvisUI("face.png")
 
+<<<<<<< HEAD
     # FEATURE: full-control consent popup. Must run on the MAIN thread -
     # PyQt6 GUI calls (QMessageBox) are not thread-safe from a background
     # thread, and JarvisLive/_execute_tool all run on a background thread
@@ -1028,6 +1035,11 @@ def main():
         except Exception as e:
             print(f"[Startup] App catalog check failed: {e}")
 
+=======
+    def runner():
+        ui.wait_for_api_key()
+        jarvis = JarvisLive(ui)
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
         try:
             asyncio.run(jarvis.run())
         except KeyboardInterrupt:

@@ -22,10 +22,17 @@
 # to memory/permissions_log.json purely as an audit trail of past answers,
 # not as a way to skip asking next time.
 #
+<<<<<<< HEAD
 # WIRING: request_full_control_consent() is called from main.py's main()
 # function, on the MAIN thread, before the background JarvisLive thread
 # starts (this matters — see the comment in main.py for why). Already
 # wired in; nothing more to do here.
+=======
+# WIRING NOTE: call request_full_control_consent() once, early, from
+# main.py's startup — before the voice/task loop begins. I haven't seen
+# main.py's content, so this isn't wired in automatically; see the
+# one-line snippet in SETUP_FULL_CONTROL.md.
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
 
 import json
 import sys

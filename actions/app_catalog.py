@@ -9,10 +9,15 @@
 #   - Lets Jarvis proactively say "I noticed you installed X" instead of
 #     silently only discovering it the next time you ask to open it
 #
+<<<<<<< HEAD
 # Call refresh_and_report_changes() once at startup (already wired into
 # main.py's runner() function, on the background thread — safe there
 # since this is pure file I/O with no Qt/GUI calls involved) and/or
 # whenever the user asks "check for new apps" (wired as a voice tool too).
+=======
+# Call refresh_and_report_changes() once at startup (see main.py wiring
+# note in the readme) and/or whenever the user asks "check for new apps".
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
 
 import json
 import sys

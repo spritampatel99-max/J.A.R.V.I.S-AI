@@ -1464,6 +1464,7 @@ class MainWindow(QMainWindow):
     # Change signature:
     def _on_setup_done(self, key: str, or_key: str, os_name: str):
         os.makedirs(CONFIG_DIR, exist_ok=True)
+<<<<<<< HEAD
         # BUGFIX: this used to always write a fresh 3-field dict, silently
         # destroying groq_api_key / ollama_model / confirm_destructive_actions
         # (and any other config added later) every time this wizard ran -
@@ -1485,6 +1486,14 @@ class MainWindow(QMainWindow):
 
         API_FILE.write_text(
             json.dumps(existing, indent=4),
+=======
+        API_FILE.write_text(
+            json.dumps({
+                "gemini_api_key":    key,
+                "openrouter_api_key": or_key,
+                "os_system":         os_name,
+            }, indent=4),
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
             encoding="utf-8",
         )
         self._ready = True

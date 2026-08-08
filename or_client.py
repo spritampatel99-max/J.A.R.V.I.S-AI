@@ -172,6 +172,7 @@ class OpenRouterClient:
         temperature: float = DEFAULT_TEMPERATURE,
         response_format: Optional[dict] = None,
     ) -> str:
+<<<<<<< HEAD
         # FEATURE: local-first routing (Phase 2 of the JARVIS upgrade spec).
         # web_search.py, flight_finder.py, memory_manager.py, and
         # youtube_video.py all call this client DIRECTLY (bypassing
@@ -205,6 +206,8 @@ class OpenRouterClient:
             except Exception as e:
                 logger.info(f"[OpenRouter] Ollama unavailable/failed ({e}) — falling back to cloud pool")
 
+=======
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
         if model and not self._is_rate_limited(model):
             result = self._call(model, messages, max_tokens, temperature, response_format)
             if result:
@@ -223,9 +226,42 @@ class OpenRouterClient:
                 logger.info(f"[OpenRouter] ✓ Success: {m}")
                 return result
 
+<<<<<<< HEAD
         raise RuntimeError(
             "[OpenRouter] All models failed or are rate-limited, and local "
             "Ollama was unavailable or failed too. Check your API key, "
+=======
+        # BUGFIX/FEATURE: previously this just raised once the whole free
+        # OpenRouter pool was exhausted/rate-limited, taking down every
+        # module that routes through this client (web_search, flight_finder,
+        # memory extraction, YouTube summarization) whenever OpenRouter had
+        # a bad day. Now falls back to a local Ollama model if one is
+        # installed and running — only for plain text chat (not vision,
+        # since Ollama's multimodal payload shape differs from OpenRouter's).
+        text_only = all(
+            isinstance(m.get("content"), str) for m in messages
+        )
+        if text_only:
+            try:
+                from llm_client import ollama_available, _ollama_chat
+                if ollama_available():
+                    logger.info("[OpenRouter] Pool exhausted — trying local Ollama...")
+                    system_msg = next((m["content"] for m in messages if m.get("role") == "system"), "")
+                    user_msg   = next((m["content"] for m in messages if m.get("role") == "user"), "")
+                    result = _ollama_chat(
+                        user_msg, system=system_msg,
+                        max_tokens=max_tokens, temperature=temperature,
+                    )
+                    if result:
+                        logger.info("[OpenRouter] ✓ Ollama fallback succeeded")
+                        return result
+            except Exception as e:
+                logger.warning(f"[OpenRouter] Ollama fallback also failed: {e}")
+
+        raise RuntimeError(
+            "[OpenRouter] All models failed or are rate-limited, and no "
+            "local Ollama fallback was available. Check your API key, "
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
             "network connection, or run 'ollama serve' locally."
         )
 

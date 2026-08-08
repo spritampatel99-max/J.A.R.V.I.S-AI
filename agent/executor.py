@@ -253,6 +253,7 @@ def _call_tool(tool: str, parameters: dict, speak: Callable | None) -> str:
         from actions.app_catalog import app_catalog
         return app_catalog(parameters=parameters, player=None) or "Done."
 
+<<<<<<< HEAD
     elif tool == "window_control":
         from actions.window_control import window_control
         return window_control(parameters=parameters, player=None) or "Done."
@@ -269,6 +270,8 @@ def _call_tool(tool: str, parameters: dict, speak: Callable | None) -> str:
         from actions.browser_extras import browser_extras
         return browser_extras(parameters=parameters, player=None) or "Done."
 
+=======
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
     elif tool == "youtube_video":
         from actions.youtube_video import youtube_video
         return youtube_video(parameters=parameters, player=None) or "Done."

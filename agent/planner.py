@@ -105,6 +105,7 @@ confirm_action
   with action:"cancel". NEVER guess or fabricate a token — only use
   the exact token from the immediately preceding confirmation message.
 
+<<<<<<< HEAD
 window_control
   action: "switch_to" | "minimize_all" | "close_window" | "type" | "press" (required)
   app_name: string (required for switch_to/close_window)
@@ -142,6 +143,8 @@ browser_extras
   subject / to: string (optional, for email)
   count: int (optional, for news)
 
+=======
+>>>>>>> 67c8ea33789aa1eeedffa001e492817756b17244
 web_search
   query: string (required) — write a clear, focused search query
   mode: "search" or "compare" (optional, default: search)
