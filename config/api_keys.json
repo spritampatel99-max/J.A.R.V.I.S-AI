@@ -1,7 +1,7 @@
 {
-    "gemini_api_key": "AQ.Ab8RN6JcBmMRTK-yfs2aLvFQxb3__QzNboSY4o0WNvLo1epZZg",
-    "openrouter_api_key": "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",
-    "groq_api_key": "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",
+    "gemini_api_key": "Enter_Your_Gemini_API_Key",
+    "openrouter_api_key": "Enter_Your_Openrouter_API_Key",
+    "groq_api_key": "Enter_Your_Groq_API_Key",
     "ollama_model": "llama3.1",
     "os_system": "windows",
     "confirm_destructive_actions": true
