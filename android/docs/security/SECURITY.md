@@ -1,0 +1,41 @@
+# Security design (what exists today)
+
+Only implemented behaviour is listed. Screens such as the Security Center belong to later phases.
+
+## Rules enforced in code
+
+1. **The model can never approve anything.** Confirmation is a suspended request in `ConfirmationGate`.
+   Only the UI layer holds the `ConfirmationResponder` (`approve` / `deny`). No tool, prompt or tool result ever
+   contains a request id or token. The dialog is native; tapping outside it counts as Deny.
+2. **Approval is bound to the exact action.** The request carries a SHA-256 fingerprint of the tool name and the
+   validated arguments (length-prefixed canonical form). The executor re-computes it after approval and refuses to run on a mismatch
+   (`CONFIRMATION_MISMATCH` in the audit log).
+3. **Single use, short life.** One request is pending at a time, it expires after 120 s, and a cancelled run withdraws it.
+4. **Risk levels.** Tools are LOW, MEDIUM or HIGH. HIGH is always confirmed; MEDIUM is confirmed when the "confirm
+   medium actions" setting is on. HIGH tools are never retried automatically.
+5. **Outside content tightens the rules.** Text from web pages or files is wrapped as untrusted data, and once a run has
+   seen any, the confirmation threshold drops to MEDIUM for the rest of that run.
+6. **No code execution.** There is no path that runs model-written Python, shell or Kotlin. A plan can only name
+   registered tools, with arguments checked against each tool's declared parameter types.
+7. **Success is only reported after the system confirms it.** `set_alarm` checks `AlarmManager.nextAlarmClock`; the
+   flashlight checks the torch callback; `open_url` and `open_youtube` report "handed to the system", not "loaded".
+   A tool that can only hand off says so (`HANDED_OFF`), and the run summary shows it differently from a confirmed result.
+8. **Foreground-only launches.** Android blocks activity starts from the background, so the app refuses to launch other
+   apps when it is not in the foreground, instead of claiming it did.
+9. **Only http(s) links** are opened; `javascript:`, `file:`, `intent:` and links with `user:pass@` are rejected.
+
+## Secrets
+
+- API keys are encrypted with an AES-256-GCM key held in the Android Keystore (`SecureKeyStore`) and are not written to Room, logs or backups (`allowBackup=false`).
+- `SecretRedactor` strips known keys and common key patterns (`AIza…`, `gsk_…`, `sk-or-…`, `Bearer …`, `api_key=…`) from errors and from the audit log. Provider settings print `apiKey=***`.
+- Keys travel only in request headers, never in URLs.
+- Limits: malware running as this app, or a rooted phone, can still use the Keystore key; anyone holding your unlocked phone can see what you type.
+
+## Audit log
+
+`filesDir/audit.jsonl`: one JSON object per line, capped in size, redacted, corrupt lines skipped. Sensitive requests,
+approvals, denials, expirations, mismatches, blocks and executions are recorded. The Activity tab shows it.
+
+## Not done yet
+
+Permission dashboard, Security Center, biometric lock, backup/export controls, instrumented tests, R8 minification.
