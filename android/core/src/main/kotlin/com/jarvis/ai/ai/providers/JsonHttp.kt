@@ -31,6 +31,20 @@ class JsonHttp(
         }
     }
 
+    /** Read-only GET with the same rules as [postJson]: https only, typed errors, JSON object back. */
+    suspend fun getJson(url: String, headers: Map<String, String>): JsonObject {
+        if (!url.startsWith(HTTPS_PREFIX, ignoreCase = true)) {
+            throw ProviderError.MissingConfig("Only https addresses are allowed for AI providers")
+        }
+        val result = transport.get(url, headers)
+        if (result.code !in 200..299) throw mapHttpError(result)
+        return try {
+            Json.parseToJsonElement(result.body).jsonObject
+        } catch (e: IllegalArgumentException) {
+            throw ProviderError.InvalidResponse("Response was not valid JSON", e)
+        }
+    }
+
     private fun mapHttpError(result: HttpResult): ProviderError {
         val excerpt = redactor.redact(result.body.take(MAX_ERROR_BODY_CHARS).replace('\n', ' ')).trim()
         return when (result.code) {

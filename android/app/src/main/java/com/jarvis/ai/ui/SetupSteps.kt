@@ -183,8 +183,9 @@ internal fun ModelsStep(ui: SetupUiState, vm: SetupViewModel) {
     StepScroll {
         StepTitle(
             "Local AI model",
-            "Models run on this phone with no computer or server. Nothing is downloaded now: you are only choosing, " +
-                "and the download itself arrives in Phase 4.",
+            "Models run on this phone with no computer or server. Nothing is downloaded now: you are only choosing. " +
+                "You download a model yourself from the Models tab, with a clear yes, once setup is finished. " +
+                "Chatting with an installed model needs the on-device engine, which is the next step.",
         )
         val recommendation = ui.recommendation
         if (recommendation == null) {
@@ -470,7 +471,14 @@ internal fun PermissionsStep(ui: SetupUiState) {
     StepScroll {
         StepTitle(
             "Permissions",
-            "Nothing is requested on this screen. A permission is asked for only when you switch on the feature that needs it, and you can use the app without optional ones.",
+            "Allow what you want now, or leave everything for later. Each button opens Android's own dialog or Settings page, " +
+                "you can decline any of them, and the app works without the optional ones.",
+        )
+        AccessList()
+        Text(
+            "What your chosen features use",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
         )
         val needed = ui.resolution.permissions
         val runtimeOrSpecial = needed.keys.filter { PermissionCatalog.info(it).kind != PermissionKind.INSTALL_TIME }

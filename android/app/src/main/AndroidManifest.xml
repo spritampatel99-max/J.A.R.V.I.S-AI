@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Optional cloud AI providers (Gemini, Groq, OpenRouter, OpenAI, Claude). All traffic is https. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -8,9 +9,36 @@
     <!-- Normal (install-time) permission needed to hand an alarm to the system Clock app. -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
+    <!-- Model downloads: a foreground service keeps a multi-gigabyte download alive when the app is not on screen. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Shows download progress (asked at run time on Android 13+). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Lets the user exempt the app from battery saving so a long download is not paused. Asked via a system dialog. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!--
+      Declared so the Access screen can ask for them. The features that use them (voice, calling, reminders, the data
+      monitor) are not built yet; the screen says so for each. Every one is off until the user allows it.
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
     <!-- The flashlight tool only works on phones with a flash; the app still installs without one. -->
     <uses-feature
         android:name="android.hardware.camera.flash"
+        android:required="false" />
+    <!-- Declaring the permissions above would otherwise make these hardware features mandatory for installing. -->
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.telephony"
         android:required="false" />
 
     <!-- Android 11 package visibility: the intents the tools resolve or launch. -->
@@ -50,5 +78,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".android.models.ModelDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

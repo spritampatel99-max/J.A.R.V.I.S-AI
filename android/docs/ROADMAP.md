@@ -3,16 +3,16 @@
 Ten phases, taken from the master prompt. "Done" means written *and* verified; the verification actually
 performed is described in `testing/BUILD_AND_TEST_REPORT.md`. The `:core` module has been built and its tests run
 under Gradle on the project owner's PC (they passed). The `:app` module (Android code and screens) has **not**
-compiled successfully yet, no APK exists, and nothing has been run on a device or emulator.
+compiled successfully yet in its latest form. An earlier version of the debug app was built and shown running on the owner's phone (screenshots), but this round's changes have not been compiled, and no release build exists.
 
 | # | Phase | Status |
 |---|---|---|
 | 1 | Project audit | **Done**: `PROJECT_AUDIT.md` |
 | 2 | Android foundation | **Partly done** (see below) |
 | 3 | Onboarding, device analysis, feature selection | **Written; logic tested offline, screens never compiled or shown.** See `setup/ONBOARDING.md` |
-| 4 | Local AI (LiteRT-LM, Gemma 3 1B / Gemma 4 E2B, model manager) | Not started; research done in the audit |
-| 5 | Cloud AI + intelligent router | Partly done: five provider adapters and the fallback client exist; the router does not |
-| 6 | Android integration (voice, apps, calls, messages, notifications, files, data monitor) | Started: 5 tools |
+| 4 | Local AI (LiteRT-LM, Gemma 3 1B / Gemma 4 E2B, model manager) | **Partly done:** model manager (download, resume, verify, import, remove) written and unit-tested offline. **Not done:** the inference engine, so an installed model cannot answer chat. See `ai/LOCAL_MODELS.md` |
+| 5 | Cloud AI + intelligent router | Partly done: five provider adapters, the fallback client, model listing and a connection test exist; built-in commands run before the AI. The task classifier and modes do not |
+| 6 | Android integration (voice, apps, calls, messages, notifications, files, data monitor) | Started: 5 tools, and the Access screen that requests real permissions (most are "not used yet") |
 | 7 | Memory, planner, automation, Custom Agent Creator | Not started |
 | 8 | Offline mode and the Offline Preparation Center | Not started |
 | 9 | Security centre, hardening, instrumented tests | Core security pieces exist; the screens do not |
@@ -23,7 +23,7 @@ compiled successfully yet, no APK exists, and nothing has been run on a device o
 | Item | State |
 |---|---|
 | Kotlin multi-module Gradle project, version catalog, wrapper (Gradle 8.14.3) | Written. `:core` resolved, compiled and tested on the owner's PC; `:app` not compiled successfully yet. |
-| Compose theme and a small shell (Chat, Providers, Activity tabs) | Written. Never rendered. |
+| Compose theme and shell (Chat, Models, Cloud, Access, Log tabs), animated backdrop, bundled fonts | Written. The earlier shell was seen running on a phone; the new one has not been compiled. |
 | Navigation Compose | Declared as a dependency but unused; the shell switches tabs by hand. |
 | Dependency injection | Manual `AppContainer`. |
 | Room | Not started. |
@@ -47,7 +47,7 @@ permission explanations. Details and limits in `setup/ONBOARDING.md`.
 
 ## Not yet built for the cloud side
 
-Connection test, model listing, streaming, usage metadata, cancel buttons, the task classifier, the four
+Streaming, usage metadata, cancel buttons, the task classifier, the four
 routing modes, and the Online/Offline/Automatic mode detector.
 
 ## Known gaps against the prompt that are deliberately deferred

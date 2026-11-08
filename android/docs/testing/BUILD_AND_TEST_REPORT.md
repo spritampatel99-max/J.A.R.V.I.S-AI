@@ -1,10 +1,51 @@
 # Build and test report
 
-Date: 2026-11-08 (Phases 1 to 3). This report says what was actually executed and what was not.
+Date: 2026-11-08 and 2026-11-09 (Phases 1 to 3, plus the model-install, access, built-in-command and UI round). This report says what was
+actually executed and what was not.
 
-**No APK has been built yet.** The sandbox that wrote the code cannot reach Maven Central, Google's Maven repository or
-the Gradle plugin portal (the proxy answers 403), and it has no Android SDK, emulator or phone. Everything in "What was run"
-below is from that sandbox's offline harness, except the next section.
+**Where things stand.** The sandbox that wrote the code cannot reach Maven Central, Google's Maven repository or the Gradle plugin
+portal (the proxy answers 403), and it has no Android SDK, emulator or phone, so it cannot build the app. After the packaging fix below,
+the owner built an earlier version on their PC and showed screenshots of it running on their phone (Providers and Chat tabs); I did not see
+that build's log. **The code written since then (this report's "Round 2" section) has not been compiled by anyone.** Everything in "What was
+run" is from the sandbox's offline harness, except the next section.
+
+## Round 2 (2026-11-08/09): what was run and what was not
+
+What the owner's first run showed: the app ran, but every cloud provider returned HTTP 404 for a stale pre-filled model name, so no command
+worked; local model selection downloaded nothing; no permission was requested; the look was plain. Round 2 addresses each.
+
+**Run (offline harness, `:core` only):** 335 tests pass (up from 277). New: `NativeCommandsTest` 17, `ModelListerTest` 12,
+`ModelInstallerTest` 28, and 1 added to `ModelMetadataClientTest`. All of `:core` compiled with no errors.
+JUnit 4 and kotlinx-coroutines 1.6.4 here, not the pinned versions.
+
+**Mutation checks (21 new):** rules were broken one at a time and the tests had to notice. Installer: checksum comparison skipped, a file
+with a bad checksum kept, size mismatch accepted, free space not checked, resume offset not checked, an oversized partial file not discarded,
+a full answer appended to an old partial file, cancellation not checked while copying, the Hugging Face token never sent. Installed-models
+record: file size ignored, path traversal accepted, delete leaving the partial file. Command matcher: an ambiguous hour guessed, "12 am"
+read as 12, an unknown part of a chained command silently skipped, file names treated as websites, "tomorrow" ignored. Model lister: free
+models not listed first, the non-chat filter removed, the Gemini `generateContent` filter removed. `getJson` accepting plain http. All 21
+are caught now. Three needed fixing first: two mutants were invalid (they did not change behaviour) and were rewritten, and one ("free models not
+first") survived because alphabetical order hid the bug, so a test model was renamed and it is now caught. A background mutation run was killed
+part-way once and left one source file mutated; I restored it from the snapshot, checked it was identical, and ran the rest in the foreground.
+One installer test was flaky once (`lateinit property job has not been initialized`, a race inside the test); it now starts the job lazily and was
+stable over 5 runs.
+
+**Syntax probe of `:app`:** the Kotlin compiler was run over every `:app` file against the real `:core` classes. It found **no syntax errors**; its other
+errors are all unresolved Android and Compose references or follow from them. That is a syntax check only.
+
+**Not run, and therefore unverified:**
+
+| Not run | Why |
+|---|---|
+| Compilation of the new `:app` code (Models, Access and Cloud screens, theme, components, `ModelManager`, `ModelDownloadService`, `AccessChecks`, manifest, fonts as resources) | No Android SDK. Likely to need one or more compile fixes: paste the Gradle errors. |
+| `OkHttpDownloadSource` (the real HTTP download with Range requests and redirect handling) | Needs OkHttp. The installer logic above it is tested against a fake source. |
+| Any real download from Hugging Face, the gated-model token flow, and a real checksum comparison | Not possible here. File sizes and checksums were only read through a web fetch. |
+| The foreground service and its notification, Android 14/15 foreground-service rules | Never on a device. |
+| Permission dialogs, Settings pages and the "blocked" detection | Never on a device. |
+| Animations, fonts and layout on real screens | Never rendered. Frame rate on a mid-range phone is unknown. |
+| Whether `gemini-3.8-flash`, the Groq pool and `openrouter/free` work with the owner's keys | No keys here. **Load models** and **Test** in the Cloud tab are how to find out. |
+| LiteRT-LM and the Gemma models | Not integrated; chat with an installed model does not exist. |
+
 
 ## First real Gradle run (on the owner's Windows PC, 2026-11-08, JDK 19, Gradle 8.14.3)
 
@@ -91,7 +132,7 @@ every screen are **unverified**.
 
 ## Acceptance criteria
 
-The prompt's acceptance list is **not met**: there is no installable APK, no local model, and nothing has been tested on
+The prompt's acceptance list is **not met**: there is no release build, no local model that can answer, and the newest code has not been tested on
 Android. Phase 3's own list is met only as far as code that has been written and unit-tested: the wizard exists, is
 resumable, tags every device value as measured / estimate / unavailable, never recommends a model on RAM alone, and
 cannot select a feature that does not exist. None of it has been seen running. This report will change only when those

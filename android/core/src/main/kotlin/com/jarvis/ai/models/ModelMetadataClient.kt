@@ -22,16 +22,21 @@ sealed interface MetadataResult {
 
 /**
  * Reads a model file's real size and SHA-256 from the Hugging Face file listing (a read-only GET).
- * It sends no personal data and no credentials; only the phone's network address is visible to the
- * server, as with any web request. The caller decides when to run it (the setup does it only on request).
+ * It sends no personal data; only the phone's network address is visible to the server, as with any
+ * web request. A Hugging Face token is sent only when the caller passes one (a gated repository). The caller decides when to run it (the setup does it only on request).
  */
 class ModelMetadataClient(private val transport: HttpTransport) {
 
-    suspend fun lookup(spec: ModelSpec): MetadataResult {
+    /** @param accessToken a Hugging Face token, sent only as a header, for repositories that ask for sign-in. */
+    suspend fun lookup(spec: ModelSpec, accessToken: String? = null): MetadataResult {
         val url = spec.metadataUrl
         if (!url.startsWith("https://")) return MetadataResult.Failed("Only https addresses are allowed")
+        val headers = buildMap {
+            put("Accept", "application/json")
+            if (!accessToken.isNullOrBlank()) put("Authorization", "Bearer ${accessToken.trim()}")
+        }
         val result = try {
-            transport.get(url, mapOf("Accept" to "application/json"))
+            transport.get(url, headers)
         } catch (e: CancellationException) {
             throw e
         } catch (e: ProviderError) {

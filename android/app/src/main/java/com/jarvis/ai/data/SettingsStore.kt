@@ -11,6 +11,10 @@ class SettingsStore(context: Context) {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    init {
+        dropRetiredDefaults()
+    }
+
     /** Fallback order. Unknown or missing providers are repaired so every provider is always present exactly once. */
     var providerOrder: List<ProviderId>
         get() {
@@ -41,11 +45,27 @@ class SettingsStore(context: Context) {
             prefs.edit().putBoolean(KEY_CONFIRM_MEDIUM, value).apply()
         }
 
+    /**
+     * One-time clean-up: earlier versions pre-filled model names that providers have since
+     * retired, and pressing Save stored them. Anything that still equals such a value is removed
+     * so the current default applies. Values the user typed themselves are never touched.
+     */
+    private fun dropRetiredDefaults() {
+        if (prefs.getBoolean(KEY_RETIRED_DROPPED, false)) return
+        val editor = prefs.edit()
+        for (id in ProviderId.entries) {
+            val saved = prefs.getString(modelKey(id), null) ?: continue
+            if (ProviderDefaults.isRetiredDefault(id, saved)) editor.remove(modelKey(id))
+        }
+        editor.putBoolean(KEY_RETIRED_DROPPED, true).apply()
+    }
+
     private fun modelKey(id: ProviderId) = "model_${id.name}"
 
     private companion object {
         const val PREFS_NAME = "jarvis_settings"
         const val KEY_ORDER = "provider_order"
         const val KEY_CONFIRM_MEDIUM = "confirm_medium_actions"
+        const val KEY_RETIRED_DROPPED = "retired_model_defaults_dropped_v1"
     }
 }

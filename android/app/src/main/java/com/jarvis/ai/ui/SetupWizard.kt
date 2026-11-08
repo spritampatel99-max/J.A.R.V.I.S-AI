@@ -46,7 +46,7 @@ fun SetupWizard(setupVm: SetupViewModel, agentVm: AgentViewModel) {
     val step = ui.step
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = { SetupHeader(ui) },
         bottomBar = { SetupFooter(ui, setupVm) },
     ) { padding ->
@@ -224,7 +224,7 @@ private fun PrivacyStep(acknowledged: Boolean, onAcknowledged: (Boolean) -> Unit
         )
         PrivacyBlock(
             "Your control",
-            "Remove a key any time under Providers. Uninstalling the app deletes everything it stored; backups are switched off.",
+            "Remove a key any time in the Cloud tab. Uninstalling the app deletes everything it stored; backups are switched off.",
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(checked = acknowledged, onCheckedChange = onAcknowledged)
@@ -243,14 +243,14 @@ private fun PrivacyBlock(title: String, body: String) {
     }
 }
 
-// ---- Providers (reuses the same screen as the Providers tab) -----------------------------------------------
+// ---- Providers (reuses the same screen as the Cloud tab) -----------------------------------------------
 
 @Composable
 private fun ProvidersStep(agentVm: AgentViewModel) {
     Column(Modifier.fillMaxSize()) {
         Text(
             "Cloud AI is optional. Add a key for any provider you want to use; leave the rest empty. " +
-                "You can skip this step and add keys later under Providers.",
+                "You can skip this step and add keys later in the Cloud tab.",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
         )
@@ -278,14 +278,15 @@ private fun SummaryStep(ui: SetupUiState, agentVm: AgentViewModel) {
         )
         SummaryRow(
             "Cloud AI",
-            if (configured > 0) "$configured provider(s) ready" else "No provider key added yet. Chat will not answer until you add one under Providers.",
+            if (configured > 0) "$configured provider(s) ready" else "No provider key added yet. Built-in commands (flashlight, alarm, YouTube) still work; free-form chat needs a key. Add one in the Cloud tab.",
         )
         SummaryRow(
             "Local AI (on-device)",
-            "Not ready. " + when (choice) {
-                null, ModelChoice.SKIP -> "No model chosen."
-                else -> "You chose ${choice.models.joinToString(" and ") { com.jarvis.ai.models.ModelCatalog.spec(it).displayName }}, " +
-                    "but downloading is not built yet (Phase 4). Nothing has been downloaded."
+            "Not ready for chat. " + when (choice) {
+                null, ModelChoice.SKIP -> "No model chosen. You can install one later in the Models tab."
+                else -> "You chose ${choice.models.joinToString(" and ") { com.jarvis.ai.models.ModelCatalog.spec(it).displayName }}. " +
+                    "Setup downloads nothing: open the Models tab and tap Download when you are ready. " +
+                    "Chatting with an installed model needs the on-device engine, which is not built yet."
             },
         )
         SummaryRow("Offline AI", "Not ready. It is marked ready only after a model has been downloaded, verified and test-loaded.")
@@ -296,7 +297,7 @@ private fun SummaryStep(ui: SetupUiState, agentVm: AgentViewModel) {
         )
         ui.storage?.let { SummaryRow("Storage", storageVerdictText(it)) }
         Text(
-            "Press Finish to open the assistant. You can run setup again from the Providers tab.",
+            "Press Finish to open the assistant. You can run setup again from the Cloud tab.",
             style = MaterialTheme.typography.bodyMedium,
         )
     }

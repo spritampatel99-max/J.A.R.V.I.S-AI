@@ -126,6 +126,22 @@ class ModelMetadataClientTest {
     }
 
     @Test
+    fun aTokenIsSentOnlyAsAHeaderAndOnlyWhenGiven() = runTest {
+        val t = FakeTransport()
+        t.reply(404, "")
+        ModelMetadataClient(t).lookup(spec)
+        t.reply(404, "")
+        ModelMetadataClient(t).lookup(spec, "hf_token_value")
+        t.reply(404, "")
+        ModelMetadataClient(t).lookup(spec, "  ")
+
+        assertTrue(!t.gets[0].second.containsKey("Authorization"))
+        assertEquals("Bearer hf_token_value", t.gets[1].second["Authorization"])
+        assertTrue(!t.gets[1].first.contains("hf_token_value"))
+        assertTrue(!t.gets[2].second.containsKey("Authorization"))
+    }
+
+    @Test
     fun cancellationIsNotSwallowed() = runTest {
         val t = FakeTransport().apply { replyThrowing(CancellationException("stop")) }
         assertFailsWith<CancellationException> { ModelMetadataClient(t).lookup(spec) }

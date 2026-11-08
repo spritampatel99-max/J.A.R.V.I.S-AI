@@ -32,7 +32,7 @@ data class LlmResponse(
 class AllProvidersFailedException(val failures: List<ProviderFailure>) :
     Exception(
         if (failures.all { it.error is ProviderError.MissingConfig }) {
-            "No AI provider is configured. Add an API key under Providers."
+            "No AI provider is configured. Add an API key in the Cloud tab."
         } else {
             "All AI providers failed: " +
                 failures.joinToString("; ") { "${it.provider.displayName}: ${it.error.message}" }

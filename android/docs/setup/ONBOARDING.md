@@ -7,7 +7,7 @@ screen.** See `../testing/BUILD_AND_TEST_REPORT.md` for exactly what was and was
 
 A resumable wizard opens on first launch and again until it is finished. Progress is the number of steps actually
 completed or skipped (never a timer), is saved after every change, and survives closing the app: reopening lands on the
-first unfinished step. After it is finished, **Providers > Run setup again** reopens it with every earlier choice kept.
+first unfinished step. After it is finished, **Cloud > Run setup again** reopens it with every earlier choice kept.
 
 | # | Step | Required | What it does |
 |---|---|---|---|
@@ -15,15 +15,15 @@ first unfinished step. After it is finished, **Providers > Run setup again** reo
 | 2 | Privacy | yes | What stays on the phone, what is read during analysis, what is sent to a cloud provider, when huggingface.co is contacted. Must be ticked to continue. |
 | 3 | Device analysis | yes | Reads the phone (below). Local only. Rescan button. |
 | 4 | Local AI model | yes | Recommendation, two model cards, "Check exact sizes online" button, four options (Gemma 3 1B / Gemma 4 E2B / both / skip). **Choosing downloads nothing.** |
-| 5 | Cloud AI providers | no | The same provider screen as the Providers tab. Can be skipped. |
+| 5 | Cloud AI providers | no | The same screen as the Cloud tab (with Load models and Test). Can be skipped. |
 | 6 | Features | yes | Presets, select/deselect all, one card per feature with details. |
 | 7 | Storage review | yes | What the choices add up to. |
-| 8 | Permissions | no | Explains permissions for the chosen features. **Requests nothing.** |
+| 8 | Permissions | no | The same list as the Access tab (`docs/setup/ACCESS.md`): **Allow** buttons that open Android's own dialogs and Settings pages, plus the explainer for the chosen features. Nothing is requested unless you tap. |
 | 9 | Summary | yes | What is true right now (Cloud AI ready? Local AI ready? Offline AI ready?). |
 
 The prompt's "model download and test", "feature initialisation" and "health check" steps are **not** in this phase:
-there is no model downloader (Phase 4) and nothing to initialise yet. Nothing in the wizard pretends otherwise: the
-summary says Local AI and Offline AI are "Not ready", whatever was chosen.
+the wizard downloads nothing (models are installed from the Models tab, `docs/ai/LOCAL_MODELS.md`) and nothing needs initialising yet. The
+summary says Local AI and Offline AI are "Not ready", whatever was chosen, because an installed model cannot answer chat yet.
 
 There is no terms-of-use text in the project, so the welcome screen does not show one.
 
@@ -132,5 +132,4 @@ also reset Permissions; unticking Privacy takes back that step.
 
 ## Not done in this phase
 
-Model download and the Hugging Face token / import-a-file flow (Phase 4). Real runtime-permission requests and a
-granted-permission reader (Phase 6). A "health check" step. Tests on a phone or emulator. Any visual check of the screens.
+A "health check" step. (Model download, the Hugging Face token and import-a-file flow now live in the Models tab, and real permission requests in the Access tab; neither has run on a device yet.) Tests on a phone or emulator. Any visual check of the screens.

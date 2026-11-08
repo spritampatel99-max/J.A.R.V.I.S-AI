@@ -10,6 +10,7 @@ import com.jarvis.ai.ai.providers.GeminiProvider
 import com.jarvis.ai.ai.providers.HttpClients
 import com.jarvis.ai.ai.providers.JsonHttp
 import com.jarvis.ai.ai.providers.LlmProvider
+import com.jarvis.ai.ai.providers.ModelLister
 import com.jarvis.ai.ai.providers.OkHttpTransport
 import com.jarvis.ai.ai.providers.OpenAiCompatibleProvider
 import com.jarvis.ai.ai.providers.ProviderId
@@ -25,16 +26,21 @@ import com.jarvis.ai.android.device.AndroidPermissionChecker
 import com.jarvis.ai.android.device.AndroidTorchController
 import com.jarvis.ai.android.device.AndroidUrlOpener
 import com.jarvis.ai.android.device.ForegroundTracker
+import com.jarvis.ai.android.models.ModelManager
 import com.jarvis.ai.core.security.ConfirmationGate
 import com.jarvis.ai.core.security.FileAuditLog
 import com.jarvis.ai.core.security.Risk
 import com.jarvis.ai.core.security.SecretRedactor
+import com.jarvis.ai.data.InstalledModelsFileStorage
 import com.jarvis.ai.data.SecureKeyStore
 import com.jarvis.ai.data.SetupFileStorage
 import com.jarvis.ai.data.SettingsStore
 import com.jarvis.ai.device.Reading
+import com.jarvis.ai.models.InstalledModels
 import com.jarvis.ai.models.ModelAdvisor
+import com.jarvis.ai.models.ModelInstaller
 import com.jarvis.ai.models.ModelMetadataClient
+import com.jarvis.ai.models.OkHttpDownloadSource
 import com.jarvis.ai.setup.SetupRepository
 import com.jarvis.ai.setup.StorageCalculator
 import java.io.File
@@ -51,7 +57,9 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     val keys = SecureKeyStore(appContext)
     val settings = SettingsStore(appContext)
 
-    private val redactor = SecretRedactor { ProviderId.entries.mapNotNull { keys.get(keyName(it)) } }
+    private val redactor = SecretRedactor {
+        ProviderId.entries.mapNotNull { keys.get(keyName(it)) } + listOfNotNull(keys.get(HF_TOKEN_KEY))
+    }
 
     private val transport = OkHttpTransport(HttpClients.cloud(), redactor)
     private val cloudHttp = JsonHttp(transport, redactor)
@@ -62,6 +70,18 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     val modelAdvisor = ModelAdvisor()
     val storageCalculator = StorageCalculator()
     val modelMetadata = ModelMetadataClient(transport)
+
+    // ---- on-device models: download, import, installed list ------------------------------------------
+    val modelsDir = File(appContext.filesDir, "models")
+    val installedModels = InstalledModels(InstalledModelsFileStorage(appContext), modelsDir)
+    val modelManager = ModelManager(
+        context = appContext,
+        metadata = modelMetadata,
+        installer = ModelInstaller(OkHttpDownloadSource()),
+        installed = installedModels,
+        modelsDir = modelsDir,
+        hfToken = { keys.get(HF_TOKEN_KEY) },
+    )
 
     /** Size of the installed app, read once; it does not change while the app runs. */
     val baseAppSize: Reading<Long> by lazy { AndroidAppSize.read(appContext) }
@@ -118,6 +138,11 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
 
     fun isConfigured(id: ProviderId): Boolean = providersById.getValue(id).isConfigured()
 
+    fun provider(id: ProviderId): LlmProvider = providersById.getValue(id)
+
+    /** Asks a provider which models the given key can use. */
+    val modelLister = ModelLister(cloudHttp)
+
     val llm = FallbackLlmClient(providers = { settings.providerOrder.mapNotNull { providersById[it] } })
 
     private val ports = DevicePorts(
@@ -143,5 +168,8 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
 
     companion object {
         fun keyName(id: ProviderId): String = "api_key_${id.name}"
+
+        /** Hugging Face access token for gated models. Stored encrypted like the AI keys; never logged. */
+        const val HF_TOKEN_KEY = "hf_access_token"
     }
 }

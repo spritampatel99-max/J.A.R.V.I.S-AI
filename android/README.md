@@ -3,19 +3,23 @@
 A standalone personal AI assistant for Android 11+ (API 30). It is built to run on the phone itself: no
 desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
 
-**Status: early foundation. There is no APK yet.** `:core:test` passes under Gradle on the owner's PC; the `:app` module has not compiled successfully yet. See
+**Status: early foundation, no release build.** `:core:test` passes under Gradle on the owner's PC, and an earlier version of the debug app was built, installed and shown running on the owner's phone (screenshots, 2026-11-08). The latest round of changes (model install, access screen, new look, built-in commands) has **not been compiled yet**. See
 [`docs/testing/BUILD_AND_TEST_REPORT.md`](docs/testing/BUILD_AND_TEST_REPORT.md) for exactly what was and was not run, and
 [`docs/ROADMAP.md`](docs/ROADMAP.md) for the ten-phase plan.
 
 ## What exists in the code today
 
 - Chat with an AI agent that plans a request into steps (at most five), then runs registered tools.
-- Five cloud providers with ordered fallback: Gemini, Groq, OpenRouter, OpenAI, Claude. Keys are encrypted with the Android Keystore.
+- **Built-in commands that need no AI:** flashlight, alarm, YouTube, open a website, battery/storage. They run on the phone with no AI key, and go through the same safety checks as AI plans.
+- Five cloud providers with ordered fallback: Gemini, Groq, OpenRouter, OpenAI, Claude. Keys are encrypted with the Android Keystore. The Cloud tab can **load the models your own key can use** and **test** a model, because pre-filled model names go stale.
+- **Models tab:** download (with resume and a progress notification), import a file, verify and remove the on-device models Gemma 3 1B and Gemma 4 E2B. An installed model cannot answer chat yet; that needs the on-device engine, the next step. See [`docs/ai/LOCAL_MODELS.md`](docs/ai/LOCAL_MODELS.md).
+- **Access tab:** real permission requests with the state Android reports and an "Allow all" walk-through. See [`docs/setup/ACCESS.md`](docs/setup/ACCESS.md).
+- A new look: animated backdrop, orb, motion on every screen, and three bundled open-licence fonts (Orbitron, Manrope, JetBrains Mono; licences in `docs/legal`). Paid typefaces cannot be bundled without a licence.
 - Five Android tools: flashlight, alarm (handed to the system Clock app), open a web link, open YouTube, device info.
 - Native confirmation dialog for sensitive actions, with an activity/audit log.
 - A resumable **setup wizard** (Phase 3): privacy information, a read-only analysis of the phone with every value tagged
   measured / estimate / not available, a model recommendation that explains its reasons, a feature chooser, a storage review
-  and a permissions explainer. It downloads nothing and asks for no permission. See [`docs/setup/ONBOARDING.md`](docs/setup/ONBOARDING.md).
+  and a permissions step. It downloads nothing and asks for nothing until you tap. See [`docs/setup/ONBOARDING.md`](docs/setup/ONBOARDING.md).
 
 **Not built yet:** on-device Gemma models (LiteRT-LM) and their download, the task router,
 voice, memory, planner screens, the Custom Agent Creator, offline mode, file manager, messaging and the rest of the prompt.
@@ -29,7 +33,7 @@ voice, memory, planner screens, the Custom Agent Creator, offline mode, file man
 
 ```
 ./gradlew :core:test          # unit tests for the pure-Kotlin core
-./gradlew :app:assembleDebug  # debug APK -> app/build/outputs/apk/debug/
+./gradlew :app:assembleDebug  # debug APK -> app/build/outputs/apk/debug/ (Windows: .\gradlew)
 ```
 
 The versions in `gradle/libs.versions.toml` resolved on a real Windows PC (JDK 19, Gradle 8.14.3). Set `sdk.dir` in
@@ -42,9 +46,9 @@ The versions in `gradle/libs.versions.toml` resolved on a real Windows PC (JDK 1
 
 ## Configure AI
 
-Open the **Providers** tab, paste a key for any provider you want, check the model name, and press Save. Nothing is
-required: with no key the app says no provider is configured. OpenAI has no pre-filled model; type the one you want.
-Reorder providers with the arrows to change the fallback order. Keys must never go in source code, commits or logs. If a
+Open the **Cloud** tab, paste a key for any provider you want, press **Load models** to see what that key can use, pick one,
+press Save, then **Test**. Nothing is required: with no key the built-in commands still work and chat says no provider is configured.
+OpenAI has no pre-filled model. Reorder providers with Up/Down to change the fallback order. Keys must never go in source code, commits or logs. If a
 key was ever committed to a repository, revoke it and make a new one.
 
 ## Release build (untested)
@@ -63,5 +67,5 @@ settings through `~/.gradle/gradle.properties` or environment variables, add a `
 ## Documentation
 
 [`docs/PROJECT_AUDIT.md`](docs/PROJECT_AUDIT.md) · [`docs/ROADMAP.md`](docs/ROADMAP.md) · [`docs/setup/ONBOARDING.md`](docs/setup/ONBOARDING.md) ·
-[`docs/ai/CLOUD_PROVIDERS.md`](docs/ai/CLOUD_PROVIDERS.md) · [`docs/security/SECURITY.md`](docs/security/SECURITY.md) ·
+[`docs/ai/CLOUD_PROVIDERS.md`](docs/ai/CLOUD_PROVIDERS.md) · [`docs/ai/LOCAL_MODELS.md`](docs/ai/LOCAL_MODELS.md) · [`docs/setup/ACCESS.md`](docs/setup/ACCESS.md) · [`docs/security/SECURITY.md`](docs/security/SECURITY.md) ·
 [`docs/testing/BUILD_AND_TEST_REPORT.md`](docs/testing/BUILD_AND_TEST_REPORT.md) · [`CHANGELOG.md`](CHANGELOG.md)

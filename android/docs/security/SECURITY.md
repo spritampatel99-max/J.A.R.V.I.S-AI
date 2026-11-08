@@ -37,7 +37,18 @@ Only implemented behaviour is listed. Screens such as the Security Center belong
 - Device analysis reads hardware and system facts only; no contacts, accounts, location, identifiers or installed-app list. The result stays on the phone.
 - The only network call the wizard makes itself is the exact-model-size lookup, a read-only GET to `huggingface.co` that
   runs only when the user presses the button, sends no credentials, and goes through the same https-only transport.
-- Nothing in the wizard requests a permission or starts a download.
+- The wizard itself starts no download. Its Permissions step embeds the Access list, which asks Android only when the user taps.
+
+## Model downloads and access (Models and Access tabs)
+
+- A model download or import starts only from an explicit tap, after a dialog showing the size. The file is size-checked and SHA-256-checked
+  against Hugging Face before it counts as installed; the result says "Checksum verified" or "Not verified" and never claims more.
+- The Hugging Face token is stored with the same Android Keystore AES-GCM store as API keys, sent only in the `Authorization` header to
+  `huggingface.co`, dropped on redirects to other hosts, and never written to logs or notifications. Remove it any time in the Models tab.
+- Permissions are requested only through Android's own dialogs and Settings pages, never silently, and the screen shows the state Android
+  reports. A permission whose feature is not built is labelled "Not used yet". The manifest declares nothing without a matching row.
+- Built-in commands run through the same executor as AI plans, so they get the same argument validation, permission checks, confirmation
+  gate and audit log. Text matched as a command never reaches a model, and nothing a model says can approve an action.
 
 ## Audit log
 
