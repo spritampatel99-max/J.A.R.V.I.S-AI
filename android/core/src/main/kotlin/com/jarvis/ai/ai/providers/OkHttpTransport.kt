@@ -23,36 +23,45 @@ class OkHttpTransport(
     private val redactor: SecretRedactor = SecretRedactor(),
 ) : HttpTransport {
 
-    /**
+    /*
      * Reading a response body is blocking I/O, and Android throws NetworkOnMainThreadException
-     * if that happens on the main thread (view models run there), so the exchange runs on
+     * if that happens on the main thread (view models run there), so every exchange runs on
      * Dispatchers.IO.
      */
     override suspend fun postJson(url: String, headers: Map<String, String>, body: String): HttpResult =
-        withContext(Dispatchers.IO) {
-            val httpUrl = url.toHttpUrlOrNull() ?: throw ProviderError.MissingConfig("Invalid URL")
-            val builder = Request.Builder().url(httpUrl)
-            for ((name, value) in headers) builder.header(name, value)
-            builder.post(body.toRequestBody(JSON_MEDIA_TYPE))
+        exchange(url, headers) { post(body.toRequestBody(JSON_MEDIA_TYPE)) }
 
-            val response = try {
-                client.newCall(builder.build()).await()
+    override suspend fun get(url: String, headers: Map<String, String>): HttpResult =
+        exchange(url, headers) { get() }
+
+    private suspend fun exchange(
+        url: String,
+        headers: Map<String, String>,
+        configure: Request.Builder.() -> Request.Builder,
+    ): HttpResult = withContext(Dispatchers.IO) {
+        val httpUrl = url.toHttpUrlOrNull() ?: throw ProviderError.MissingConfig("Invalid URL")
+        val builder = Request.Builder().url(httpUrl)
+        for ((name, value) in headers) builder.header(name, value)
+        builder.configure()
+
+        val response = try {
+            client.newCall(builder.build()).await()
+        } catch (e: InterruptedIOException) {
+            throw ProviderError.Timeout("Request timed out", e)
+        } catch (e: IOException) {
+            throw ProviderError.Network(safeMessage(e), e)
+        }
+        response.use { resp ->
+            val text = try {
+                resp.body?.string().orEmpty()
             } catch (e: InterruptedIOException) {
-                throw ProviderError.Timeout("Request timed out", e)
+                throw ProviderError.Timeout("Reading the response timed out", e)
             } catch (e: IOException) {
                 throw ProviderError.Network(safeMessage(e), e)
             }
-            response.use { resp ->
-                val text = try {
-                    resp.body?.string().orEmpty()
-                } catch (e: InterruptedIOException) {
-                    throw ProviderError.Timeout("Reading the response timed out", e)
-                } catch (e: IOException) {
-                    throw ProviderError.Network(safeMessage(e), e)
-                }
-                HttpResult(resp.code, text, resp.header("Retry-After"))
-            }
+            HttpResult(resp.code, text, resp.header("Retry-After"))
         }
+    }
 
     private fun safeMessage(e: IOException): String = redactor.redact(e.message ?: e.javaClass.simpleName)
 

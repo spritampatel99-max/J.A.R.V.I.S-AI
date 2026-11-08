@@ -8,7 +8,7 @@ on a device or emulator.
 |---|---|---|
 | 1 | Project audit | **Done**: `PROJECT_AUDIT.md` |
 | 2 | Android foundation | **Partly done** (see below) |
-| 3 | Onboarding, device analysis, feature selection | Not started |
+| 3 | Onboarding, device analysis, feature selection | **Written; logic tested offline, screens never compiled or shown.** See `setup/ONBOARDING.md` |
 | 4 | Local AI (LiteRT-LM, Gemma 3 1B / Gemma 4 E2B, model manager) | Not started; research done in the audit |
 | 5 | Cloud AI + intelligent router | Partly done: five provider adapters and the fallback client exist; the router does not |
 | 6 | Android integration (voice, apps, calls, messages, notifications, files, data monitor) | Started: 5 tools |
@@ -29,7 +29,7 @@ on a device or emulator.
 | DataStore | Declared, not used; `SharedPreferences` holds non-secret settings. |
 | Android Keystore storage for keys | Written (`SecureKeyStore`). Not run on a device. |
 | HTTPS-only network layer with typed errors, retries and rate-limit cooldown | Written and unit-tested (see report). The OkHttp adapter itself is not. |
-| Unit-test setup | 138 tests run in an offline harness. Not yet through Gradle. |
+| Unit-test setup | 277 tests run in an offline harness. Not yet through Gradle. |
 
 ## Already in place that later phases build on
 
@@ -37,6 +37,12 @@ on a device or emulator.
 - **Agent:** planner, executor, tool registry with argument validation and risk levels.
 - **Tools (Android side):** `flashlight`, `set_alarm`, `open_url`, `open_youtube`, `get_device_info`.
 - **Cloud:** Gemini, Groq, OpenRouter, OpenAI and Claude adapters with ordered fallback.
+
+## Phase 3: what exists
+
+Setup wizard (9 steps, resumable), device analysis with measured/estimate/unavailable tagging, model advisor, exact-size
+lookup from Hugging Face on request, 25-feature catalogue (3 selectable), presets, dependency resolution, storage review,
+permission explanations. Details and limits in `setup/ONBOARDING.md`.
 
 ## Not yet built for the cloud side
 

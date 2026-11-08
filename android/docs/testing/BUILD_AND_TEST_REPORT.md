@@ -1,6 +1,6 @@
 # Build and test report
 
-Date: 2026-11-07. This report says what was actually executed and what was not.
+Date: 2026-11-08 (Phases 1 to 3). This report says what was actually executed and what was not.
 
 **No APK has been built. Gradle has never run on this project.** The sandbox that wrote the code cannot reach
 Maven Central, Google's Maven repository or the Gradle plugin portal (the proxy answers 403), and it has no
@@ -19,34 +19,63 @@ An offline harness compiled and tested the pure-Kotlin `:core` module:
 
 Results:
 
-- 24 of the 26 `:core` source files compiled with **no errors and no warnings**.
-- 8 of the 9 test files compiled and **all 138 tests passed** (0.78 s). Per file: Executor 26, JsonHttp/providers 28, Tools 24, Planner 14, Fallback 11, Security utils 13, Builtin tools 15, Confirmation gate 7.
-- **Mutation check:** six security-relevant lines were deliberately broken one at a time (skipping confirmation, not binding approval to the exact arguments, dropping the https-only rule, sending `temperature` to Claude, putting the Gemini key in the URL, allowing `javascript:` URLs). Five were caught at once. One was not: no test covered the approval/argument mismatch check. I added that test, and it now fails when the check is broken. All files were restored and re-verified afterwards.
+- 35 of the 37 `:core` source files compiled with **no errors and no warnings** (the two left out need OkHttp).
+- 14 of the 15 test files compiled and **all 277 tests passed** (about 0.6 s). Per file: Executor 26, JsonHttp/providers 28, Tools 24,
+  Planner 14, Fallback 11, Security utils 13, Builtin tools 15, Confirmation gate 7, and for Phase 3: Feature catalogue and
+  selection 38, Model advisor 24, Setup flow 22, Storage calculator 19, Model metadata client 14, Setup repository and
+  codec 14, Device readings and formatting 8.
 
-What the harness found in my own work this session: a test file using an extension property without its import,
-two `assertEquals` calls whose type inference the real kotlin-test rejects, and a regression where a URL helper
-had stopped producing canonical addresses. All three are fixed.
+### Mutation checks
+
+Key rules were broken one at a time to prove the tests notice.
+
+- **Earlier (6):** skipping confirmation, not binding approval to the exact arguments, dropping the https-only rule, sending
+  `temperature` to Claude, putting the Gemini key in the URL, allowing `javascript:` URLs. All caught (one needed a new test first).
+- **Phase 3 (22), all caught, none survived:**
+  advisor: ignoring a storage shortfall, accepting any architecture, labelling an estimate as measured, letting an unknown
+  size pass, dropping the RAM rule; metadata: trusting a malformed checksum, ignoring the file name; features: selecting an
+  unbuilt feature, not pulling in dependencies, leaving dependents behind on deselect; storage: counting the installed app in
+  the totals, consent threshold off by one, ignoring unknown sizes for consent, treating a missing size as zero; setup flow:
+  skipping required steps, finishing early, completing privacy unticked, resuming into skipped steps, not resetting storage
+  after a model change, trusting a forged "finished" flag, unticking privacy keeping the step, reopening forgetting earlier steps.
+
+**A harness incident, found and fixed:** the first Phase 3 mutation run was a background process and was cut off part-way,
+leaving one mutation (`if (false)` in the privacy gate of `SetupFlow.kt`) in the source. I noticed that the run had no
+closing line, searched the sources, found it, restored it, and confirmed with a full run (273 tests green at that point). The script now
+snapshots every source file first and checks at the end that they are identical to the snapshot (it reported identical).
+Nothing mutated was left in the tree.
+
+### The `:app` Phase 3 files
+
+They cannot be compiled without the Android SDK. As a partial check I ran the Kotlin compiler on the new `:app` files
+against the real `:core` classes: **no syntax errors**, and every unresolved reference is an Android or Compose class (or
+something that follows from one). That is a syntax check only. Type-checking against Android and Compose, the layouts, and
+every screen are **unverified**.
 
 ## What was NOT run
 
 | Not run | Why |
 |---|---|
 | `./gradlew build`, `test`, `lint`, `assembleDebug`, `assembleRelease` | Gradle cannot download dependencies here. |
-| Compilation of the `:app` module (10 files, Compose UI, Keystore, device ports) | No Android SDK. It was reviewed by reading only. |
-| `OkHttpTransport.kt` and `HttpClients.kt` | Need OkHttp; not available offline. I checked the OkHttp calls by reading, not compiling. |
-| `OkHttpTransportTest` (5 tests: MockWebServer) | Same reason. Written, never compiled or run. |
+| Compilation of the `:app` module (Compose UI, Keystore, device ports, the new wizard and analyzer) | No Android SDK. Reviewed by reading only. |
+| `OkHttpTransport.kt` (now with a `get` method) and `HttpClients.kt` | Need OkHttp; not available offline. Checked by reading, not compiling. |
+| `OkHttpTransportTest` (7 tests: MockWebServer, 2 new for GET) | Same reason. Written, never compiled or run. |
 | JUnit 5 execution, the pinned library versions | The harness used JUnit 4 and older libraries. |
-| Emulator (API 30), instrumented tests, device tests | None available. The flashlight, alarm, URL, Keystore and UI code has never executed. |
-| Real provider calls | No API keys were used; provider behaviour is tested against scripted replies only. |
+| Emulator, instrumented tests, device tests | None available. Nothing in the device analyzer (Build, ActivityManager, StatFs, ConnectivityManager, SpeechRecognizer, TTS lookups), `AtomicFile` persistence, the Keystore, the flashlight, alarm or URL code has ever executed. |
+| Real provider calls, and a real Hugging Face call from the app | No API keys used; no outbound calls from the app code. The metadata parser is tested against hand-written JSON that follows the shape a web fetch reported; it has not been checked against a captured live response. |
 | LiteRT-LM and the Gemma models | Not integrated yet. |
 
 ## Likely first-run problems
 
 - `libs.versions.toml` versions were never resolved. Any of them may need bumping at the first Gradle sync.
 - LiteRT-LM (Phase 4) needs a newer Kotlin than the pinned 2.1.20.
-- `:app` code has not met a compiler, so expect some compile errors there.
+- `:app` code has not met a compiler, so expect some compile errors there, especially in the Compose screens (about 1,300 new lines across the wizard, view model, analyzer and storage).
+- The Phase 3 memory rule of thumb is uncalibrated and may be too cautious (`ONBOARDING.md`).
 
 ## Acceptance criteria
 
-The prompt's acceptance list is **not met**: there is no installable APK, no onboarding, no local model, and nothing
-has been tested on Android. This report will change only when those things actually run.
+The prompt's acceptance list is **not met**: there is no installable APK, no local model, and nothing has been tested on
+Android. Phase 3's own list is met only as far as code that has been written and unit-tested: the wizard exists, is
+resumable, tags every device value as measured / estimate / unavailable, never recommends a model on RAM alone, and
+cannot select a feature that does not exist. None of it has been seen running. This report will change only when those
+things actually run.

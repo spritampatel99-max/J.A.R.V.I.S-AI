@@ -97,4 +97,29 @@ class OkHttpTransportTest {
         }
         assertEquals(0, server.requestCount)
     }
+
+    @Test
+    fun getSendsAPlainGetWithHeadersAndNoBody() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("[]"))
+
+        val result = OkHttpTransport(OkHttpClient()).get(url("/api/models/x/tree/main"), mapOf("Accept" to "application/json"))
+
+        assertEquals(200, result.code)
+        assertEquals("[]", result.body)
+        val recorded = server.takeRequest()
+        assertEquals("GET", recorded.method)
+        assertEquals("/api/models/x/tree/main", recorded.path)
+        assertEquals("application/json", recorded.getHeader("Accept"))
+        assertEquals(0L, recorded.bodySize)
+    }
+
+    @Test
+    fun getReportsErrorStatusesAndBadAddressesLikePost() {
+        server.enqueue(MockResponse().setResponseCode(404).setBody("missing"))
+        val result = runBlocking { OkHttpTransport(OkHttpClient()).get(url("/"), emptyMap()) }
+        assertEquals(404, result.code)
+        assertFailsWith<ProviderError.MissingConfig> {
+            runBlocking { OkHttpTransport(OkHttpClient()).get("not a url", emptyMap()) }
+        }
+    }
 }

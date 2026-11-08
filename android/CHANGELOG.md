@@ -8,4 +8,7 @@
 - Cloud providers: Gemini, Groq, OpenRouter, OpenAI and Claude with ordered fallback; https only.
 - Android tools: flashlight, alarm, open link, open YouTube, device info.
 - Removed (scope change to a standalone phone-only product): the Ollama provider, the private-network/cleartext exception and any desktop pairing plan.
-- 138 offline unit tests pass in a non-Gradle harness. Gradle build, the `:app` module and device behaviour are unverified.
+- Phase 3: resumable setup wizard (welcome, privacy, device analysis, local model choice, providers, features, storage review, permissions, summary); device analysis with measured / estimate / unavailable readings; model advisor with visible rules; exact model size and checksum lookup from Hugging Face on request; 25-feature catalogue with dependencies and presets (only the 3 features that exist are selectable); storage calculator; atomic, forgiving setup persistence. See `docs/setup/ONBOARDING.md`.
+- `HttpTransport` gained a `get` method (used only for the model metadata lookup).
+- Correction: Gemma 3 1B's file is 584,417,280 bytes per the repository listing, not the "about 529 MB" noted earlier.
+- 277 offline unit tests pass in a non-Gradle harness. Gradle build, the `:app` module and device behaviour are unverified.

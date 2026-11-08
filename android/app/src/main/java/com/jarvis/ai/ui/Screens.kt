@@ -55,7 +55,7 @@ import java.util.Date
 private val TAB_TITLES = listOf("Chat", "Providers", "Activity")
 
 @Composable
-fun JarvisApp(vm: AgentViewModel) {
+fun JarvisApp(vm: AgentViewModel, onRunSetupAgain: () -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val pending by vm.pendingConfirmation.collectAsStateWithLifecycle()
 
@@ -81,7 +81,7 @@ fun JarvisApp(vm: AgentViewModel) {
         Column(Modifier.padding(padding).fillMaxSize()) {
             when (tab) {
                 0 -> ChatScreen(vm)
-                1 -> ProvidersScreen(vm)
+                1 -> ProvidersScreen(vm, onRunSetupAgain = onRunSetupAgain)
                 else -> ActivityScreen(vm)
             }
         }
@@ -226,14 +226,14 @@ private fun MessageBubble(item: ChatItem) {
 // ---- Providers -------------------------------------------------------------------------------
 
 @Composable
-private fun ProvidersScreen(vm: AgentViewModel) {
+internal fun ProvidersScreen(vm: AgentViewModel, showTitle: Boolean = true, onRunSetupAgain: (() -> Unit)? = null) {
     val state by vm.settingsState.collectAsStateWithLifecycle()
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("AI providers", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+        if (showTitle) Text("AI providers", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
         Text(
             "They are tried top to bottom until one answers. Keys are encrypted with the Android Keystore and never " +
                 "written to logs. A key stored on a phone can still be extracted by malware or on a rooted device.",
@@ -265,6 +265,17 @@ private fun ProvidersScreen(vm: AgentViewModel) {
                 )
             }
             Switch(checked = state.confirmMedium, onCheckedChange = vm::setConfirmMedium)
+        }
+
+        if (onRunSetupAgain != null) {
+            HorizontalDivider()
+            Text("Setup", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Walk through the setup again. Your earlier choices are kept and you can change any of them.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(onClick = onRunSetupAgain) { Text("Run setup again") }
         }
     }
 }

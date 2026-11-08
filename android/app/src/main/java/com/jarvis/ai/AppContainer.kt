@@ -18,6 +18,8 @@ import com.jarvis.ai.ai.tools.ToolRegistry
 import com.jarvis.ai.ai.tools.builtin.BuiltinTools
 import com.jarvis.ai.ai.tools.builtin.DevicePorts
 import com.jarvis.ai.android.device.AndroidAlarmLauncher
+import com.jarvis.ai.android.device.AndroidAppSize
+import com.jarvis.ai.android.device.AndroidDeviceAnalyzer
 import com.jarvis.ai.android.device.AndroidDeviceInfoReader
 import com.jarvis.ai.android.device.AndroidPermissionChecker
 import com.jarvis.ai.android.device.AndroidTorchController
@@ -28,7 +30,13 @@ import com.jarvis.ai.core.security.FileAuditLog
 import com.jarvis.ai.core.security.Risk
 import com.jarvis.ai.core.security.SecretRedactor
 import com.jarvis.ai.data.SecureKeyStore
+import com.jarvis.ai.data.SetupFileStorage
 import com.jarvis.ai.data.SettingsStore
+import com.jarvis.ai.device.Reading
+import com.jarvis.ai.models.ModelAdvisor
+import com.jarvis.ai.models.ModelMetadataClient
+import com.jarvis.ai.setup.SetupRepository
+import com.jarvis.ai.setup.StorageCalculator
 import java.io.File
 
 /**
@@ -45,7 +53,24 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
 
     private val redactor = SecretRedactor { ProviderId.entries.mapNotNull { keys.get(keyName(it)) } }
 
-    private val cloudHttp = JsonHttp(OkHttpTransport(HttpClients.cloud(), redactor), redactor)
+    private val transport = OkHttpTransport(HttpClients.cloud(), redactor)
+    private val cloudHttp = JsonHttp(transport, redactor)
+
+    // ---- setup wizard (Phase 3) ----------------------------------------------------------------
+    val deviceAnalyzer = AndroidDeviceAnalyzer(appContext)
+    val setup = SetupRepository(SetupFileStorage(appContext))
+    val modelAdvisor = ModelAdvisor()
+    val storageCalculator = StorageCalculator()
+    val modelMetadata = ModelMetadataClient(transport)
+
+    /** Size of the installed app, read once; it does not change while the app runs. */
+    val baseAppSize: Reading<Long> by lazy { AndroidAppSize.read(appContext) }
+
+    val appVersion: String = try {
+        appContext.packageManager.getPackageInfo(appContext.packageName, 0).versionName ?: "unknown"
+    } catch (e: Exception) {
+        "unknown"
+    }
 
     fun providerSettings(id: ProviderId): ProviderSettings = ProviderSettings(
         apiKey = keys.get(keyName(id)),

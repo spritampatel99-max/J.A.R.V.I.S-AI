@@ -31,6 +31,14 @@ Only implemented behaviour is listed. Screens such as the Security Center belong
 - Keys travel only in request headers, never in URLs.
 - Limits: malware running as this app, or a rooted phone, can still use the Keystore key; anyone holding your unlocked phone can see what you type.
 
+## Setup wizard (Phase 3)
+
+- The saved setup state (`setup_state.json`) holds step progress and choices only: no keys, no personal data. It is written atomically.
+- Device analysis reads hardware and system facts only; no contacts, accounts, location, identifiers or installed-app list. The result stays on the phone.
+- The only network call the wizard makes itself is the exact-model-size lookup, a read-only GET to `huggingface.co` that
+  runs only when the user presses the button, sends no credentials, and goes through the same https-only transport.
+- Nothing in the wizard requests a permission or starts a download.
+
 ## Audit log
 
 `filesDir/audit.jsonl`: one JSON object per line, capped in size, redacted, corrupt lines skipped. Sensitive requests,

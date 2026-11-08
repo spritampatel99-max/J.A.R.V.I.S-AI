@@ -44,8 +44,20 @@ class FakeTransport : HttpTransport {
         replies += { throw error }
     }
 
+    fun replyThrowing(error: Throwable) {
+        replies += { throw error }
+    }
+
     override suspend fun postJson(url: String, headers: Map<String, String>, body: String): HttpResult {
         posts += Post(url, headers, body)
+        val next = replies.removeFirstOrNull() ?: error("FakeTransport has no more scripted replies")
+        return next()
+    }
+
+    val gets = mutableListOf<Pair<String, Map<String, String>>>()
+
+    override suspend fun get(url: String, headers: Map<String, String>): HttpResult {
+        gets += url to headers
         val next = replies.removeFirstOrNull() ?: error("FakeTransport has no more scripted replies")
         return next()
     }

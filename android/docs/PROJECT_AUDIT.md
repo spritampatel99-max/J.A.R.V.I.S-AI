@@ -80,7 +80,8 @@ Hugging Face model pages. Re-check before relying on them, since they change.
   GPU use needs a manifest `uses-native-library` entry. NPU support is not covered by that page.
 - **Model format:** `.litertlm` files, downloaded separately from the APK.
 - **Gemma 3 1B:** repo `litert-community/Gemma3-1B-IT`, file `gemma3-1b-it-int4.litertlm`, listed at about
-  529 MB. **The repo is gated**: the user must accept Google's Gemma licence on Hugging Face while
+  529 MB on the page read for this audit (**the repository's file listing later showed 584,417,280 bytes**, see
+  `setup/ONBOARDING.md`; the app reads the real size at run time). **The repo is gated**: the user must accept Google's Gemma licence on Hugging Face while
   logged in. The app therefore needs a user-supplied Hugging Face token (kept in the Keystore) *or* an
   "import the file I downloaded" path through the file picker. It must not pretend it can fetch the model silently.
 - **Gemma 4 E2B:** repo `litert-community/gemma-4-E2B-it-litert-lm`, file `gemma-4-E2B-it.litertlm`, listed at

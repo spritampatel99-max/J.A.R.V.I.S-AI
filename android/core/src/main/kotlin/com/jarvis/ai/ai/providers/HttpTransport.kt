@@ -20,4 +20,7 @@ interface HttpTransport {
      * @throws ProviderError.MissingConfig when [url] cannot be parsed
      */
     suspend fun postJson(url: String, headers: Map<String, String>, body: String): HttpResult
+
+    /** Same contract as [postJson], for a plain GET (used for read-only metadata lookups). */
+    suspend fun get(url: String, headers: Map<String, String>): HttpResult
 }

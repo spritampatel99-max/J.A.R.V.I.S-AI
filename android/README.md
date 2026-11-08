@@ -13,8 +13,11 @@ desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
 - Five cloud providers with ordered fallback: Gemini, Groq, OpenRouter, OpenAI, Claude. Keys are encrypted with the Android Keystore.
 - Five Android tools: flashlight, alarm (handed to the system Clock app), open a web link, open YouTube, device info.
 - Native confirmation dialog for sensitive actions, with an activity/audit log.
+- A resumable **setup wizard** (Phase 3): privacy information, a read-only analysis of the phone with every value tagged
+  measured / estimate / not available, a model recommendation that explains its reasons, a feature chooser, a storage review
+  and a permissions explainer. It downloads nothing and asks for no permission. See [`docs/setup/ONBOARDING.md`](docs/setup/ONBOARDING.md).
 
-**Not built yet:** on-device Gemma models (LiteRT-LM), the setup wizard, device analysis, the task router,
+**Not built yet:** on-device Gemma models (LiteRT-LM) and their download, the task router,
 voice, memory, planner screens, the Custom Agent Creator, offline mode, file manager, messaging and the rest of the prompt.
 
 ## Requirements
@@ -59,6 +62,6 @@ settings through `~/.gradle/gradle.properties` or environment variables, add a `
 
 ## Documentation
 
-[`docs/PROJECT_AUDIT.md`](docs/PROJECT_AUDIT.md) · [`docs/ROADMAP.md`](docs/ROADMAP.md) ·
+[`docs/PROJECT_AUDIT.md`](docs/PROJECT_AUDIT.md) · [`docs/ROADMAP.md`](docs/ROADMAP.md) · [`docs/setup/ONBOARDING.md`](docs/setup/ONBOARDING.md) ·
 [`docs/ai/CLOUD_PROVIDERS.md`](docs/ai/CLOUD_PROVIDERS.md) · [`docs/security/SECURITY.md`](docs/security/SECURITY.md) ·
 [`docs/testing/BUILD_AND_TEST_REPORT.md`](docs/testing/BUILD_AND_TEST_REPORT.md) · [`CHANGELOG.md`](CHANGELOG.md)
