@@ -3,7 +3,7 @@
 A standalone personal AI assistant for Android 11+ (API 30). It is built to run on the phone itself: no
 desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
 
-**Status: early foundation. There is no APK yet and the project has never been built with Gradle.** See
+**Status: early foundation. There is no APK yet.** `:core:test` passes under Gradle on the owner's PC; the `:app` module has not compiled successfully yet. See
 [`docs/testing/BUILD_AND_TEST_REPORT.md`](docs/testing/BUILD_AND_TEST_REPORT.md) for exactly what was and was not run, and
 [`docs/ROADMAP.md`](docs/ROADMAP.md) for the ten-phase plan.
 
@@ -25,15 +25,15 @@ voice, memory, planner screens, the Custom Agent Creator, offline mode, file man
 - JDK 17 or newer, Android Studio, Android SDK platform 35.
 - A phone or emulator running Android 11 or newer.
 
-## Build (untested)
+## Build
 
 ```
 ./gradlew :core:test          # unit tests for the pure-Kotlin core
 ./gradlew :app:assembleDebug  # debug APK -> app/build/outputs/apk/debug/
 ```
 
-The versions in `gradle/libs.versions.toml` were never resolved against Maven. If Gradle reports one missing, change it
-in that one file.
+The versions in `gradle/libs.versions.toml` resolved on a real Windows PC (JDK 19, Gradle 8.14.3). Set `sdk.dir` in
+`local.properties` (Android Studio does this for you) or the `ANDROID_HOME` variable.
 
 ## Install on a phone (once a debug APK exists)
 

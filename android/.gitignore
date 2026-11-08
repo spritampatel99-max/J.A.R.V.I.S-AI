@@ -13,3 +13,7 @@ captures/
 # Never commit provider keys or exported memory
 api_keys*.json
 *.secret
+
+# The repository root ignores data/ and memory/ for the desktop app. Here they are real Kotlin package names.
+!data/
+!memory/

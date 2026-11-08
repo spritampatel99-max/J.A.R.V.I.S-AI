@@ -2,9 +2,26 @@
 
 Date: 2026-11-08 (Phases 1 to 3). This report says what was actually executed and what was not.
 
-**No APK has been built. Gradle has never run on this project.** The sandbox that wrote the code cannot reach
-Maven Central, Google's Maven repository or the Gradle plugin portal (the proxy answers 403), and it has no
-Android SDK, emulator or phone.
+**No APK has been built yet.** The sandbox that wrote the code cannot reach Maven Central, Google's Maven repository or
+the Gradle plugin portal (the proxy answers 403), and it has no Android SDK, emulator or phone. Everything in "What was run"
+below is from that sandbox's offline harness, except the next section.
+
+## First real Gradle run (on the owner's Windows PC, 2026-11-08, JDK 19, Gradle 8.14.3)
+
+Taken from the console log the owner pasted; I did not run it.
+
+| Command | Result |
+|---|---|
+| `.\gradlew :core:test` | **BUILD SUCCESSFUL** (3 min 9 s). Compiles and passes under Gradle with the pinned library versions and JUnit 5, which the offline harness could not check. Only warnings: tests use an API that needs the coroutines-test opt-in. The log does not show a per-test count. |
+| `.\gradlew :app:assembleDebug` | **FAILED** at `:app:compileDebugKotlin` with 14 errors in `AppContainer.kt` and `AgentViewModel.kt`. Dependencies did resolve (it got as far as compiling), so `libs.versions.toml` versions are good for `:core` and `:app`. |
+
+**Cause of the 14 errors: a packaging mistake of mine, not a code bug.** The repository root `.gitignore` (from the desktop
+project) contains `data/`, which also matched the Android package `com.jarvis.ai.data`. Git silently left out
+`SecureKeyStore.kt`, `SettingsStore.kt` and `SetupFileStorage.kt`, and my zip was built from `git ls-files`, so it left them
+out too. Every reported error is a knock-on effect of those missing classes (`keys.get(...)` and `settings.providerOrder`
+resolving to nothing). Fixed by `!data/` and `!memory/` in `android/.gitignore`, and I checked that every file on disk under
+`android/` (excluding build output) is now tracked. **Not yet confirmed:** that the build passes once the files are present.
+Other errors may be hidden behind these.
 
 ## What was run
 
@@ -56,10 +73,10 @@ every screen are **unverified**.
 
 | Not run | Why |
 |---|---|
-| `./gradlew build`, `test`, `lint`, `assembleDebug`, `assembleRelease` | Gradle cannot download dependencies here. |
+| `lint`, `assembleRelease`, and `:app:assembleDebug` after the fix | Gradle cannot run in this sandbox; the owner's PC ran `:core:test` only (above). |
 | Compilation of the `:app` module (Compose UI, Keystore, device ports, the new wizard and analyzer) | No Android SDK. Reviewed by reading only. |
 | `OkHttpTransport.kt` (now with a `get` method) and `HttpClients.kt` | Need OkHttp; not available offline. Checked by reading, not compiling. |
-| `OkHttpTransportTest` (7 tests: MockWebServer, 2 new for GET) | Same reason. Written, never compiled or run. |
+| `OkHttpTransportTest` (7 tests: MockWebServer, 2 new for GET) | Not run in the sandbox. It is part of `:core:test`, which passed on the owner's PC. |
 | JUnit 5 execution, the pinned library versions | The harness used JUnit 4 and older libraries. |
 | Emulator, instrumented tests, device tests | None available. Nothing in the device analyzer (Build, ActivityManager, StatFs, ConnectivityManager, SpeechRecognizer, TTS lookups), `AtomicFile` persistence, the Keystore, the flashlight, alarm or URL code has ever executed. |
 | Real provider calls, and a real Hugging Face call from the app | No API keys used; no outbound calls from the app code. The metadata parser is tested against hand-written JSON that follows the shape a web fetch reported; it has not been checked against a captured live response. |
@@ -67,7 +84,7 @@ every screen are **unverified**.
 
 ## Likely first-run problems
 
-- `libs.versions.toml` versions were never resolved. Any of them may need bumping at the first Gradle sync.
+- ~~`libs.versions.toml` versions never resolved~~ They resolved on the owner's PC. LiteRT-LM has not been added yet.
 - LiteRT-LM (Phase 4) needs a newer Kotlin than the pinned 2.1.20.
 - `:app` code has not met a compiler, so expect some compile errors there, especially in the Compose screens (about 1,300 new lines across the wizard, view model, analyzer and storage).
 - The Phase 3 memory rule of thumb is uncalibrated and may be too cautious (`ONBOARDING.md`).
