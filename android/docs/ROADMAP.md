@@ -1,8 +1,9 @@
 # Roadmap and status
 
 Ten phases, taken from the master prompt. "Done" means written *and* verified; the verification actually
-performed is described in `testing/BUILD_AND_TEST_REPORT.md`. Nothing here has been built with Gradle or run
-on a device or emulator.
+performed is described in `testing/BUILD_AND_TEST_REPORT.md`. The `:core` module has been built and its tests run
+under Gradle on the project owner's PC (they passed). The `:app` module (Android code and screens) has **not**
+compiled successfully yet, no APK exists, and nothing has been run on a device or emulator.
 
 | # | Phase | Status |
 |---|---|---|
@@ -21,7 +22,7 @@ on a device or emulator.
 
 | Item | State |
 |---|---|
-| Kotlin multi-module Gradle project, version catalog, wrapper (Gradle 8.14.3) | Written. Not resolved or built here. |
+| Kotlin multi-module Gradle project, version catalog, wrapper (Gradle 8.14.3) | Written. `:core` resolved, compiled and tested on the owner's PC; `:app` not compiled successfully yet. |
 | Compose theme and a small shell (Chat, Providers, Activity tabs) | Written. Never rendered. |
 | Navigation Compose | Declared as a dependency but unused; the shell switches tabs by hand. |
 | Dependency injection | Manual `AppContainer`. |
@@ -29,7 +30,7 @@ on a device or emulator.
 | DataStore | Declared, not used; `SharedPreferences` holds non-secret settings. |
 | Android Keystore storage for keys | Written (`SecureKeyStore`). Not run on a device. |
 | HTTPS-only network layer with typed errors, retries and rate-limit cooldown | Written and unit-tested (see report). The OkHttp adapter itself is not. |
-| Unit-test setup | 277 tests run in an offline harness. Not yet through Gradle. |
+| Unit-test setup | 277 tests run in an offline harness; `:core:test` also passed through Gradle on the owner's PC (including the OkHttp/MockWebServer tests). |
 
 ## Already in place that later phases build on
 
