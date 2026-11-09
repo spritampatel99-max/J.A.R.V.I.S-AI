@@ -7,6 +7,9 @@ import com.jarvis.ai.ai.fallback.ProviderFailure
 import com.jarvis.ai.ai.planner.Plan
 import com.jarvis.ai.ai.planner.PlanResult
 import com.jarvis.ai.ai.planner.Planner
+import com.jarvis.ai.ai.planner.answeredBy
+import com.jarvis.ai.ai.planner.localModel
+import com.jarvis.ai.ai.planner.provider
 import com.jarvis.ai.ai.providers.ChatMessage
 import com.jarvis.ai.ai.providers.ChatRole
 import com.jarvis.ai.ai.providers.LlmRequest
@@ -159,6 +162,40 @@ class PlannerTest {
         val failed = assertIs<PlanResult.Failed>(planner(llm).plan("x"))
 
         assertTrue(failed.reason.contains("Gemini"))
+    }
+
+    @Test
+    fun planningRequestsAreMarkedHeavySoTheRouterPrefersTheBiggerLocalModel() = runTest {
+        val llm = FakeLlm(validPlan)
+        planner(llm).plan("flashlight on and alarm at 6")
+
+        assertEquals(com.jarvis.ai.ai.providers.TaskWeight.HEAVY, llm.requests.single().weight)
+    }
+
+    @Test
+    fun aLocalModelsAnswerIsLabelledAsOnDeviceNotAsACloudProvider() = runTest {
+        val local = object : LlmClient {
+            override suspend fun complete(request: LlmRequest) =
+                LlmResponse("""{"reply":"Paris.","clarification":null,"steps":[]}""", null, 1, emptyList(), com.jarvis.ai.models.ModelId.GEMMA3_1B)
+        }
+
+        val result = planner(local).plan("capital of France?")
+
+        assertEquals("On-device Gemma 3 1B", result.answeredBy)
+        assertEquals(null, result.provider)
+        assertEquals(com.jarvis.ai.models.ModelId.GEMMA3_1B, result.localModel)
+    }
+
+    @Test
+    fun anyAiUnavailableErrorBecomesAFailedResult() = runTest {
+        val llm = object : LlmClient {
+            override suspend fun complete(request: LlmRequest): LlmResponse =
+                throw com.jarvis.ai.ai.router.NoRouteException("No AI is available right now.", emptyList())
+        }
+
+        val failed = assertIs<PlanResult.Failed>(planner(llm).plan("x"))
+
+        assertEquals("No AI is available right now.", failed.reason)
     }
 
     @Test

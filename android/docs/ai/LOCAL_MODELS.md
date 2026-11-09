@@ -45,3 +45,36 @@ file and can be resumed. Notification permission (Access tab) is needed to see t
 
 Loading and running a model, the Kotlin bump, GPU or NPU use, memory calibration (the RAM rule of thumb in the advisor is uncalibrated),
 and a test against a real Hugging Face download. The real file sizes and checksums have only been read through a web fetch.
+
+## Routing between on-device and cloud AI (written and tested, not wired into the app yet)
+
+`RoutePlanner` and `RoutedLlmClient` (in `:core`, `ai/router`) decide where a request goes, and `LocalEngine` (`ai/local`) is the boundary the
+on-device engine will implement. No engine exists yet, so nothing in the app uses the router today: the app still asks the cloud providers
+directly, and built-in commands still run first. Wiring comes with the engine.
+
+| Mode | Order | Never |
+|---|---|---|
+| Local only | installed on-device models | the cloud, whatever else fails |
+| Local first (default) | on-device models, then the cloud | |
+| Cloud assisted | the cloud, then on-device models | |
+| Manual | exactly the route the user picked | any other route |
+
+- An on-device model is usable only when the app has an engine **and** the model's file is installed and verified.
+- The cloud is usable only when the phone is online, a provider has a key and a model saved, and the mode allows it.
+- Light requests try Gemma 3 1B first. Heavy ones (the planner's strict JSON plan) try Gemma 4 E2B first, because the smaller model is weaker at
+  structured output. This ordering is my decision, not from the specification, which lists the small model first.
+- A failed route does not end the request while another is allowed. The answer carries notes such as "Gemma 4 E2B: not enough memory", and the
+  UI can show them. If nothing can answer, the message says why and what to do (add a cloud key, install a model).
+- One request uses the engine at a time; a model is loaded only if it is not already in memory; an out-of-memory error unloads the model so the
+  app is not the next thing Android stops; cancelling a request stops the engine, and a request that is only waiting its turn cannot stop
+  another request's work.
+- An on-device answer is labelled "On-device Gemma 3 1B" and never as a cloud provider.
+- Local models have no JSON mode. The planner already parses defensively and retries once, but expect the small model to fail strict
+  plans more often than a cloud model; if it does, the router moves on to the next route.
+
+## Engine step (not started)
+
+LiteRT-LM (`com.google.ai.edge.litertlm:litertlm-android`): Google's guide shows `EngineConfig(modelPath, backend, cacheDir)`, `Engine(config).initialize()`
+(up to about 10 seconds, so off the main thread), `engine.createConversation(...)`, and `sendMessage` or a Flow-returning `sendMessageAsync`. What is **not** confirmed:
+a pinned version (the guide says `latest.release`), the Kotlin version it needs (my earlier audit noted Kotlin 2.4 metadata, which the pinned 2.1.20 cannot read),
+and how to cancel a running generation. A lookup of the published versions was declined, so these stay open until the version and requirement are known.

@@ -1,6 +1,7 @@
 package com.jarvis.ai.ai.planner
 
 import com.jarvis.ai.ai.providers.ProviderId
+import com.jarvis.ai.models.ModelId
 import kotlinx.serialization.json.JsonObject
 
 data class PlanStep(
@@ -22,13 +23,13 @@ data class Plan(val goal: String, val steps: List<PlanStep>)
 
 sealed interface PlanResult {
     /** Tools are needed: run [plan]. */
-    data class Ready(val plan: Plan, val provider: ProviderId) : PlanResult
+    data class Ready(val plan: Plan, val provider: ProviderId?, val localModel: ModelId? = null) : PlanResult
 
     /** No tool is needed; this is the answer to say. */
-    data class Reply(val text: String, val provider: ProviderId) : PlanResult
+    data class Reply(val text: String, val provider: ProviderId?, val localModel: ModelId? = null) : PlanResult
 
     /** The request is ambiguous in a way that matters; ask the user this. */
-    data class NeedsClarification(val question: String, val provider: ProviderId) : PlanResult
+    data class NeedsClarification(val question: String, val provider: ProviderId?, val localModel: ModelId? = null) : PlanResult
 
     /** Planning was impossible (every provider failed, or the model never produced a valid plan). */
     data class Failed(val reason: String) : PlanResult

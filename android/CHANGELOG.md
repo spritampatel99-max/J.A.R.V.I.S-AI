@@ -21,3 +21,5 @@
 - New look: aurora backdrop, animated orb, staggered motion, sliding tab bar, animated chat bubbles, bundled Orbitron, Manrope and JetBrains Mono (SIL OFL 1.1, licences in `docs/legal`).
 - Removed the Providers tab name: it is now **Cloud**. Tabs are Chat, Models, Cloud, Access, Log.
 - 335 offline unit tests pass (58 new). The new `:app` code has not been compiled.
+- New (core only): `LocalEngine` interface, `RoutePlanner` (Local only, Local first, Cloud assisted, Manual) and `RoutedLlmClient` with fallback between on-device and cloud, cancellation, out-of-memory handling and honest route notes. Requests now carry a weight (the planner's are heavy); responses can come from an on-device model. Not wired into the app: there is no engine yet.
+- 369 offline tests pass (34 new), 18 more mutation checks caught.

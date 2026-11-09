@@ -30,6 +30,15 @@ part-way once and left one source file mutated; I restored it from the snapshot,
 One installer test was flaky once (`lateinit property job has not been initialized`, a race inside the test); it now starts the job lazily and was
 stable over 5 runs.
 
+**Round 3 (2026-11-09), `:core` only:** 369 tests pass (34 new: 12 route-planner rules, 19 routed-client behaviours, 3 planner changes). 18 more mutation
+checks, all caught on the first run: Local only allowing the cloud, offline still using the cloud, an unconfigured cloud used, a missing engine ignored,
+a not-installed model used, the heavy order not swapped, Cloud assisted putting the cloud last, Manual falling back to other routes, a model reloaded
+on every call, the engine lock removed, out-of-memory not unloading, an empty answer accepted, cancellation not stopping the engine, an unexpected
+engine crash not contained, route notes dropped, a response allowed to have two sources, the planner not marking its requests heavy, and the planner
+catching only the old exception. The rule that a request that is only waiting its turn must not stop another request's engine work is covered by a
+test but was not mutation-checked. The router is tested against a fake engine only; no real engine exists. The `:app` module was not touched in this round,
+apart from types it already compiled against becoming nullable (`LlmResponse.provider`, `PlanResult.provider`).
+
 **Syntax probe of `:app`:** the Kotlin compiler was run over every `:app` file against the real `:core` classes. It found **no syntax errors**; its other
 errors are all unresolved Android and Compose references or follow from them. That is a syntax check only.
 

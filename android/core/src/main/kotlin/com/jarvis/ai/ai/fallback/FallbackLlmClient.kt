@@ -5,6 +5,8 @@ import com.jarvis.ai.ai.providers.LlmRequest
 import com.jarvis.ai.ai.providers.ProviderError
 import com.jarvis.ai.ai.providers.ProviderId
 import com.jarvis.ai.core.common.SystemTimeSource
+import com.jarvis.ai.models.ModelCatalog
+import com.jarvis.ai.models.ModelId
 import com.jarvis.ai.core.common.TimeSource
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
@@ -22,15 +24,30 @@ data class ProviderFailure(val provider: ProviderId, val error: ProviderError, v
 
 data class LlmResponse(
     val text: String,
-    /** Which provider actually answered; the UI shows this. */
-    val provider: ProviderId,
+    /** The cloud provider that answered, or null when an on-device model did. */
+    val provider: ProviderId?,
     val attempts: Int,
     /** Providers that were tried first and failed or were skipped. */
     val failures: List<ProviderFailure>,
-)
+    /** The on-device model that answered, or null when a cloud provider did. */
+    val localModel: ModelId? = null,
+    /** Plain-language notes about routes that were skipped or failed first, for example a local model that ran out of memory. */
+    val routeNotes: List<String> = emptyList(),
+) {
+    init {
+        require((provider == null) != (localModel == null)) { "A response comes from exactly one source" }
+    }
+
+    /** What the UI shows as the source of the answer. */
+    val answeredBy: String
+        get() = provider?.displayName ?: localModel?.let { "On-device ${ModelCatalog.spec(it).displayName}" }.orEmpty()
+}
+
+/** Nothing could answer. Callers show [message] to the user as it is. */
+open class AiUnavailableException(message: String) : Exception(message)
 
 class AllProvidersFailedException(val failures: List<ProviderFailure>) :
-    Exception(
+    AiUnavailableException(
         if (failures.all { it.error is ProviderError.MissingConfig }) {
             "No AI provider is configured. Add an API key in the Cloud tab."
         } else {

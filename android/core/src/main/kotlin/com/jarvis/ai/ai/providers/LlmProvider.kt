@@ -70,6 +70,15 @@ enum class ChatRole(val openAiName: String) {
 
 data class ChatMessage(val role: ChatRole, val content: String)
 
+/** How demanding a request is. The router uses it to decide which on-device model to try first. */
+enum class TaskWeight {
+    /** Short answers and chat. */
+    LIGHT,
+
+    /** Strict structured output, such as the planner's JSON plan. */
+    HEAVY,
+}
+
 data class LlmRequest(
     /** System instruction; passed in the provider's native "system" slot. */
     val system: String,
@@ -77,6 +86,7 @@ data class LlmRequest(
     val maxTokens: Int = 2048,
     val temperature: Double = 0.7,
     val jsonMode: Boolean = false,
+    val weight: TaskWeight = TaskWeight.LIGHT,
 )
 
 /** Per-provider configuration. [toString] never prints the key. */

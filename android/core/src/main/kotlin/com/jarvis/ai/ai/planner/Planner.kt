@@ -1,16 +1,19 @@
 package com.jarvis.ai.ai.planner
 
-import com.jarvis.ai.ai.fallback.AllProvidersFailedException
+import com.jarvis.ai.ai.fallback.AiUnavailableException
 import com.jarvis.ai.ai.fallback.LlmClient
 import com.jarvis.ai.ai.providers.ChatMessage
 import com.jarvis.ai.ai.providers.ChatRole
 import com.jarvis.ai.ai.providers.LlmRequest
 import com.jarvis.ai.ai.providers.ProviderId
+import com.jarvis.ai.ai.providers.TaskWeight
 import com.jarvis.ai.ai.tools.ArgValidator
 import com.jarvis.ai.ai.tools.ToolRegistry
 import com.jarvis.ai.ai.tools.ValidationResult
 import com.jarvis.ai.core.security.SecretRedactor
 import com.jarvis.ai.core.security.UntrustedContent
+import com.jarvis.ai.models.ModelCatalog
+import com.jarvis.ai.models.ModelId
 import java.time.Clock
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -76,16 +79,17 @@ class Planner(
                         maxTokens = 1_536,
                         temperature = 0.2,
                         jsonMode = true,
+                        weight = TaskWeight.HEAVY,
                     ),
                 )
-            } catch (e: AllProvidersFailedException) {
+            } catch (e: AiUnavailableException) {
                 return PlanResult.Failed(e.message ?: "No AI provider could be reached")
             }
 
             when (val outcome = interpret(goal, response.text)) {
-                is Interpretation.Steps -> return PlanResult.Ready(Plan(goal, outcome.steps), response.provider)
-                is Interpretation.Clarify -> return PlanResult.NeedsClarification(outcome.question, response.provider)
-                is Interpretation.Reply -> return PlanResult.Reply(outcome.text, response.provider)
+                is Interpretation.Steps -> return PlanResult.Ready(Plan(goal, outcome.steps), response.provider, response.localModel)
+                is Interpretation.Clarify -> return PlanResult.NeedsClarification(outcome.question, response.provider, response.localModel)
+                is Interpretation.Reply -> return PlanResult.Reply(outcome.text, response.provider, response.localModel)
                 is Interpretation.Invalid -> {
                     lastProblems = outcome.problems
                     messages += ChatMessage(ChatRole.ASSISTANT, response.text.take(2_000))
@@ -230,7 +234,7 @@ class Planner(
     }
 }
 
-/** Convenience for the UI: which provider planned this. */
+/** Convenience for the UI: which cloud provider planned this (null for an on-device model or a failure). */
 val PlanResult.provider: ProviderId?
     get() = when (this) {
         is PlanResult.Ready -> provider
@@ -238,3 +242,16 @@ val PlanResult.provider: ProviderId?
         is PlanResult.NeedsClarification -> provider
         is PlanResult.Failed -> null
     }
+
+/** The on-device model that planned this, if one did. */
+val PlanResult.localModel: ModelId?
+    get() = when (this) {
+        is PlanResult.Ready -> localModel
+        is PlanResult.Reply -> localModel
+        is PlanResult.NeedsClarification -> localModel
+        is PlanResult.Failed -> null
+    }
+
+/** Who answered, in words for the chat label; null for a failure. */
+val PlanResult.answeredBy: String?
+    get() = provider?.displayName ?: localModel?.let { "On-device ${ModelCatalog.spec(it).displayName}" }

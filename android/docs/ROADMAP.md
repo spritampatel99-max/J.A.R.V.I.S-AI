@@ -11,7 +11,7 @@ compiled successfully yet in its latest form. An earlier version of the debug ap
 | 2 | Android foundation | **Partly done** (see below) |
 | 3 | Onboarding, device analysis, feature selection | **Written; logic tested offline, screens never compiled or shown.** See `setup/ONBOARDING.md` |
 | 4 | Local AI (LiteRT-LM, Gemma 3 1B / Gemma 4 E2B, model manager) | **Partly done:** model manager (download, resume, verify, import, remove) written and unit-tested offline. **Not done:** the inference engine, so an installed model cannot answer chat. See `ai/LOCAL_MODELS.md` |
-| 5 | Cloud AI + intelligent router | Partly done: five provider adapters, the fallback client, model listing and a connection test exist; built-in commands run before the AI. The task classifier and modes do not |
+| 5 | Cloud AI + intelligent router | Partly done: five provider adapters, the fallback client, model listing and a connection test exist; built-in commands run before the AI. The route planner and the on-device/cloud router (four modes) are written and unit-tested but **not wired into the app**; the task classifier and the mode settings screen do not exist |
 | 6 | Android integration (voice, apps, calls, messages, notifications, files, data monitor) | Started: 5 tools, and the Access screen that requests real permissions (most are "not used yet") |
 | 7 | Memory, planner, automation, Custom Agent Creator | Not started |
 | 8 | Offline mode and the Offline Preparation Center | Not started |
