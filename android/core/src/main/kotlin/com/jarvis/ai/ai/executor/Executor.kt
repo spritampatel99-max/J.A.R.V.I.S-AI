@@ -5,6 +5,7 @@ import com.jarvis.ai.ai.planner.PlanResult
 import com.jarvis.ai.ai.planner.PlanStep
 import com.jarvis.ai.ai.planner.Replanner
 import com.jarvis.ai.ai.tools.ArgValidator
+import com.jarvis.ai.ai.tools.Prepared
 import com.jarvis.ai.ai.tools.Tool
 import com.jarvis.ai.ai.tools.ToolArgs
 import com.jarvis.ai.ai.tools.ToolError
@@ -107,10 +108,13 @@ object NoListener : ExecutionListener
  *  1. The tool must exist in the registry (anything else is BLOCKED).
  *  2. Parameters are validated against the tool's schema.
  *  3. Required Android permissions are checked.
- *  4. If the tool's risk is at or above the confirmation threshold, the user must approve
- *     in native UI. The approval is bound to a fingerprint of (tool, arguments).
- *  5. The tool runs with a timeout; retryable failures are retried (never for HIGH risk).
- *  6. The real result is recorded and audited.
+ *  4. The tool resolves the request into the exact action ([Tool.prepare], for example which
+ *     contact and which number). It may stop here with a question or a reason, and nothing is
+ *     confirmed or run.
+ *  5. If the tool's risk is at or above the confirmation threshold, the user must approve
+ *     in native UI. The approval is bound to a fingerprint of (tool, resolved arguments).
+ *  6. The tool runs with a timeout; retryable failures are retried (never for HIGH risk).
+ *  7. The real result is recorded and audited.
  *
  * Steps are independent: one failing does not stop the others, so the final report can
  * list successes and failures separately. Only a failed step the planner marked
@@ -179,7 +183,7 @@ class Executor(
         val spec = tool.spec
 
         return try {
-            val args = when (val check = ArgValidator.validate(spec, step.parameters)) {
+            val validated = when (val check = ArgValidator.validate(spec, step.parameters)) {
                 is ValidationResult.Invalid ->
                     return failed(step, ToolError.InvalidArguments(check.errors.joinToString("; ")), 0)
                 is ValidationResult.Valid -> check.args
@@ -191,8 +195,17 @@ class Executor(
                     missing,
                     "Permission needed: ${missing.joinToString(", ") { it.substringAfterLast('.') }}. Grant it and ask again.",
                 )
-                if (spec.risk >= Risk.MEDIUM) audit(AuditKind.BLOCKED, spec.name, spec.risk, tool.describe(args), error.message)
+                if (spec.risk >= Risk.MEDIUM) audit(AuditKind.BLOCKED, spec.name, spec.risk, tool.describe(validated), error.message)
                 return failed(step, error, 0)
+            }
+
+            // Resolve the request into the exact action first, so the confirmation shows what will really happen.
+            val args = when (val prepared = runPrepare(tool, validated)) {
+                is Prepared.Stop -> {
+                    if (spec.risk >= Risk.MEDIUM) audit(AuditKind.BLOCKED, spec.name, spec.risk, tool.describe(validated), prepared.error.message)
+                    return failed(step, prepared.error, 0)
+                }
+                is Prepared.Ready -> prepared.args
             }
 
             val threshold = if (untrustedSeen) minOf(policy().confirmAt, Risk.MEDIUM) else policy().confirmAt
@@ -249,6 +262,20 @@ class Executor(
                 audit(AuditKind.CONFIRMATION_EXPIRED, spec.name, spec.risk, summary, null)
                 StepRun(StepOutcome(step, StepStatus.EXPIRED, "No answer to the confirmation, so it was not run."))
             }
+        }
+    }
+
+    private suspend fun runPrepare(tool: Tool, args: ToolArgs): Prepared {
+        val timeoutMs = tool.spec.timeoutMs
+        return try {
+            withTimeoutOrNull(timeoutMs) { tool.prepare(args) }
+                ?: Prepared.Stop(ToolError.Timeout(timeoutMs))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Prepared.Stop(
+                ToolError.Failed("Unexpected ${e.javaClass.simpleName}: ${SecretRedactor.redactPatterns(e.message.orEmpty()).take(200)}"),
+            )
         }
     }
 

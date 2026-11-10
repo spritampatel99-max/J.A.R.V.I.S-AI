@@ -68,4 +68,7 @@ class DevicePorts(
     val alarms: AlarmLauncher,
     val urls: UrlOpener,
     val deviceInfo: DeviceInfoReader,
+    /** Both are needed for the call tools; without them those tools are simply not offered. */
+    val contacts: ContactsPort? = null,
+    val calls: CallPort? = null,
 )

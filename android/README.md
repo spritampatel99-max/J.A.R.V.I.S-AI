@@ -3,7 +3,7 @@
 A standalone personal AI assistant for Android 11+ (API 30). It is built to run on the phone itself: no
 desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
 
-**Status: early foundation, no release build.** `:core:test` passes under Gradle on the owner's PC, and an earlier version of the debug app was built, installed and shown running on the owner's phone (screenshots, 2026-11-08). The latest round of changes (model install, access screen, new look, built-in commands) has **not been compiled yet**. See
+**Status: early foundation, no release build.** `:core:test` passes under Gradle on the owner's PC, and an earlier version of the debug app was built, installed and shown running on the owner's phone (screenshots, 2026-11-08). The latest rounds of changes (model install, access screen, built-in commands, the Stitch-based screens, voice and calls) have **not been compiled yet**. See
 [`docs/testing/BUILD_AND_TEST_REPORT.md`](docs/testing/BUILD_AND_TEST_REPORT.md) for exactly what was and was not run, and
 [`docs/ROADMAP.md`](docs/ROADMAP.md) for the ten-phase plan.
 
@@ -14,15 +14,16 @@ desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
 - Five cloud providers with ordered fallback: Gemini, Groq, OpenRouter, OpenAI, Claude. Keys are encrypted with the Android Keystore. The Cloud tab can **load the models your own key can use** and **test** a model, because pre-filled model names go stale.
 - **Models tab:** download (with resume and a progress notification), import a file, verify and remove the on-device models Gemma 3 1B and Gemma 4 E2B. An installed model cannot answer chat yet; that needs the on-device engine, the next step. See [`docs/ai/LOCAL_MODELS.md`](docs/ai/LOCAL_MODELS.md).
 - **Access tab:** real permission requests with the state Android reports and an "Allow all" walk-through. See [`docs/setup/ACCESS.md`](docs/setup/ACCESS.md).
-- A new look: animated backdrop, orb, motion on every screen, and three bundled open-licence fonts (Orbitron, Manrope, JetBrains Mono; licences in `docs/legal`). Paid typefaces cannot be bundled without a licence.
-- Five Android tools: flashlight, alarm (handed to the system Clock app), open a web link, open YouTube, device info.
+- **The Stitch design** (Prismatic Spectral Core): five tabs (Home, Chat, Tools, Logs, Prefs), a living orb tied to the real voice state, glass cards, a floating tab bar, and two bundled open-licence fonts (Inter, Space Grotesk; licences in `docs/legal`). Only dark is built. What was taken from the design and what was left out is in [`docs/ui/DESIGN_NOTES.md`](docs/ui/DESIGN_NOTES.md).
+- **Voice and calls:** push-to-talk with Android's speech recogniser, spoken replies for spoken requests, calling a contact or number, answering and ending a call. Every call needs a tap on a confirmation that shows the exact name and number. See [`docs/VOICE_AND_CALLS.md`](docs/VOICE_AND_CALLS.md).
+- **Logs:** conversations saved on the phone only (keys removed), searchable, deletable, plus the action record.
+- Nine Android tools: flashlight, alarm (handed to the system Clock app), open a web link, open YouTube, device info, call a contact, call a number, answer a call, end a call.
 - Native confirmation dialog for sensitive actions, with an activity/audit log.
 - A resumable **setup wizard** (Phase 3): privacy information, a read-only analysis of the phone with every value tagged
   measured / estimate / not available, a model recommendation that explains its reasons, a feature chooser, a storage review
   and a permissions step. It downloads nothing and asks for nothing until you tap. See [`docs/setup/ONBOARDING.md`](docs/setup/ONBOARDING.md).
 
-**Not built yet:** on-device Gemma models (LiteRT-LM) and their download, the task router,
-voice, memory, planner screens, the Custom Agent Creator, offline mode, file manager, messaging and the rest of the prompt.
+**Not built yet:** the on-device engine (LiteRT-LM) that would let an installed model answer, a light theme, a wake word, and the rest of the master prompt. See the roadmap for the state of each phase.
 
 ## Requirements
 

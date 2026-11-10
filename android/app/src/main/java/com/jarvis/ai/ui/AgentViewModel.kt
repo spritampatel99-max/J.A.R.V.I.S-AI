@@ -18,6 +18,11 @@ import com.jarvis.ai.ai.providers.RemoteModel
 import com.jarvis.ai.core.security.AuditEvent
 import com.jarvis.ai.core.security.ConfirmationRequest
 import com.jarvis.ai.core.security.SecretRedactor
+import com.jarvis.ai.data.UiPrefs
+import com.jarvis.ai.history.Conversation
+import com.jarvis.ai.voice.VoiceChoice
+import com.jarvis.ai.voice.VoiceErrors
+import com.jarvis.ai.voice.VoiceUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +41,9 @@ data class ChatItem(
     val provider: ProviderId? = null,
     /** Set when the app ran the request itself, with no AI provider (for example "Built-in command"). */
     val source: String? = null,
+    /** True for a request the person spoke, and for the reply to it. */
+    val viaVoice: Boolean = false,
+    val atMs: Long = System.currentTimeMillis(),
 )
 
 data class ChatState(
@@ -97,8 +105,26 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
     /** The provider that answered most recently. */
     val activeProvider: StateFlow<ProviderId?> = container.llm.activeProvider
 
+    /** Speech in and out. Always read and written on the main thread, as the viewModelScope runs there. */
+    val voice: StateFlow<VoiceUi> = container.voice.state
+
+    /** Everything stored in the Logs tab, newest first. */
+    val history: StateFlow<List<Conversation>> = container.history.conversations
+
+    /** What is in the chat input box. It lives here so that other tabs (Tools, Home) can fill it in. */
+    private val draftFlow = MutableStateFlow("")
+    val draft: StateFlow<String> = draftFlow.asStateFlow()
+
+    fun setDraft(text: String) {
+        draftFlow.value = text
+    }
+
     private var nextId = 1L
     private var runJob: Job? = null
+    private var conversationId: String? = null
+
+    /** True while a spoken request is being answered, so its reply is read aloud. Typed requests never are. */
+    private var requestViaVoice = false
 
     init {
         refreshAudit()
@@ -106,15 +132,16 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
 
     // ---- conversation ------------------------------------------------------------------
 
-    fun send(rawText: String) {
+    fun send(rawText: String, viaVoice: Boolean = false) {
         val text = rawText.trim()
         if (text.isEmpty() || chat.value.running) return
+        requestViaVoice = viaVoice
 
         val history = chat.value.items
             .filter { it.sender != Sender.SYSTEM }
             .map { ChatMessage(if (it.sender == Sender.USER) ChatRole.USER else ChatRole.ASSISTANT, it.text) }
 
-        append(Sender.USER, text)
+        append(Sender.USER, text, viaVoice = viaVoice)
         chat.update { it.copy(running = true, currentStep = "Thinking…") }
 
         runJob = viewModelScope.launch {
@@ -134,6 +161,71 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
 
     fun cancel() {
         runJob?.cancel()
+        container.voice.stopSpeaking()
+    }
+
+    /** Starts a fresh conversation. The old one stays in the Logs tab. */
+    fun newChat() {
+        if (chat.value.running) return
+        container.voice.stopSpeaking()
+        conversationId = null
+        chat.value = ChatState()
+    }
+
+    // ---- voice (push to talk; the person taps the mic, nothing listens on its own) ---------------------------
+
+    /** The caller has checked that the microphone permission is granted. */
+    fun listen() {
+        if (chat.value.running) return
+        container.voice.startListening { heard -> send(heard, viaVoice = true) }
+    }
+
+    fun stopListening() {
+        container.voice.stopListening()
+    }
+
+    fun stopSpeaking() {
+        container.voice.stopSpeaking()
+    }
+
+    fun dismissVoiceMessage() {
+        container.voice.clearMessage()
+    }
+
+    /** The microphone permission is off, so tell the person where to turn it on. */
+    fun microphoneOff() {
+        container.voice.showMessage(VoiceErrors.message(VoiceErrors.ERROR_INSUFFICIENT_PERMISSIONS))
+    }
+
+    // ---- look and voice preferences -----------------------------------------------------------------------
+
+    val uiPrefs: StateFlow<UiPrefs> = container.settings.ui
+
+    fun updateUi(change: (UiPrefs) -> UiPrefs) {
+        container.settings.updateUi(change)
+    }
+
+    fun voiceChoices(): List<VoiceChoice> = container.voice.voices()
+
+    fun previewVoice() {
+        container.voice.speak("This is how I will sound.")
+    }
+
+    // ---- history ------------------------------------------------------------------------------------
+
+    fun findHistory(query: String, filter: com.jarvis.ai.history.HistoryFilter): List<Conversation> =
+        container.history.find(query, filter)
+
+    fun historyBytes(): Long = container.history.sizeBytes()
+
+    fun deleteConversation(id: String) {
+        container.history.delete(id)
+        if (conversationId == id) conversationId = null
+    }
+
+    fun clearHistory() {
+        container.history.clear()
+        conversationId = null
     }
 
     private suspend fun handle(text: String, history: List<ChatMessage>) {
@@ -170,6 +262,7 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
             }
         }
         val report = container.executor.execute(plan, listener)
+        if (report.succeededCount > 0) conversationId?.let { container.history.recordToolRun(it) }
         // The report is built from recorded outcomes only; no model summarises it.
         append(Sender.ASSISTANT, report.summary(), provider, source)
     }
@@ -309,9 +402,24 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
         notice = message,
     )
 
-    private fun append(sender: Sender, text: String, provider: ProviderId? = null, source: String? = null) {
-        val item = ChatItem(nextId++, sender, text, provider, source)
+    private fun append(sender: Sender, text: String, provider: ProviderId? = null, source: String? = null, viaVoice: Boolean = false) {
+        val spoken = viaVoice || (requestViaVoice && sender != Sender.USER)
+        val item = ChatItem(nextId++, sender, text, provider, source, viaVoice = spoken)
         chat.update { it.copy(items = it.items + item) }
+        conversationId = container.history.append(
+            conversationId,
+            when (sender) {
+                Sender.USER -> "user"
+                Sender.ASSISTANT -> "assistant"
+                Sender.SYSTEM -> "system"
+            },
+            text,
+            viaVoice = spoken,
+            answeredBy = if (sender == Sender.ASSISTANT) source ?: provider?.displayName else null,
+        )
+        if (sender != Sender.USER && requestViaVoice && container.settings.ui.value.speakReplies) {
+            container.voice.speak(text)
+        }
     }
 
     private companion object {

@@ -62,21 +62,30 @@ enum class AccessKey(
         "Settings > Apps > Special access > Battery optimisation.",
     ),
     MICROPHONE(
-        "Microphone", AccessKind.RUNTIME, Manifest.permission.RECORD_AUDIO, false,
-        "For voice commands. Voice input is not built yet, so nothing uses this today.",
-        "Sound from the microphone while a voice command is being recorded.",
+        "Microphone", AccessKind.RUNTIME, Manifest.permission.RECORD_AUDIO, true,
+        "For voice commands. It listens only while you hold a listening session open with the mic button; there is no always-listening mode.",
+        "Sound is passed to Android's speech recogniser for that one request. The app does not record or store audio. " +
+            "Depending on your phone, the recogniser may send the sound to its provider (usually Google) to turn it into text; " +
+            "on Android 13 and later the app asks for the on-device recogniser when your phone has one.",
         "Settings > Apps > J.A.R.V.I.S. > Permissions > Microphone.",
     ),
     CONTACTS(
-        "Contacts", AccessKind.RUNTIME, Manifest.permission.READ_CONTACTS, false,
-        "To find a person by name when you ask to call them. Calling is not built yet.",
-        "Names and phone numbers in your contacts, only when a command needs one.",
+        "Contacts", AccessKind.RUNTIME, Manifest.permission.READ_CONTACTS, true,
+        "To find a person by name when you ask to call them.",
+        "Names and phone numbers matching the name you asked for, only when a command needs one. Contacts are never uploaded by the app, " +
+            "and the confirmation shows the exact name and number before anything is dialled.",
         "Settings > Apps > J.A.R.V.I.S. > Permissions > Contacts.",
     ),
     PHONE_CALLS(
-        "Phone calls", AccessKind.RUNTIME, Manifest.permission.CALL_PHONE, false,
-        "To place a call you asked for. Calling is not built yet, and every call will still ask you first.",
-        "It lets the app start a call. It does not read your call history.",
+        "Phone calls", AccessKind.RUNTIME, Manifest.permission.CALL_PHONE, true,
+        "To place a call you asked for, after you tap Confirm. Without it, the phone's dialer opens with the number filled in and you press call yourself.",
+        "It lets the app start a call. It does not read your call history. Emergency numbers are never dialled by the app.",
+        "Settings > Apps > J.A.R.V.I.S. > Permissions > Phone.",
+    ),
+    ANSWER_CALLS(
+        "Answer and end calls", AccessKind.RUNTIME, Manifest.permission.ANSWER_PHONE_CALLS, true,
+        "So you can say or type \"answer the call\" or \"hang up\". The app cannot see who is calling and does not watch for calls.",
+        "It lets the app ask Android to pick up a ringing call or end the current one, only when you ask.",
         "Settings > Apps > J.A.R.V.I.S. > Permissions > Phone.",
     ),
     EXACT_ALARMS(
@@ -107,7 +116,7 @@ object AccessChecks {
         AccessKey.NOTIFICATIONS ->
             if (NotificationManagerCompat.from(context).areNotificationsEnabled()) AccessState.ALLOWED else AccessState.NOT_ALLOWED
 
-        AccessKey.MICROPHONE, AccessKey.CONTACTS, AccessKey.PHONE_CALLS ->
+        AccessKey.MICROPHONE, AccessKey.CONTACTS, AccessKey.PHONE_CALLS, AccessKey.ANSWER_CALLS ->
             if (granted(context, key.manifestPermission.orEmpty())) AccessState.ALLOWED else AccessState.NOT_ALLOWED
 
         AccessKey.BATTERY -> {

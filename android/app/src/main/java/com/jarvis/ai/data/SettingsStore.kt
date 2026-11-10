@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.jarvis.ai.ai.providers.ProviderDefaults
 import com.jarvis.ai.ai.providers.ProviderId
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /** Non-secret settings. Keys never go here; see [SecureKeyStore]. */
 class SettingsStore(context: Context) {
@@ -38,6 +41,33 @@ class SettingsStore(context: Context) {
         editor.apply()
     }
 
+    private val uiFlow = MutableStateFlow(readUi())
+
+    /** Look and voice preferences. */
+    val ui: StateFlow<UiPrefs> = uiFlow.asStateFlow()
+
+    fun updateUi(change: (UiPrefs) -> UiPrefs) {
+        val next = change(uiFlow.value).sanitised()
+        prefs.edit()
+            .putBoolean(KEY_AMBIENT, next.ambient)
+            .putBoolean(KEY_REDUCE_MOTION, next.reduceMotion)
+            .putFloat(KEY_FLARE, next.flare)
+            .putBoolean(KEY_SPEAK, next.speakReplies)
+            .putFloat(KEY_RATE, next.speechRate)
+            .apply { if (next.voiceName == null) remove(KEY_VOICE) else putString(KEY_VOICE, next.voiceName) }
+            .apply()
+        uiFlow.value = next
+    }
+
+    private fun readUi() = UiPrefs(
+        ambient = prefs.getBoolean(KEY_AMBIENT, true),
+        reduceMotion = prefs.getBoolean(KEY_REDUCE_MOTION, false),
+        flare = prefs.getFloat(KEY_FLARE, 0.85f),
+        speakReplies = prefs.getBoolean(KEY_SPEAK, true),
+        speechRate = prefs.getFloat(KEY_RATE, 1.0f),
+        voiceName = prefs.getString(KEY_VOICE, null),
+    ).sanitised()
+
     /** When on, MEDIUM-risk actions (for example setting an alarm) also ask first. HIGH always asks. */
     var confirmMediumActions: Boolean
         get() = prefs.getBoolean(KEY_CONFIRM_MEDIUM, false)
@@ -66,6 +96,12 @@ class SettingsStore(context: Context) {
         const val PREFS_NAME = "jarvis_settings"
         const val KEY_ORDER = "provider_order"
         const val KEY_CONFIRM_MEDIUM = "confirm_medium_actions"
+        const val KEY_AMBIENT = "ui_ambient"
+        const val KEY_REDUCE_MOTION = "ui_reduce_motion"
+        const val KEY_FLARE = "ui_flare"
+        const val KEY_SPEAK = "voice_speak_replies"
+        const val KEY_RATE = "voice_rate"
+        const val KEY_VOICE = "voice_name"
         const val KEY_RETIRED_DROPPED = "retired_model_defaults_dropped_v1"
     }
 }

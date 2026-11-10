@@ -35,10 +35,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.SolidColor
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -73,52 +83,63 @@ import androidx.compose.ui.unit.dp
 
 // ---- Background -------------------------------------------------------------------------------------------------
 
+/** Visual preferences every screen reads: whether the ambient layer and motion are on, and how bright the orb glows. */
+data class Look(val ambient: Boolean = true, val animate: Boolean = true, val flare: Float = 0.85f)
+
+val LocalLook = staticCompositionLocalOf { Look() }
+
 /**
- * The app's backdrop: two slow-drifting pools of colour over a very faint dot grid. The grid is a separate layer that
- * never changes, so only the two colour pools are redrawn as they move.
+ * The app's backdrop from the Stitch screens: a near-black blue gradient with three slow-drifting pools of cyan, violet
+ * and magenta light, and (when ambient effects are on) a very faint dot grid. With motion off it stays still.
  */
 @Composable
 fun AuroraBackdrop(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val transition = rememberInfiniteTransition(label = "aurora")
-    val drift by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(24_000, easing = LinearEasing), RepeatMode.Reverse),
-        label = "drift",
-    )
-    val cyan = colors.primary
-    val violet = colors.secondary
-
-    Box(modifier.fillMaxSize().background(colors.background)) {
+    val look = LocalLook.current
+    var t by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(look.animate) {
+        if (look.animate) {
+            var last = withFrameNanos { it }
+            while (true) {
+                val now = withFrameNanos { it }
+                t += (now - last) / 1_000_000_000f
+                last = now
+            }
+        }
+    }
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(listOf(JarvisColors.Void, Color(0xFF090E1C), JarvisColors.VoiceDeep))),
+    ) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
-            val radius = maxOf(w, h) * 0.8f
-            val first = Offset(w * (0.05f + 0.6f * drift), h * (0.05f + 0.15f * drift))
-            drawCircle(
-                brush = Brush.radialGradient(listOf(cyan.copy(alpha = 0.17f), Color.Transparent), center = first, radius = radius),
-                radius = radius,
-                center = first,
-            )
-            val second = Offset(w * (0.95f - 0.6f * drift), h * (0.95f - 0.2f * drift))
-            drawCircle(
-                brush = Brush.radialGradient(listOf(violet.copy(alpha = 0.15f), Color.Transparent), center = second, radius = radius),
-                radius = radius,
-                center = second,
-            )
+            val phase = t / 14f
+            fun plume(cx: Float, cy: Float, r: Float, color: Color, alpha: Float) {
+                val c = Offset(cx, cy)
+                drawCircle(
+                    brush = Brush.radialGradient(listOf(color.copy(alpha = alpha), Color.Transparent), center = c, radius = r),
+                    radius = r,
+                    center = c,
+                )
+            }
+            plume(w * (0.18f + 0.10f * sin(phase)), h * 0.10f, w * 0.95f, JarvisColors.Cyan, 0.16f)
+            plume(w * (0.85f - 0.10f * sin(phase * 0.8f)), h * 0.45f, w * 0.85f, JarvisColors.Violet, 0.17f)
+            plume(w * 0.2f, h * (0.92f + 0.03f * cos(phase)), w * 0.85f, JarvisColors.Magenta, 0.12f)
         }
-        Canvas(Modifier.fillMaxSize()) {
-            val step = 28.dp.toPx()
-            val dot = 1.dp.toPx()
-            var y = step / 2
-            while (y < size.height) {
-                var x = step / 2
-                while (x < size.width) {
-                    drawCircle(Color.White.copy(alpha = 0.045f), radius = dot, center = Offset(x, y))
-                    x += step
+        if (look.ambient) {
+            Canvas(Modifier.fillMaxSize()) {
+                val step = 24.dp.toPx()
+                val dot = 1.dp.toPx()
+                var y = step / 2
+                while (y < size.height) {
+                    var x = step / 2
+                    while (x < size.width) {
+                        drawCircle(Color.White.copy(alpha = 0.04f), radius = dot, center = Offset(x, y))
+                        x += step
+                    }
+                    y += step
                 }
-                y += step
             }
         }
         content()
@@ -234,23 +255,27 @@ fun AppearIn(modifier: Modifier = Modifier, delayMillis: Int = 0, content: @Comp
 
 // ---- Surfaces and buttons ----------------------------------------------------------------------------------------
 
-/** A card with a soft gradient fill and a thin glowing edge. */
+/** A glass card: dark gradient fill, thin white edge (or a tinted one when [accent] is given). */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
     accent: Color? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val colors = MaterialTheme.colorScheme
     val shape = MaterialTheme.shapes.large
     Column(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(colors.surfaceContainerHigh.copy(alpha = 0.94f), colors.surfaceContainer.copy(alpha = 0.94f))))
+            .background(Brush.verticalGradient(listOf(Color(0xFF141A2E).copy(alpha = 0.92f), Color(0xFF0D1222).copy(alpha = 0.94f))))
             .border(
                 1.dp,
-                Brush.linearGradient(listOf((accent ?: colors.primary).copy(alpha = 0.38f), colors.outline.copy(alpha = 0.25f))),
+                Brush.linearGradient(
+                    listOf(
+                        (accent ?: Color.White).copy(alpha = if (accent != null) 0.42f else 0.12f),
+                        Color.White.copy(alpha = 0.06f),
+                    ),
+                ),
                 shape,
             )
             .padding(16.dp),
@@ -259,7 +284,7 @@ fun GlassCard(
     )
 }
 
-/** The app's main button: a cyan-to-violet gradient that dips slightly when pressed. */
+/** The main button: the cyan-violet-magenta spectrum as a pill that dips when pressed. [subtle] is the glass variant. */
 @Composable
 fun GlowButton(
     text: String,
@@ -268,7 +293,6 @@ fun GlowButton(
     enabled: Boolean = true,
     subtle: Boolean = false,
 ) {
-    val colors = MaterialTheme.colorScheme
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -276,12 +300,7 @@ fun GlowButton(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "press",
     )
-    val shape = RoundedCornerShape(14.dp)
-    val fill = if (subtle) {
-        Brush.horizontalGradient(listOf(colors.surfaceContainerHighest, colors.surfaceContainerHighest))
-    } else {
-        Brush.horizontalGradient(listOf(colors.primary, colors.secondary))
-    }
+    val shape = RoundedCornerShape(50)
     Box(
         modifier
             .graphicsLayer {
@@ -290,17 +309,16 @@ fun GlowButton(
                 alpha = if (enabled) 1f else 0.4f
             }
             .clip(shape)
-            .background(fill)
-            .then(if (subtle) Modifier.border(1.dp, colors.outline, shape) else Modifier)
+            .background(if (subtle) SolidColor(Color.White.copy(alpha = 0.06f)) else JarvisColors.spectrumHorizontal())
+            .then(if (subtle) Modifier.border(1.dp, Color.White.copy(alpha = 0.14f), shape) else Modifier)
             .clickable(interactionSource = interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 11.dp),
+            .padding(horizontal = 20.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text,
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = if (subtle) colors.onSurface else colors.onPrimary,
+            color = if (subtle) MaterialTheme.colorScheme.onSurface else Color.White,
         )
     }
 }
@@ -320,142 +338,169 @@ fun StatusPill(text: String, color: Color, modifier: Modifier = Modifier) {
     )
 }
 
-// ---- Tab bar -----------------------------------------------------------------------------------------------------
+// ---- Navigation --------------------------------------------------------------------------------------------------
 
-enum class AppTab(val title: String) {
-    CHAT("Chat"),
-    MODELS("Models"),
-    CLOUD("Cloud"),
-    ACCESS("Access"),
-    LOG("Log"),
+enum class AppTab(val title: String, val glyph: Glyph) {
+    HOME("Home", Glyph.HOME),
+    CHAT("Chat", Glyph.CHAT),
+    TOOLS("Tools", Glyph.TOOLS),
+    LOGS("Logs", Glyph.LOGS),
+    PREFS("Prefs", Glyph.PREFS),
 }
 
-/** Bottom navigation with a sliding indicator and icons that lift when selected. */
+/** The floating pill navigation from the Stitch screens: the active tab glows in the spectrum. */
 @Composable
-fun JarvisTabBar(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    val tabs = AppTab.entries
-    BoxWithConstraints(
+fun FloatingNav(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Box(
         modifier
             .fillMaxWidth()
-            .background(colors.surfaceContainerLow)
-            .navigationBarsPadding(),
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        val tabWidth = maxWidth / tabs.size
-        val indicatorX by animateDpAsState(
-            targetValue = tabWidth * selected,
-            animationSpec = spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow),
-            label = "indicator",
-        )
-        Box(
+        Row(
             Modifier
-                .offset(x = indicatorX + tabWidth * 0.25f)
-                .width(tabWidth * 0.5f)
-                .height(3.dp)
-                .clip(RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp))
-                .background(Brush.horizontalGradient(listOf(colors.primary, colors.secondary))),
-        )
-        Row(Modifier.fillMaxWidth().padding(top = 3.dp)) {
-            tabs.forEachIndexed { index, tab ->
-                TabItem(tab, selected = index == selected, onClick = { onSelect(index) }, modifier = Modifier.weight(1f))
+                .widthIn(max = 384.dp)
+                .fillMaxWidth()
+                .clip(CircleShape)
+                .background(Color(0xFF080D1E).copy(alpha = 0.94f))
+                .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+                .padding(6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppTab.entries.forEachIndexed { index, tab ->
+                NavItem(tab, active = index == selected, onClick = { onSelect(index) })
             }
         }
     }
 }
 
 @Composable
-private fun TabItem(tab: AppTab, selected: Boolean, onClick: () -> Unit, modifier: Modifier) {
-    val colors = MaterialTheme.colorScheme
-    val tint by animateColorAsState(
-        targetValue = if (selected) colors.primary else colors.onSurfaceVariant,
-        animationSpec = tween(250),
-        label = "tabTint",
-    )
-    val lift by animateFloatAsState(
-        targetValue = if (selected) -3f else 0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "tabLift",
-    )
+private fun NavItem(tab: AppTab, active: Boolean, onClick: () -> Unit) {
+    val tint by animateColorAsState(if (active) JarvisColors.Cyan else JarvisColors.Muted, tween(250), label = "navTint")
+    val glow by animateFloatAsState(if (active) 1f else 0f, tween(300), label = "navGlow")
     Column(
-        modifier
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Tab, onClick = onClick)
-            .padding(top = 9.dp, bottom = 7.dp),
+        Modifier
+            .size(52.dp)
+            .clip(CircleShape)
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        JarvisColors.Cyan.copy(alpha = 0.22f * glow),
+                        JarvisColors.Violet.copy(alpha = 0.22f * glow),
+                        JarvisColors.Magenta.copy(alpha = 0.18f * glow),
+                    ),
+                ),
+            )
+            .border(1.dp, JarvisColors.Cyan.copy(alpha = 0.45f * glow), CircleShape)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, role = Role.Tab, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+        verticalArrangement = Arrangement.Center,
     ) {
-        Canvas(
-            Modifier
-                .size(24.dp)
-                .graphicsLayer { translationY = lift.dp.toPx() },
-        ) {
-            drawGlyph(tab, tint)
-        }
+        GlyphIcon(tab.glyph, tint, size = 20.dp)
         Text(tab.title, style = MaterialTheme.typography.labelSmall, color = tint)
     }
 }
 
-/** Hand-drawn line icons on a 24 x 24 grid, so the app needs no icon library. */
-private fun DrawScope.drawGlyph(tab: AppTab, color: Color) {
-    val s = size.minDimension / 24f
-    val stroke = Stroke(width = 1.8f * s, cap = StrokeCap.Round, join = StrokeJoin.Round)
-    fun p(x: Float, y: Float) = Offset(x * s, y * s)
+// ---- Small shared pieces -----------------------------------------------------------------------------------------
 
-    when (tab) {
-        AppTab.CHAT -> {
-            drawRoundRect(color, p(3f, 4f), Size(18f * s, 12f * s), CornerRadius(4f * s), style = stroke)
-            val tail = Path().apply {
-                moveTo(8f * s, 16f * s)
-                lineTo(8f * s, 20.5f * s)
-                lineTo(12.5f * s, 16f * s)
+/** A section heading as in the Prefs screen: a cyan icon, an uppercase title, and a short note on the right. */
+@Composable
+fun SectionTitle(glyph: Glyph, title: String, note: String? = null, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        GlyphIcon(glyph, JarvisColors.Cyan, size = 18.dp)
+        Text(
+            title.uppercase(),
+            Modifier.padding(start = 8.dp).weight(1f),
+            style = MaterialTheme.typography.labelMedium,
+            color = JarvisColors.Cyan,
+            fontWeight = FontWeight.SemiBold,
+        )
+        if (note != null) Text(note.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+    }
+}
+
+/** The spectrum switch from the Stitch screens. */
+@Composable
+fun SpectrumSwitch(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val knob by animateDpAsState(if (checked) 20.dp else 0.dp, tween(250), label = "knob")
+    Box(
+        modifier
+            .size(width = 48.dp, height = 28.dp)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
+            .clip(CircleShape)
+            .background(if (checked) JarvisColors.spectrumHorizontal() else SolidColor(Color(0xFF1C243C)))
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+            .padding(2.dp),
+    ) {
+        Box(Modifier.offset(x = knob).size(24.dp).background(Color.White, CircleShape))
+    }
+}
+
+/** A round glass button holding one icon. */
+@Composable
+fun GlyphButton(
+    glyph: Glyph,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = Color.White,
+    size: Dp = 48.dp,
+    description: String? = null,
+) {
+    Box(
+        modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.10f))
+            .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        GlyphIcon(glyph, tint, size = size * 0.46f)
+    }
+}
+
+/** The top bar: the brand mark with its spectrum ring, the product name, and a profile ring that opens Prefs. */
+@Composable
+fun AppHeader(onProfile: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .background(JarvisColors.Void.copy(alpha = 0.85f))
+            .statusBarsPadding()
+            .height(64.dp)
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(JarvisColors.spectrum()).padding(1.5.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)).background(JarvisColors.Void), contentAlignment = Alignment.Center) {
+                GlyphIcon(Glyph.HUB, JarvisColors.Cyan, size = 20.dp)
             }
-            drawPath(tail, color, style = stroke)
         }
-        AppTab.MODELS -> {
-            drawRoundRect(color, p(6f, 6f), Size(12f * s, 12f * s), CornerRadius(2f * s), style = stroke)
-            drawRoundRect(color, p(9.5f, 9.5f), Size(5f * s, 5f * s), CornerRadius(1f * s), style = stroke)
-            for (x in listOf(9f, 12f, 15f)) {
-                drawLine(color, p(x, 2.5f), p(x, 6f), strokeWidth = stroke.width, cap = StrokeCap.Round)
-                drawLine(color, p(x, 18f), p(x, 21.5f), strokeWidth = stroke.width, cap = StrokeCap.Round)
-            }
-            for (y in listOf(9f, 12f, 15f)) {
-                drawLine(color, p(2.5f, y), p(6f, y), strokeWidth = stroke.width, cap = StrokeCap.Round)
-                drawLine(color, p(18f, y), p(21.5f, y), strokeWidth = stroke.width, cap = StrokeCap.Round)
-            }
+        Column(Modifier.padding(start = 10.dp).weight(1f)) {
+            Text("JARVIS 2.0", style = MaterialTheme.typography.labelLarge, color = JarvisColors.Ink, fontWeight = FontWeight.Bold)
+            Text(
+                "07 // PRISMATIC SPECTRAL CORE",
+                style = MaterialTheme.typography.labelSmall.copy(brush = JarvisColors.spectrumHorizontal()),
+            )
         }
-        AppTab.CLOUD -> {
-            for (top in listOf(3.5f, 9.75f, 16f)) {
-                drawRoundRect(color, p(3f, top), Size(18f * s, 4.5f * s), CornerRadius(1.6f * s), style = stroke)
-                drawCircle(color, radius = 0.9f * s, center = p(6.6f, top + 2.25f))
+        Box(
+            Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(JarvisColors.spectrum())
+                .padding(1.5.dp)
+                .clickable(role = Role.Button, onClick = onProfile)
+                .semantics { contentDescription = "Open preferences" },
+        ) {
+            Box(Modifier.fillMaxSize().clip(CircleShape).background(JarvisColors.Void), contentAlignment = Alignment.Center) {
+                GlyphIcon(Glyph.PERSON, JarvisColors.Cyan, size = 18.dp)
             }
-        }
-        AppTab.ACCESS -> {
-            val shield = Path().apply {
-                moveTo(12f * s, 2.5f * s)
-                lineTo(20f * s, 5.5f * s)
-                lineTo(20f * s, 11.5f * s)
-                cubicTo(20f * s, 16.5f * s, 16.5f * s, 20f * s, 12f * s, 21.5f * s)
-                cubicTo(7.5f * s, 20f * s, 4f * s, 16.5f * s, 4f * s, 11.5f * s)
-                lineTo(4f * s, 5.5f * s)
-                close()
-            }
-            drawPath(shield, color, style = stroke)
-            val tick = Path().apply {
-                moveTo(8.5f * s, 12f * s)
-                lineTo(11f * s, 14.5f * s)
-                lineTo(15.5f * s, 9.5f * s)
-            }
-            drawPath(tick, color, style = stroke)
-        }
-        AppTab.LOG -> {
-            val pulse = Path().apply {
-                moveTo(2f * s, 12f * s)
-                lineTo(7f * s, 12f * s)
-                lineTo(10f * s, 5f * s)
-                lineTo(14f * s, 19f * s)
-                lineTo(17f * s, 12f * s)
-                lineTo(22f * s, 12f * s)
-            }
-            drawPath(pulse, color, style = stroke)
         }
     }
 }

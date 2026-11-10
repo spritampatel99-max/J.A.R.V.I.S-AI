@@ -23,3 +23,7 @@
 - 335 offline unit tests pass (58 new). The new `:app` code has not been compiled.
 - New (core only): `LocalEngine` interface, `RoutePlanner` (Local only, Local first, Cloud assisted, Manual) and `RoutedLlmClient` with fallback between on-device and cloud, cancellation, out-of-memory handling and honest route notes. Requests now carry a weight (the planner's are heavy); responses can come from an on-device model. Not wired into the app: there is no engine yet.
 - 369 offline tests pass (34 new), 18 more mutation checks caught.
+- New (core): calls. `call_contact`, `call_number` (high risk, always confirmed), `answer_call`, `end_call` (medium). A tool can now resolve its exact action in a `prepare` step before the confirmation, so the confirmation shows, and the approval is bound to, the real name and number. Carrier codes (`*`/`#`) are never dialled, emergency numbers only open the dialer, ambiguity asks instead of guessing, and results say "Asked Android to call", never "called".
+- New (core): `ConversationStore` for the Logs tab (capped, redacted, deletable, atomic file in the app).
+- New (app, uncompiled): push-to-talk voice (`VoiceController`), spoken replies for spoken requests only, contacts and call ports, the Stitch-based Home / Chat / Tools / Logs / Prefs screens, and a confirmation card that can only be answered by a tap. Fonts changed to Inter and Space Grotesk.
+- 456 offline tests pass; 21 of 22 call-safety mutation checks are caught (the 22nd is covered by a second safety net).

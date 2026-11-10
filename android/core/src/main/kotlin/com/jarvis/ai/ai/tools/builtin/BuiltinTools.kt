@@ -19,13 +19,24 @@ import kotlinx.coroutines.delay
 
 /** The Phase 1 tool set. Each tool says only what the platform actually reported. */
 object BuiltinTools {
-    fun create(ports: DevicePorts, clock: Clock = Clock.systemDefaultZone()): List<Tool> = listOf(
-        FlashlightTool(ports.torch),
-        SetAlarmTool(ports.alarms, clock),
-        OpenUrlTool(ports.urls),
-        OpenYoutubeTool(ports.urls),
-        DeviceInfoTool(ports.deviceInfo),
-    )
+    fun create(ports: DevicePorts, clock: Clock = Clock.systemDefaultZone()): List<Tool> {
+        val base = listOf(
+            FlashlightTool(ports.torch),
+            SetAlarmTool(ports.alarms, clock),
+            OpenUrlTool(ports.urls),
+            OpenYoutubeTool(ports.urls),
+            DeviceInfoTool(ports.deviceInfo),
+        )
+        val contacts = ports.contacts
+        val calls = ports.calls
+        if (contacts == null || calls == null) return base
+        return base + listOf(
+            CallContactTool(contacts, calls),
+            CallNumberTool(calls),
+            AnswerCallTool(calls),
+            EndCallTool(calls),
+        )
+    }
 }
 
 private fun launchFailure(result: LaunchResult): ToolResult.Failure? = when (result) {

@@ -61,7 +61,54 @@ object NativeCommands {
     }
 
     private fun single(text: String, clock: Clock): One? =
-        flashlight(text) ?: youtube(text) ?: alarm(text, clock) ?: website(text) ?: deviceInfo(text)
+        flashlight(text) ?: youtube(text) ?: alarm(text, clock) ?: website(text) ?: deviceInfo(text) ?: calls(text)
+
+    // ---- phone calls -------------------------------------------------------------------------------------
+    //
+    // These only turn words into a step. A call is a high-risk tool, so the app always shows the exact name and number and
+    // waits for a tap before anything is dialled, however the request arrived (typed or spoken).
+
+    private val CALL_TARGET = Regex("""^(?:call|phone|ring|dial) (.{1,60})$""", RegexOption.IGNORE_CASE)
+    private val NUMBER_LIKE = Regex("""^[+\d*#][\d\s\-().*#+]*$""")
+    private val NAME_LIKE = Regex("""^[\p{L}][\p{L}\p{M} .'\-]{0,39}$""")
+    private val NOT_A_NAME = setOf(
+        "me", "us", "it", "them", "back", "a", "an", "the", "someone", "somebody", "anyone", "anybody", "everyone", "everybody",
+        "of", "off", "out", "up", "on", "to", "for", "in", "about",
+    )
+    private val JOINERS = Regex("""\b(?:and|then|or)\b""", RegexOption.IGNORE_CASE)
+
+    private val ANSWER = Regex(
+        """^(?:answer|pick up|accept|take) (?:the |this |that |my |an? )?(?:incoming |ringing )?(?:phone )?(?:call|phone)$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val HANG_UP = Regex("""^(?:hang ?up)(?: the| this| my| that)?(?: phone| call)?(?: now)?$""", RegexOption.IGNORE_CASE)
+    private val END_CALL = Regex(
+        """^(?:end|cut|reject|decline|disconnect|drop) (?:the |this |that |my )?(?:incoming |ringing |current |active )?(?:phone )?call$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private fun calls(text: String): One? {
+        if (ANSWER.matches(text)) return One.Step("answer_call", "Answer the ringing call", JsonObject(emptyMap()))
+        if (HANG_UP.matches(text) || END_CALL.matches(text)) return One.Step("end_call", "Hang up the call", JsonObject(emptyMap()))
+
+        var target = CALL_TARGET.matchEntire(text)?.groupValues?.get(1)?.trim() ?: return null
+        target = target.removeSuffix(" please").removeSuffix(" now").trim()
+        if (target.isEmpty()) return null
+
+        // Anything with digits or the characters * # + is a number, never a name, so carrier codes reach the number
+        // checks (which refuse them) instead of being searched for in the contacts.
+        if (target.any { it.isDigit() || it == '*' || it == '#' || it == '+' }) {
+            if (!NUMBER_LIKE.matches(target)) return null
+            return One.Step("call_number", "Call $target", buildJsonObject { put("number", target) })
+        }
+
+        val name = target.removePrefix("my ").trim()
+        val words = name.split(' ')
+        if (words.size > 4 || words.first().lowercase(Locale.ROOT) in NOT_A_NAME || !NAME_LIKE.matches(name)) return null
+        // "call mom and dad" is two people; leave it to the planner so each call is confirmed on its own.
+        if (JOINERS.containsMatchIn(name)) return null
+        return One.Step("call_contact", "Call $name", buildJsonObject { put("name", name) })
+    }
 
     // ---- flashlight --------------------------------------------------------------------------------
 

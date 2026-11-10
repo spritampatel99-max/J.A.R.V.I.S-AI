@@ -21,21 +21,26 @@ import com.jarvis.ai.ai.tools.builtin.DevicePorts
 import com.jarvis.ai.android.device.AndroidAlarmLauncher
 import com.jarvis.ai.android.device.AndroidAppSize
 import com.jarvis.ai.android.device.AndroidDeviceAnalyzer
+import com.jarvis.ai.android.device.AndroidContactsPort
+import com.jarvis.ai.android.device.AndroidCallPort
 import com.jarvis.ai.android.device.AndroidDeviceInfoReader
 import com.jarvis.ai.android.device.AndroidPermissionChecker
 import com.jarvis.ai.android.device.AndroidTorchController
 import com.jarvis.ai.android.device.AndroidUrlOpener
 import com.jarvis.ai.android.device.ForegroundTracker
 import com.jarvis.ai.android.models.ModelManager
+import com.jarvis.ai.core.common.SystemTimeSource
 import com.jarvis.ai.core.security.ConfirmationGate
 import com.jarvis.ai.core.security.FileAuditLog
 import com.jarvis.ai.core.security.Risk
 import com.jarvis.ai.core.security.SecretRedactor
+import com.jarvis.ai.data.HistoryFileStorage
 import com.jarvis.ai.data.InstalledModelsFileStorage
 import com.jarvis.ai.data.SecureKeyStore
 import com.jarvis.ai.data.SetupFileStorage
 import com.jarvis.ai.data.SettingsStore
 import com.jarvis.ai.device.Reading
+import com.jarvis.ai.history.ConversationStore
 import com.jarvis.ai.models.InstalledModels
 import com.jarvis.ai.models.ModelAdvisor
 import com.jarvis.ai.models.ModelInstaller
@@ -43,6 +48,7 @@ import com.jarvis.ai.models.ModelMetadataClient
 import com.jarvis.ai.models.OkHttpDownloadSource
 import com.jarvis.ai.setup.SetupRepository
 import com.jarvis.ai.setup.StorageCalculator
+import com.jarvis.ai.voice.VoiceController
 import java.io.File
 
 /**
@@ -150,16 +156,29 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         alarms = AndroidAlarmLauncher(appContext, foreground),
         urls = AndroidUrlOpener(appContext, foreground),
         deviceInfo = AndroidDeviceInfoReader(appContext),
+        contacts = AndroidContactsPort(appContext),
+        calls = AndroidCallPort(appContext),
     )
+
+    /** The conversation history shown in the Logs tab. Stored in a private file, redacted of keys, deletable by the person. */
+    val history = ConversationStore(HistoryFileStorage(appContext), SystemTimeSource)
+
+    /**
+     * Speech in and out. Created on first use, which is always on the main thread (the UI), as its recogniser requires.
+     */
+    val voice: VoiceController by lazy { VoiceController(appContext) { settings.ui.value } }
 
     val registry = ToolRegistry(BuiltinTools.create(ports))
     val planner = Planner(llm, registry)
     val gate = ConfirmationGate()
     val audit = FileAuditLog(File(appContext.filesDir, "audit.jsonl"), redactor = redactor)
 
+    /** Reads which Android permissions are granted right now. The executor and the Tools tab both use it. */
+    val permissions = AndroidPermissionChecker(appContext)
+
     val executor = Executor(
         registry = registry,
-        permissions = AndroidPermissionChecker(appContext),
+        permissions = permissions,
         gate = gate,
         auditLog = audit,
         replanner = planner,

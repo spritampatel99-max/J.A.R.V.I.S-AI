@@ -115,6 +115,14 @@ sealed interface ToolError {
         override val replannable: Boolean get() = false
     }
 
+    /**
+     * The request cannot go on without an answer from the user (which of two contacts, for example). [message] is the
+     * question. Nothing is retried or replanned around it: the user answers and asks again.
+     */
+    data class NeedsInput(override val message: String) : ToolError {
+        override val replannable: Boolean get() = false
+    }
+
     /** Hardware or target app is missing / busy. */
     data class Unavailable(override val message: String) : ToolError {
         override val replannable: Boolean get() = false
@@ -146,8 +154,27 @@ sealed interface ToolResult {
     data class Failure(val error: ToolError) : ToolResult
 }
 
+/** What a tool's [Tool.prepare] step decided. */
+sealed interface Prepared {
+    /** Go on with these arguments. They are what is confirmed, fingerprinted and executed. */
+    data class Ready(val args: ToolArgs) : Prepared
+
+    /** Stop here, without confirming or running anything. */
+    data class Stop(val error: ToolError) : Prepared
+}
+
 interface Tool {
     val spec: ToolSpec
+
+    /**
+     * Runs after the model's arguments are validated and permissions are checked, and before any confirmation. It
+     * turns a loose request into the exact thing that will happen, for example a contact name into one specific
+     * name and number. The confirmation then shows, and the approval is bound to, the arguments returned here.
+     *
+     * It must have no side effects (it may read, but must not act), and everything it returns comes from app code,
+     * never from the model. The default changes nothing.
+     */
+    suspend fun prepare(args: ToolArgs): Prepared = Prepared.Ready(args)
 
     /**
      * One line describing exactly what will happen, built from the validated arguments.

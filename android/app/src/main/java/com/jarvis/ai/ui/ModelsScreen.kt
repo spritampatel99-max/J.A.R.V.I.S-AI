@@ -56,7 +56,6 @@ fun ModelsScreen(manager: ModelManager, keys: SecureKeyStore) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("MODELS", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
         AppearIn {
             GlassCard {
                 Text("AI that lives on your phone", style = MaterialTheme.typography.titleMedium)

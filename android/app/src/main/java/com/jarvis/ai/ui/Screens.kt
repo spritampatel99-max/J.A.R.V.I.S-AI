@@ -1,51 +1,38 @@
 package com.jarvis.ai.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,15 +41,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -70,343 +51,96 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jarvis.ai.AppContainer
 import com.jarvis.ai.ai.providers.ProviderId
 import com.jarvis.ai.ai.providers.RemoteModel
-import com.jarvis.ai.core.security.AuditEvent
-import com.jarvis.ai.core.security.ConfirmationRequest
-import com.jarvis.ai.core.security.Risk
-import java.text.DateFormat
-import java.util.Date
 
 // ---- The app shell -------------------------------------------------------------------------------------------
 
+/** Space the floating tab bar needs at the bottom of every tab, so the last item can scroll clear of it. */
+val ScreenBottomPadding = 108.dp
+
+@Composable
+private fun keyboardOpen(): Boolean = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+
 @Composable
 fun JarvisApp(vm: AgentViewModel, container: AppContainer, onRunSetupAgain: () -> Unit) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableIntStateOf(AppTab.HOME.ordinal) }
+    var sub by rememberSaveable { mutableStateOf<SubPage?>(null) }
     val pending by vm.pendingConfirmation.collectAsStateWithLifecycle()
+    val imeOpen = keyboardOpen()
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize().imePadding(),
-        containerColor = Color.Transparent,
-        bottomBar = {
-            JarvisTabBar(
-                selected = tab,
-                onSelect = { index ->
-                    tab = index
-                    if (index == AppTab.LOG.ordinal) vm.refreshAudit()
-                },
-            )
-        },
-    ) { padding ->
-        Box(Modifier.padding(padding).fillMaxSize()) {
-            AnimatedContent(
-                targetState = tab,
-                modifier = Modifier.fillMaxSize(),
-                transitionSpec = {
-                    (fadeIn(tween(280, delayMillis = 60)) + slideInVertically(tween(300, easing = FastOutSlowInEasing)) { it / 24 }) togetherWith
-                        fadeOut(tween(120))
-                },
-                label = "tab",
-            ) { page ->
-                when (page) {
-                    AppTab.CHAT.ordinal -> ChatScreen(vm)
-                    AppTab.MODELS.ordinal -> ModelsScreen(container.modelManager, container.keys)
-                    AppTab.CLOUD.ordinal -> ProvidersScreen(vm, onRunSetupAgain = onRunSetupAgain)
-                    AppTab.ACCESS.ordinal -> AccessScreen()
-                    else -> ActivityScreen(vm)
-                }
-            }
-        }
+    fun open(target: AppTab) {
+        sub = null
+        tab = target.ordinal
+        if (target == AppTab.LOGS) vm.refreshAudit()
     }
 
-    pending?.let { request -> ConfirmationDialog(request, onAllow = { vm.approve(request.id) }, onDeny = { vm.deny(request.id) }) }
-}
+    BackHandler(enabled = sub != null) { sub = null }
+    BackHandler(enabled = sub == null && tab != AppTab.HOME.ordinal) { tab = AppTab.HOME.ordinal }
 
-/**
- * The only place a sensitive action can be approved. The text shown comes from the tool's
- * own description of the validated arguments, never from model output. Tapping outside or
- * pressing back counts as "Deny".
- */
-@Composable
-private fun ConfirmationDialog(request: ConfirmationRequest, onAllow: () -> Unit, onDeny: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    AlertDialog(
-        onDismissRequest = onDeny,
-        containerColor = colors.surfaceContainerHigh,
-        title = {
-            Text(
-                if (request.risk == Risk.HIGH) "Confirm sensitive action" else "Confirm action",
-                color = if (request.risk == Risk.HIGH) colors.error else colors.onSurface,
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(request.summary)
-                Text(
-                    "Risk level: ${request.risk.name.lowercase()}. This request expires if you do not answer.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                )
-            }
-        },
-        confirmButton = { GlowButton("Allow", onClick = onAllow) },
-        dismissButton = { TextButton(onClick = onDeny) { Text("Deny") } },
-    )
-}
+    Box(Modifier.fillMaxSize().imePadding()) {
+        Column(Modifier.fillMaxSize()) {
+            val current = sub
+            if (current == null) AppHeader(onProfile = { open(AppTab.PREFS) }) else SubHeader(current.title, onBack = { sub = null })
 
-// ---- Chat ----------------------------------------------------------------------------------------------------
-
-/** Phrases that the app runs itself, with no cloud AI. Each one is a real command the built-in matcher understands. */
-private val SUGGESTIONS = listOf(
-    "Turn on the flashlight",
-    "Turn off the flashlight",
-    "Open YouTube",
-    "Set an alarm for 7 AM",
-    "How much battery do I have",
-)
-
-@Composable
-private fun ChatScreen(vm: AgentViewModel) {
-    val state by vm.chatState.collectAsStateWithLifecycle()
-    val active by vm.activeProvider.collectAsStateWithLifecycle()
-    val settings by vm.settingsState.collectAsStateWithLifecycle()
-    val colors = MaterialTheme.colorScheme
-    val listState = rememberLazyListState()
-    var input by rememberSaveable { mutableStateOf("") }
-    val anyProvider = settings.providers.any { it.configured }
-    val newestId = state.items.lastOrNull()?.id
-
-    LaunchedEffect(state.items.size) {
-        if (state.items.isNotEmpty()) listState.animateScrollToItem(state.items.lastIndex)
-    }
-
-    fun submit() {
-        if (input.isNotBlank() && !state.running) {
-            vm.send(input)
-            input = ""
-        }
-    }
-
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        Row(
-            Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            PulseOrb(active = state.running, diameter = 56.dp)
-            Column {
-                Text("J.A.R.V.I.S.", style = MaterialTheme.typography.headlineMedium, color = colors.primary)
-                Text(
-                    when {
-                        active != null -> "Last AI reply: ${active?.displayName}"
-                        anyProvider -> "Cloud AI is set up"
-                        else -> "Built-in commands only. No cloud AI set up yet."
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                AnimatedContent(
+                    targetState = tab to sub,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        (fadeIn(tween(280, delayMillis = 60)) + slideInVertically(tween(300, easing = FastOutSlowInEasing)) { it / 24 }) togetherWith
+                            fadeOut(tween(120))
                     },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = colors.onSurfaceVariant,
-                )
-            }
-        }
-
-        if (state.items.isEmpty()) {
-            Column(
-                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                AppearIn {
-                    GlassCard {
-                        Text("At your service", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            "Tap a command to run it, or type your own. These commands run on the phone itself, " +
-                                "so they work with no internet and no AI key.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.onSurfaceVariant,
+                    label = "page",
+                ) { (page, subPage) ->
+                    when {
+                        subPage == SubPage.MODELS -> ModelsScreen(container.modelManager, container.keys)
+                        subPage == SubPage.CLOUD -> ProvidersScreen(vm, showTitle = false)
+                        subPage == SubPage.ACCESS -> AccessScreen()
+                        page == AppTab.HOME.ordinal -> HomeScreen(
+                            vm,
+                            onOpenChat = { open(AppTab.CHAT) },
+                            onRun = { text ->
+                                vm.send(text)
+                                open(AppTab.CHAT)
+                            },
+                            onPrefill = { text ->
+                                vm.setDraft(text)
+                                open(AppTab.CHAT)
+                            },
                         )
+                        page == AppTab.CHAT.ordinal -> ChatScreen(vm, onOpenPrefs = { open(AppTab.PREFS) })
+                        page == AppTab.TOOLS.ordinal -> ToolsScreen(
+                            container,
+                            onTry = { text ->
+                                vm.setDraft(text)
+                                open(AppTab.CHAT)
+                            },
+                        )
+                        page == AppTab.LOGS.ordinal -> LogsScreen(vm)
+                        else -> PrefsScreen(vm, container.appVersion, onOpen = { sub = it }, onRunSetupAgain = onRunSetupAgain)
                     }
-                }
-                SUGGESTIONS.forEachIndexed { index, text ->
-                    AppearIn(delayMillis = 120 + index * 70) {
-                        CommandChip(text, onClick = { vm.send(text) })
-                    }
-                }
-                if (!anyProvider) {
-                    AppearIn(delayMillis = 120 + SUGGESTIONS.size * 70) {
-                        GlassCard(accent = JarvisColors.Warning) {
-                            Text("Free-form chat needs a cloud AI", style = MaterialTheme.typography.titleSmall, color = JarvisColors.Warning)
-                            Text(
-                                "Questions and longer plans are answered by an AI provider. Add a key in the Cloud tab. " +
-                                    "An on-device model can be installed in the Models tab, but chatting with it is not built yet.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(state.items, key = { it.id }) { item ->
-                    MessageBubble(item, animate = item.id == newestId, modifier = Modifier.animateItem())
                 }
             }
         }
 
-        if (state.running) {
-            Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                TypingDots()
-                Text(
-                    state.currentStep ?: "Working…",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                )
-            }
-        }
-
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Ask or command…") },
-                maxLines = 4,
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = jarvisFieldColors(),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { submit() }),
-            )
-            SendButton(
-                canSend = input.isNotBlank(),
-                running = state.running,
-                onSend = ::submit,
-                onStop = vm::cancel,
-            )
+        // The tab bar is hidden while the keyboard is up and on sub-pages, which have their own back arrow.
+        if (sub == null && !imeOpen) {
+            FloatingNav(selected = tab, onSelect = { open(AppTab.entries[it]) }, modifier = Modifier.align(Alignment.BottomCenter))
         }
     }
+
+    pending?.let { request -> ConfirmationOverlay(request, onAllow = { vm.approve(request.id) }, onDeny = { vm.deny(request.id) }) }
 }
 
+/** The bar shown on pages that open from Prefs: a back arrow and the page name. */
 @Composable
-private fun CommandChip(text: String, onClick: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(16.dp)
+private fun SubHeader(title: String, onBack: () -> Unit) {
     Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(colors.surfaceContainer.copy(alpha = 0.9f))
-            .border(1.dp, colors.primary.copy(alpha = 0.3f), shape)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 13.dp),
+        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(">", style = MaterialTheme.typography.labelMedium, color = colors.primary)
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
-    }
-}
-
-@Composable
-private fun SendButton(canSend: Boolean, running: Boolean, onSend: () -> Unit, onStop: () -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val usable = canSend || running
-    val scale by animateFloatAsState(
-        targetValue = if (usable) 1f else 0.9f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "sendScale",
-    )
-    val arrow = colors.onPrimary
-    Box(
-        Modifier
-            .size(52.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                alpha = if (usable) 1f else 0.45f
-            }
-            .clip(CircleShape)
-            .background(Brush.linearGradient(listOf(colors.primary, colors.secondary)))
-            .semantics { contentDescription = if (running) "Stop" else "Send" }
-            .clickable(enabled = usable, role = Role.Button, onClick = if (running) onStop else onSend),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (running) {
-            Box(Modifier.size(16.dp).background(arrow, RoundedCornerShape(3.dp)))
-        } else {
-            Canvas(Modifier.size(24.dp)) { drawSendArrow(arrow) }
-        }
-    }
-}
-
-@Composable
-private fun MessageBubble(item: ChatItem, animate: Boolean, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    val appear = remember { Animatable(if (animate) 0f else 1f) }
-    LaunchedEffect(Unit) {
-        if (appear.value < 1f) appear.animateTo(1f, tween(340, easing = FastOutSlowInEasing))
-    }
-
-    val isUser = item.sender == Sender.USER
-    val isSystem = item.sender == Sender.SYSTEM
-    val shape = RoundedCornerShape(
-        topStart = 20.dp,
-        topEnd = 20.dp,
-        bottomStart = if (isUser) 20.dp else 6.dp,
-        bottomEnd = if (isUser) 6.dp else 20.dp,
-    )
-    val label = when (item.sender) {
-        Sender.USER -> "You"
-        Sender.ASSISTANT -> item.source ?: item.provider?.displayName ?: "Jarvis"
-        Sender.SYSTEM -> "System"
-    }
-    val fill = when {
-        isUser -> Brush.linearGradient(listOf(colors.primaryContainer, colors.secondaryContainer))
-        isSystem -> Brush.linearGradient(listOf(colors.error.copy(alpha = 0.14f), colors.error.copy(alpha = 0.08f)))
-        else -> Brush.linearGradient(listOf(colors.surfaceContainerHigh, colors.surfaceContainer))
-    }
-    val edge = when {
-        isUser -> colors.primary.copy(alpha = 0.35f)
-        isSystem -> colors.error.copy(alpha = 0.45f)
-        else -> colors.outline
-    }
-
-    Box(
-        modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                alpha = appear.value
-                translationY = (1f - appear.value) * 24.dp.toPx()
-            },
-        contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart,
-    ) {
-        Column(
-            Modifier
-                .widthIn(max = 330.dp)
-                .clip(shape)
-                .background(fill)
-                .border(1.dp, edge, shape)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = when {
-                    isSystem -> colors.error
-                    isUser -> colors.onPrimaryContainer
-                    else -> colors.primary
-                },
-            )
-            Text(item.text, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
-        }
+        GlyphButton(Glyph.ARROW_LEFT, onClick = onBack, size = 44.dp, description = "Back")
+        Text(title, style = MaterialTheme.typography.headlineSmall, color = JarvisColors.Ink)
     }
 }
 
@@ -674,65 +408,5 @@ private fun ModelRow(model: RemoteModel, onClick: () -> Unit) {
             }
         }
         if (model.free) StatusPill("free", JarvisColors.Good)
-    }
-}
-
-// ---- Activity / audit ----------------------------------------------------------------------------------------------
-
-@Composable
-private fun ActivityScreen(vm: AgentViewModel) {
-    val events by vm.auditEvents.collectAsStateWithLifecycle()
-    val format = remember { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM) }
-    val colors = MaterialTheme.colorScheme
-
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        Text("ACTIVITY LOG", style = MaterialTheme.typography.headlineSmall, color = colors.primary, modifier = Modifier.padding(top = 12.dp))
-        Text(
-            "Confirmations and every medium- or high-risk action, newest first. Low-risk actions are not listed.",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 10.dp),
-        )
-        if (events.isEmpty()) {
-            AppearIn {
-                GlassCard {
-                    Text("Nothing yet", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "When the app asks you to confirm something, or runs a medium- or high-risk action, it is recorded here.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.onSurfaceVariant,
-                    )
-                }
-            }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(events) { event -> AuditRow(event, format.format(Date(event.timestampMs))) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AuditRow(event: AuditEvent, time: String) {
-    val colors = MaterialTheme.colorScheme
-    val accent = when (event.risk) {
-        Risk.HIGH -> colors.error
-        Risk.MEDIUM -> JarvisColors.Warning
-        else -> colors.primary
-    }
-    GlassCard(accent = accent) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusPill("${event.risk.name.lowercase()} risk", accent)
-            Text(
-                event.kind.name.lowercase().replace('_', ' '),
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.onSurfaceVariant,
-            )
-        }
-        Text(event.summary, style = MaterialTheme.typography.bodyMedium)
-        if (!event.detail.isNullOrBlank()) {
-            Text(event.detail.orEmpty(), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-        }
-        Text(time, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
     }
 }
