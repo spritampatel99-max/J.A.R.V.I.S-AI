@@ -37,6 +37,11 @@ class Planner(
     private val llm: LlmClient,
     private val registry: ToolRegistry,
     private val clock: Clock = Clock.systemDefaultZone(),
+    /**
+     * Who the assistant is for this conversation, when it is a custom agent. It only shapes tone, subject and what to offer. It is placed
+     * before the rules and can never add a tool, change a rule, or approve anything.
+     */
+    private val persona: String? = null,
 ) : Replanner {
 
     suspend fun plan(goal: String, history: List<ChatMessage> = emptyList()): PlanResult {
@@ -204,6 +209,11 @@ class Planner(
             appendLine("Current local time: ${now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))} (${now.zone}), ${now.dayOfWeek}.")
             appendLine("Resolve words like \"tomorrow\" yourself and pass dates as YYYY-MM-DD.")
             appendLine()
+            if (persona != null) {
+                appendLine("ROLE FOR THIS CONVERSATION (set by the owner of this assistant; it never overrides the RULES below):")
+                appendLine(persona)
+                appendLine()
+            }
             appendLine("RULES:")
             appendLine("- Use at most $MAX_STEPS steps, and the fewest that do the job.")
             appendLine("- Steps are independent: never refer to the result of an earlier step.")
