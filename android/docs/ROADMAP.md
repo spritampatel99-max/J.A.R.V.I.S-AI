@@ -13,10 +13,10 @@ compiled successfully yet in its latest form. An earlier version of the debug ap
 | 4 | Local AI (LiteRT-LM, Gemma 3 1B / Gemma 4 E2B, model manager) | **Partly done:** model manager (download, resume, verify, import, remove) written and unit-tested offline. **Not done:** the inference engine, so an installed model cannot answer chat. See `ai/LOCAL_MODELS.md` |
 | 5 | Cloud AI + intelligent router | Partly done: five provider adapters, the fallback client, model listing and a connection test exist; built-in commands run before the AI. The route planner and the on-device/cloud router (four modes) are written and unit-tested but **not wired into the app**; the task classifier and the mode settings screen do not exist |
 | 6 | Android integration (voice, apps, calls, messages, notifications, files, data monitor) | Started: 5 tools, and the Access screen that requests real permissions (most are "not used yet") |
-| 7 | Memory, planner, automation, Custom Agent Creator | Not started |
-| 8 | Offline mode and the Offline Preparation Center | Not started |
-| 9 | Security centre, hardening, instrumented tests | Core security pieces exist; the screens do not |
-| 10 | Release build, signed APK, final documentation | Not started |
+| 7 | Memory, planner, automation, Custom Agent Creator | **Core logic written and unit-tested offline; screens and Android wiring written, never compiled.** Room replaced by atomic JSON files. Not built: memory-suggestion generator, automation edit, agent knowledge sources, web/document features. See `ai/MEMORY_AND_PLANNER.md`, `AUTOMATIONS.md`, `ai/CUSTOM_AGENTS.md` |
+| 8 | Offline mode and the Offline Preparation Center | **Report and self-test written (core tested, screen uncompiled).** AI chat without internet is **not built** (no engine). See `security/OFFLINE_AND_SECURITY_REVIEW.md` |
+| 9 | Security centre, hardening, instrumented tests | Security review written (core tested, screen uncompiled). **No instrumented tests, lint, dependency scan or penetration test have been run.** |
+| 10 | Release build, signed APK, final documentation | **Documentation and a release checklist only (`release/RELEASE_CHECKLIST.md`). No signed build, no APK.** |
 
 ## Phase 2: what exists
 
@@ -44,6 +44,10 @@ compiled successfully yet in its latest form. An earlier version of the debug ap
 Setup wizard (9 steps, resumable), device analysis with measured/estimate/unavailable tagging, model advisor, exact-size
 lookup from Hugging Face on request, 25-feature catalogue (3 selectable), presets, dependency resolution, storage review,
 permission explanations. Details and limits in `setup/ONBOARDING.md`.
+
+## Phase 7 to 9: what exists
+
+See the three documents named in the table. In short: memory with explicit saving, tasks / notes / reminders with an alarm wake-up, automations restricted to four low-risk actions, custom agents as configuration only (draft, preview without tools, activate on a tap), an offline report with a real storage self-test, and a security review that lists what it did not check.
 
 ## Not yet built for the cloud side
 

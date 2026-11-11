@@ -45,6 +45,12 @@ enum class SubPage(val title: String) {
     MODELS("On-device models"),
     CLOUD("Cloud AI"),
     ACCESS("Access"),
+    AGENTS("Agents"),
+    MEMORY("Memory"),
+    PLANNER("Planner"),
+    AUTOMATIONS("Automations"),
+    OFFLINE("Offline and readiness"),
+    SECURITY("Security review"),
 }
 
 /**
@@ -143,6 +149,26 @@ fun PrefsScreen(vm: AgentViewModel, appVersion: String, onOpen: (SubPage) -> Uni
             GlowButton("Manage access", onClick = { onOpen(SubPage.ACCESS) }, modifier = Modifier.fillMaxWidth())
         }
 
+        // ---- Assistant ---------------------------------------------------------------------------
+        SectionTitle(Glyph.SPARK, "Assistant", "yours, on this phone")
+        GlassCard {
+            NavRow("Agents", "Build your own assistants for a job, such as teaching, study or planning.", Glyph.PERSON) { onOpen(SubPage.AGENTS) }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            NavRow("Memory", "What you asked it to remember. See, edit or delete any of it.", Glyph.STORAGE) { onOpen(SubPage.MEMORY) }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            NavRow("Planner", "Tasks, notes and reminders.", Glyph.CALENDAR) { onOpen(SubPage.PLANNER) }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            NavRow("Automations", "Small jobs that run on a schedule: add a task, add a note or show a notification.", Glyph.BOLT) { onOpen(SubPage.AUTOMATIONS) }
+        }
+
+        // ---- Status ------------------------------------------------------------------------------
+        SectionTitle(Glyph.SHIELD, "Status", "what works right now")
+        GlassCard {
+            NavRow("Offline and readiness", "What works without internet, checked on this phone.", Glyph.GLOBE) { onOpen(SubPage.OFFLINE) }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            NavRow("Security review", "Permissions, keys, saved data and confirmations. Says what it does not check.", Glyph.LOCK) { onOpen(SubPage.SECURITY) }
+        }
+
         // ---- AI ----------------------------------------------------------------------------------
         SectionTitle(Glyph.CHIP, "AI", "models and providers")
         GlassCard {
@@ -238,7 +264,7 @@ private fun SettingRow(title: String, subtitle: String, trailing: @Composable ()
 }
 
 @Composable
-private fun NavRow(title: String, subtitle: String, glyph: Glyph, onClick: () -> Unit) {
+internal fun NavRow(title: String, subtitle: String, glyph: Glyph, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).clickable(role = Role.Button, onClick = onClick).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

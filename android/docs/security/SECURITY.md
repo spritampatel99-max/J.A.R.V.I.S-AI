@@ -1,6 +1,6 @@
 # Security design (what exists today)
 
-Only implemented behaviour is listed. Screens such as the Security Center belong to later phases.
+Only implemented behaviour is listed. Code marked "unit-tested" was tested offline in `:core`; the Android parts (screens, alarms, receivers, storage on a device) have never been compiled or run.
 
 ## Rules enforced in code
 
@@ -23,6 +23,14 @@ Only implemented behaviour is listed. Screens such as the Security Center belong
 8. **Foreground-only launches.** Android blocks activity starts from the background, so the app refuses to launch other
    apps when it is not in the foreground, instead of claiming it did.
 9. **Only http(s) links** are opened; `javascript:`, `file:`, `intent:` and links with `user:pass@` are rejected.
+
+## Memory, automations and agents (added in Phase 7 to 9)
+
+10. **Memory saves only on an explicit act:** the Add button, a clear "remember that …" phrase, or approving a suggestion. Text is redacted before storing; chat cannot delete or edit memory. Memory is handed to the model as the person's notes (data) before the fixed rules, never as instructions.
+11. **Automations can only run four low-risk actions** (add task, add note, show notification, notify overview), validated at save time, re-validated against the full registry before every run, and executed with a deny-all confirmation and no re-planner. The last two layers are backup and not independently tested (see the test report).
+12. **Agents are configuration, not code.** A new agent is a draft with no tools; only the person's Approve tap activates it. Tools are derived from the chosen features, must be low risk, and are re-derived at run time so a hand-edited file grants nothing. Fixed safety rules come after the owner's text. An agent never sees another agent's memory.
+13. **Voice cannot approve a confirmation.** Confirmations are answered by tapping only.
+14. **Security review** lists what it checked and what it did not; it never reports the phone as "secure" and only counts API keys.
 
 ## Secrets
 
@@ -57,4 +65,4 @@ approvals, denials, expirations, mismatches, blocks and executions are recorded.
 
 ## Not done yet
 
-Permission dashboard, Security Center, biometric lock, backup/export controls, instrumented tests, R8 minification.
+Biometric lock, backup/export controls, instrumented tests, lint and dependency scans, R8 minification. The Access screen and the Security review screen exist but have never been compiled or run.

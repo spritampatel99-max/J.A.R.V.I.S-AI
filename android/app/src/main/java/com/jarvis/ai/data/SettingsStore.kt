@@ -68,6 +68,16 @@ class SettingsStore(context: Context) {
         voiceName = prefs.getString(KEY_VOICE, null),
     ).sanitised()
 
+    /**
+     * When on, the notes saved in Memory are given to the AI that answers, so it can use them. They go to the provider along with the
+     * request. When off, memory stays on the phone and is never sent.
+     */
+    var useMemoryInChat: Boolean
+        get() = prefs.getBoolean(KEY_USE_MEMORY, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_USE_MEMORY, value).apply()
+        }
+
     /** When on, MEDIUM-risk actions (for example setting an alarm) also ask first. HIGH always asks. */
     var confirmMediumActions: Boolean
         get() = prefs.getBoolean(KEY_CONFIRM_MEDIUM, false)
@@ -96,6 +106,7 @@ class SettingsStore(context: Context) {
         const val PREFS_NAME = "jarvis_settings"
         const val KEY_ORDER = "provider_order"
         const val KEY_CONFIRM_MEDIUM = "confirm_medium_actions"
+        const val KEY_USE_MEMORY = "use_memory_in_chat"
         const val KEY_AMBIENT = "ui_ambient"
         const val KEY_REDUCE_MOTION = "ui_reduce_motion"
         const val KEY_FLARE = "ui_flare"

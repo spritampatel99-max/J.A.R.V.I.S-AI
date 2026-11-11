@@ -18,14 +18,15 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!--
-      Declared so the Access screen can ask for them. The features that use them (voice, calling, reminders, the data
-      monitor) are not built yet; the screen says so for each. Every one is off until the user allows it.
+      Declared so the Access screen can ask for them. The data monitor is not built yet; the screen says so. Every one is off until the user allows it.
     -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Android forgets alarms when the phone restarts; this lets the app ask for the next reminder again after boot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
@@ -79,6 +80,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Wakes the app for reminders and automations, and after a restart or an app update. Not callable by other apps. -->
+        <receiver
+            android:name=".android.schedule.WakeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.jarvis.ai.action.WAKE" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".android.models.ModelDownloadService"

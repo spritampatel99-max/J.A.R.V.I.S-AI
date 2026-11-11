@@ -28,12 +28,24 @@ import com.jarvis.ai.android.device.AndroidPermissionChecker
 import com.jarvis.ai.android.device.AndroidTorchController
 import com.jarvis.ai.android.device.AndroidUrlOpener
 import com.jarvis.ai.android.device.ForegroundTracker
+import com.jarvis.ai.agents.AgentRuntime
+import com.jarvis.ai.agents.AgentStore
+import com.jarvis.ai.android.device.AccessChecks
+import com.jarvis.ai.android.device.AccessKey
+import com.jarvis.ai.android.device.AccessState
+import com.jarvis.ai.android.device.AndroidStatus
 import com.jarvis.ai.android.models.ModelManager
+import com.jarvis.ai.android.schedule.AndroidNotifier
+import com.jarvis.ai.android.schedule.AndroidWakeScheduler
+import com.jarvis.ai.android.schedule.ScheduleEngine
+import com.jarvis.ai.automation.AutomationRunner
+import com.jarvis.ai.automation.AutomationStore
 import com.jarvis.ai.core.common.SystemTimeSource
 import com.jarvis.ai.core.security.ConfirmationGate
 import com.jarvis.ai.core.security.FileAuditLog
 import com.jarvis.ai.core.security.Risk
 import com.jarvis.ai.core.security.SecretRedactor
+import com.jarvis.ai.data.AtomicTextStorage
 import com.jarvis.ai.data.HistoryFileStorage
 import com.jarvis.ai.data.InstalledModelsFileStorage
 import com.jarvis.ai.data.SecureKeyStore
@@ -41,11 +53,23 @@ import com.jarvis.ai.data.SetupFileStorage
 import com.jarvis.ai.data.SettingsStore
 import com.jarvis.ai.device.Reading
 import com.jarvis.ai.history.ConversationStore
+import com.jarvis.ai.memory.MemoryStore
+import com.jarvis.ai.offline.OfflineReadiness
+import com.jarvis.ai.offline.OfflineReport
+import com.jarvis.ai.offline.OfflineSelfTest
+import com.jarvis.ai.offline.OfflineSnapshot
+import com.jarvis.ai.offline.SelfTestResult
 import com.jarvis.ai.models.InstalledModels
 import com.jarvis.ai.models.ModelAdvisor
+import com.jarvis.ai.models.ModelCatalog
 import com.jarvis.ai.models.ModelInstaller
 import com.jarvis.ai.models.ModelMetadataClient
 import com.jarvis.ai.models.OkHttpDownloadSource
+import com.jarvis.ai.productivity.ProductivityStore
+import com.jarvis.ai.productivity.ProductivityTools
+import com.jarvis.ai.security.SecurityReport
+import com.jarvis.ai.security.SecurityReview
+import com.jarvis.ai.security.SecuritySnapshot
 import com.jarvis.ai.setup.SetupRepository
 import com.jarvis.ai.setup.StorageCalculator
 import com.jarvis.ai.voice.VoiceController
@@ -168,7 +192,21 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
      */
     val voice: VoiceController by lazy { VoiceController(appContext) { settings.ui.value } }
 
-    val registry = ToolRegistry(BuiltinTools.create(ports))
+    // ---- memory, planner, automations, agents (Phases 7-9) ---------------------------------------------
+    // Each keeps its data in one small private file on this phone. Nothing here is sent anywhere by itself.
+    val memory = MemoryStore(AtomicTextStorage(appContext, "memory.json"), SystemTimeSource)
+    val productivity = ProductivityStore(AtomicTextStorage(appContext, "planner.json"), SystemTimeSource)
+    val automations = AutomationStore(AtomicTextStorage(appContext, "automations.json"), SystemTimeSource)
+    private val wake = AndroidWakeScheduler(appContext)
+    val notifier = AndroidNotifier(appContext)
+    val status = AndroidStatus(appContext)
+
+    /** What the assistant can do: the phone tools plus the planner and reminder tools. */
+    val registry = ToolRegistry(BuiltinTools.create(ports) + ProductivityTools.create(productivity, wake, notifier))
+
+    val agents = AgentStore(AtomicTextStorage(appContext, "agents.json"), SystemTimeSource, registry, memory)
+    val agentRuntime = AgentRuntime(registry, memory, SystemTimeSource)
+
     val planner = Planner(llm, registry)
     val gate = ConfirmationGate()
     val audit = FileAuditLog(File(appContext.filesDir, "audit.jsonl"), redactor = redactor)
@@ -184,6 +222,82 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         replanner = planner,
         policy = { ExecutionPolicy(confirmAt = if (settings.confirmMediumActions) Risk.MEDIUM else Risk.HIGH) },
     )
+
+    /** Runs automations unattended: allow-listed low-risk tools only, and nothing that needs a confirmation. */
+    private val automationRunner = AutomationRunner(automations, registry, permissions, audit, SystemTimeSource)
+
+    /** Delivers due reminders, runs due automations and asks Android for the next wake-up. */
+    val schedule = ScheduleEngine(productivity, automations, automationRunner, notifier, wake, SystemTimeSource)
+
+    /** "Run now" from the Automations screen. Runs the same restricted way, and never moves the schedule. */
+    suspend fun runAutomationNow(id: String) = automationRunner.runNow(id)
+
+    // ---- readiness and security reviews -------------------------------------------------------------------
+
+    /** True only when an on-device inference engine is part of this build. It is not yet, so downloaded models cannot answer. */
+    val localEngineBuilt: Boolean = false
+
+    private fun cloudKeyCount(): Int = ProviderId.entries.count { isConfigured(it) }
+
+    fun offlineSnapshot(selfTest: List<SelfTestResult>? = null): OfflineSnapshot = OfflineSnapshot(
+        connectivity = status.connectivity(),
+        localEngineBuilt = localEngineBuilt,
+        installedLocalModels = installedModels.all().map { ModelCatalog.spec(it.id).displayName },
+        offlineSpeechRecognition = status.offlineSpeechRecognition(),
+        speechRecognitionAvailable = status.speechRecognitionAvailable(),
+        textToSpeechAvailable = status.textToSpeechAvailable(),
+        cloudKeyCount = cloudKeyCount(),
+        notificationsAllowed = notifier.canNotify(),
+        selfTest = selfTest,
+    )
+
+    fun offlineReport(selfTest: List<SelfTestResult>? = null): OfflineReport = OfflineReadiness.assess(offlineSnapshot(selfTest))
+
+    /** Writes and reads back two scratch files in the app's cache, so the check uses the same code path as real saving. */
+    fun runOfflineSelfTest(): List<SelfTestResult> {
+        val planner = AtomicTextStorage(appContext.cacheDir, "selftest-planner.json")
+        val memory = AtomicTextStorage(appContext.cacheDir, "selftest-memory.json")
+        return try {
+            OfflineSelfTest.run(planner, memory, SystemTimeSource)
+        } finally {
+            planner.delete()
+            memory.delete()
+        }
+    }
+
+    fun securityReport(): SecurityReport {
+        val granted = AccessKey.entries
+            .filter { it.manifestPermission != null && AccessChecks.state(appContext, it) == AccessState.ALLOWED }
+            .mapNotNull { it.manifestPermission }
+            .toSet()
+        // A permission counts as used when a tool asks for it, or when the Access screen says a feature in this build uses it today.
+        val needed = registry.all().flatMap { it.spec.requiredPermissions }.toSet() +
+            AccessKey.entries.filter { it.activeNow }.mapNotNull { it.manifestPermission }
+        val failures = buildList {
+            if (history.saveFailed) add("chat history")
+            if (memory.saveFailed) add("memory")
+            if (productivity.saveFailed) add("planner")
+            if (automations.saveFailed) add("automations")
+            if (agents.saveFailed) add("agents")
+        }
+        return SecurityReview.review(
+            SecuritySnapshot(
+                grantedPermissions = granted,
+                neededPermissions = needed,
+                cloudKeyCount = cloudKeyCount(),
+                historyConversations = history.conversations.value.size,
+                historyBytes = history.sizeBytes(),
+                memory = memory.entries.value,
+                agents = agents.agents.value,
+                automations = automations.automations.value,
+                registry = registry,
+                audit = audit.recent(500),
+                saveFailures = failures,
+                notificationsAllowed = notifier.canNotify(),
+                pendingReminders = productivity.state.value.reminders.count { !it.delivered },
+            ),
+        )
+    }
 
     companion object {
         fun keyName(id: ProviderId): String = "api_key_${id.name}"

@@ -1,6 +1,6 @@
 # Build and test report
 
-Date: 2026-11-08 and 2026-11-09 (Phases 1 to 3, plus the model-install, access, built-in-command and UI round). This report says what was
+Date: 2026-11-08 to 2026-11-11 (Phases 1 to 3, the model-install, access, built-in-command and UI round, and the memory, planner, automation, agent, offline and security round). This report says what was
 actually executed and what was not.
 
 **Where things stand.** The sandbox that wrote the code cannot reach Maven Central, Google's Maven repository or the Gradle plugin
@@ -8,6 +8,24 @@ portal (the proxy answers 403), and it has no Android SDK, emulator or phone, so
 the owner built an earlier version on their PC and showed screenshots of it running on their phone (Providers and Chat tabs); I did not see
 that build's log. **The code written since then (this report's "Round 2" section) has not been compiled by anyone.** Everything in "What was
 run" is from the sandbox's offline harness, except the next section.
+
+## Round 4 (2026-11-10/11): memory, planner, automations, agents, offline, security
+
+**Run (offline harness, `:core` only):** 618 tests pass (456 before this round). New test files: `MemoryStoreTest`, `ProductivityTest`, `AutomationTest`, `AgentTest`,
+`OfflineAndSecurityTest`, `MemoryCommandsTest` (5). JUnit 4 and kotlinx-coroutines 1.6.4 here, not the pinned versions; Gradle has **not** run these tests.
+The last Gradle result on the owner's PC is the 2026-11-08 `:core:test` pass for older code.
+
+**Mutation checks (29 new, re-run in full on 2026-11-11): 27 caught, 2 survived.** Rules broken one at a time:
+
+- Automation save rules: allow-list ignored, non-low-risk tools allowed, interval floor removed, daily trigger not strictly after now, never rescheduling, pause keeping the next run. All caught.
+- Automation runner: skipping the live re-check (caught); **its registry not risk-filtered and its confirmation gate approving instead of denying both survived.** Those two are backup layers behind the save-time check and behind the live re-check, so with the first layer working there is no input that makes them matter. They were left in as defence in depth and are **not independently tested**; if the earlier layers were broken, these two would be the only protection and no test would show whether they work.
+- Agents: created active, draft can be enabled, approve from any status, delete keeping memory, tools taken from the stored file, validator allowing risky tools, unbuilt features or secrets, runtime trusting stored tools, preview having tools, own-only memory including general memory, no-memory agent seeing memory, fixed rules removed, local-only agent allowed to use the cloud, main assistant seeing agent memory. All caught.
+- Security and offline: review missing key-like memory notes or unused permissions; offline report claiming local AI without an engine or hiding the missing engine. All caught.
+- Reminders: delivered without recording whether the notification was shown. Caught only after a test was added for it (the first version of the tests missed it).
+
+The mutation script snapshots every source file first and reported "identical to the pre-run snapshot: True" after each batch.
+
+**Not run:** compilation of any new `:app` code (about 20 new or changed files: storage, alarm scheduler, receiver, notifier, status checks, eight screens, `AgentChat`, wiring in `AppContainer`, manifest). The Kotlin compiler's syntax pass over `:app` found no parse errors; every other error it printed was an unresolved Android or Compose name. Android and Compose API validity (for example `TimeInput`, `LocalClipboardManager`, `SpeechRecognizer.isOnDeviceRecognitionAvailable`, `Notification.Builder`) is unchecked. No alarm, boot receiver, notification, permission dialog, wizard or screen has run on a device or emulator. Lint, instrumented tests, a dependency scan and a release build were not run.
 
 ## Round 2 (2026-11-08/09): what was run and what was not
 

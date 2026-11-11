@@ -48,7 +48,7 @@ object OfflineReadiness {
         caps += Capability(
             "commands", "Built-in commands",
             CapabilityState.WORKS,
-            "Flashlight, alarms, volume, opening apps and calls are matched on the phone and need no internet. Each still needs its Android permission.",
+            "Flashlight, alarms, battery and storage, and calls are matched on the phone and need no internet. Opening YouTube or a web page needs internet once it opens. Each still needs its Android permission.",
         )
 
         val planner = s.selfTest?.firstOrNull { it.id == "planner" }

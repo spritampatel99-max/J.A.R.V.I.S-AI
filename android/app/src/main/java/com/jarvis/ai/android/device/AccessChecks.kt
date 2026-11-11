@@ -51,7 +51,7 @@ enum class AccessKey(
 ) {
     NOTIFICATIONS(
         "Notifications", AccessKind.RUNTIME, Manifest.permission.POST_NOTIFICATIONS, true,
-        "Shows the progress of a model download and tells you when it finishes.",
+        "Shows reminders and automation notifications, and the progress of a model download.",
         "Nothing is read. The app can only show its own notifications.",
         "Settings > Apps > J.A.R.V.I.S. > Notifications.",
     ),
@@ -89,8 +89,8 @@ enum class AccessKey(
         "Settings > Apps > J.A.R.V.I.S. > Permissions > Phone.",
     ),
     EXACT_ALARMS(
-        "Exact alarms and reminders", AccessKind.SPECIAL, Manifest.permission.SCHEDULE_EXACT_ALARM, false,
-        "For reminders that fire at the exact minute. Reminders are not built yet.",
+        "Exact alarms and reminders", AccessKind.SPECIAL, Manifest.permission.SCHEDULE_EXACT_ALARM, true,
+        "Lets reminders and automations fire at the exact minute. Without it they still run, but Android may deliver them a few minutes late.",
         "Nothing is read. It only lets the app schedule precise timers.",
         "Settings > Apps > Special access > Alarms & reminders.",
     ),

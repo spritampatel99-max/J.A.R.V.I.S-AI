@@ -95,6 +95,12 @@ fun JarvisApp(vm: AgentViewModel, container: AppContainer, onRunSetupAgain: () -
                         subPage == SubPage.MODELS -> ModelsScreen(container.modelManager, container.keys)
                         subPage == SubPage.CLOUD -> ProvidersScreen(vm, showTitle = false)
                         subPage == SubPage.ACCESS -> AccessScreen()
+                        subPage == SubPage.AGENTS -> AgentsScreen(container)
+                        subPage == SubPage.MEMORY -> MemoryScreen(container)
+                        subPage == SubPage.PLANNER -> PlannerScreen(container)
+                        subPage == SubPage.AUTOMATIONS -> AutomationsScreen(container)
+                        subPage == SubPage.OFFLINE -> OfflineScreen(container)
+                        subPage == SubPage.SECURITY -> SecurityScreen(container)
                         page == AppTab.HOME.ordinal -> HomeScreen(
                             vm,
                             onOpenChat = { open(AppTab.CHAT) },
