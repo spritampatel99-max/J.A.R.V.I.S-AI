@@ -19,6 +19,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.StatFs
 import android.provider.AlarmClock
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.jarvis.ai.ai.tools.builtin.AlarmLauncher
 import com.jarvis.ai.ai.tools.builtin.DeviceInfo
@@ -34,16 +35,30 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val BACKGROUND_REASON =
-    "Android only lets J.A.R.V.I.S. open other apps while it is on screen. Keep it open and try again."
+    "Android only lets J.A.R.V.I.S. open other apps while it is on screen, or when \"Display over other apps\" is allowed. " +
+        "Allow it in Prefs > Access, or keep the app open and try again."
+
+/**
+ * Whether Android will let this app start another app's screen right now.
+ *
+ * Since Android 10 a background app is blocked SILENTLY (no exception). The two ways to be allowed are: one of this app's
+ * screens is showing, or the person has allowed "Display over other apps" (the hands-free service then also shows a small
+ * window while it works, which Android 15 requires for that exemption). This check cannot prove Android will allow it, so
+ * a start from the background is still only reported as "handed off", never as confirmed.
+ */
+internal object BackgroundStart {
+    fun allowed(context: Context, foreground: ForegroundTracker): Boolean =
+        foreground.isForeground || Settings.canDrawOverlays(context)
+}
 
 /** Starts an activity and reports what Android actually did. */
-private fun startActivitySafely(
+internal fun startActivitySafely(
     context: Context,
     foreground: ForegroundTracker,
     intent: Intent,
     what: String,
 ): LaunchResult {
-    if (!foreground.isForeground) return LaunchResult.Failed(BACKGROUND_REASON)
+    if (!BackgroundStart.allowed(context, foreground)) return LaunchResult.Failed(BACKGROUND_REASON)
     return try {
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         LaunchResult.Launched

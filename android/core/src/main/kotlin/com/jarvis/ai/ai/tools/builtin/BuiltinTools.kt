@@ -26,7 +26,8 @@ object BuiltinTools {
             OpenUrlTool(ports.urls),
             OpenYoutubeTool(ports.urls),
             DeviceInfoTool(ports.deviceInfo),
-        )
+            TimeTool(clock),
+        ) + listOfNotNull(ports.apps?.let { OpenAppTool(it) })
         val contacts = ports.contacts
         val calls = ports.calls
         if (contacts == null || calls == null) return base
@@ -242,4 +243,24 @@ class DeviceInfoTool(private val reader: DeviceInfoReader) : Tool {
     }
 
     private fun gb(bytes: Long): String = String.format(Locale.ROOT, "%.1f GB", bytes / 1_000_000_000.0)
+}
+
+/** Tells the time and date from the phone's own clock, so the question is answered at once, offline, without an AI call. */
+class TimeTool(private val clock: Clock) : Tool {
+    override val spec = ToolSpec(
+        name = "get_time",
+        description = "Tell the current time and today's date from the phone's clock. Use it for \"what time is it\" and \"what is the date\".",
+        params = emptyList(),
+        risk = Risk.LOW,
+        resultFormat = "CONFIRMED: the time and date read from the phone's clock, as one sentence.",
+    )
+
+    override fun describe(args: ToolArgs): String = "Read the time and date"
+
+    override suspend fun execute(args: ToolArgs): ToolResult {
+        val now = ZonedDateTime.now(clock)
+        val time = now.format(DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH))
+        val date = now.format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale.ENGLISH))
+        return ToolResult.Success("It is $time on $date.", Verification.CONFIRMED, answer = true)
+    }
 }

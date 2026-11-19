@@ -12,6 +12,10 @@
     <!-- Model downloads: a foreground service keeps a multi-gigabyte download alive when the app is not on screen. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Hands-free: a microphone foreground service that listens for the word "Jarvis" while the person has it switched on. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- "Display over other apps": a small status card while hands-free works, and the way Android lets a background app open another app. Off until the person allows it. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Shows download progress (asked at run time on Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Lets the user exempt the app from battery saving so a long download is not paused. Asked via a system dialog. -->
@@ -53,6 +57,11 @@
         <intent>
             <action android:name="android.intent.action.SET_ALARM" />
         </intent>
+        <!-- "Open WhatsApp": which apps on the phone have a launcher icon. Only icon apps are visible, not every installed package. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <!-- Setup only asks whether the phone has a speech recogniser and a text-to-speech engine. -->
         <intent>
             <action android:name="android.speech.RecognitionService" />
@@ -91,6 +100,37 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!-- Always-on "Jarvis" listening. Started only from the Hands-free page while the app is on screen; not restarted by Android. -->
+        <service
+            android:name=".android.voice.HandsFreeService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <!-- Phone control by voice: read the screen in front, scroll, press Back/Home/Recents/Lock/Screenshot. Off until the person switches it on in Settings > Accessibility. No gestures. -->
+        <service
+            android:name=".android.screen.JarvisAccessibilityService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Read and dismiss the notifications that are showing. Off until the person switches on Notification access in Settings. -->
+        <service
+            android:name=".android.screen.JarvisNotificationListener"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".android.models.ModelDownloadService"

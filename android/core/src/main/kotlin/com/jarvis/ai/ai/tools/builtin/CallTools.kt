@@ -20,7 +20,9 @@ object CallPermissions {
 }
 
 /**
- * Calls always need the user's tap on a native confirmation (the tools are [Risk.HIGH]). The confirmation shows the contact
+ * Calls always go through a native confirmation (the tools are [Risk.HIGH]). A typed or assistant-planned call needs the person's tap.
+ * A call the person SPOKE and the app's own fixed patterns matched is read back and approved by a 3-second countdown the person can
+ * cancel (see VoiceCountdown); the model can never use that path. The confirmation shows the contact
  * and the exact number, which app code resolves in [Tool.prepare] before it asks; the approval is bound to that number, so
  * a different one can never be dialled under it. Results say only what Android reported: a call is "requested", never "made".
  */

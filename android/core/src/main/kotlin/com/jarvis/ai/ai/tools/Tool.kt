@@ -149,6 +149,17 @@ sealed interface ToolResult {
         val data: Map<String, String> = emptyMap(),
         /** True when [message]/[data] contain text from outside (web, files, messages). */
         val untrusted: Boolean = false,
+        /**
+         * True when [message] is itself the answer to what the person asked (weather, a fact), so the chat shows it as plain text
+         * and speaks it, rather than as a checklist line. An untrusted answer is still marked untrusted for the rest of the run.
+         */
+        val answer: Boolean = false,
+        /**
+         * True when [message] is the person's own private content (the text on their screen, their notifications). It is shown to
+         * the person, but never written to the audit log and never passed to an AI model, not even to replan a failed step.
+         * Only meaningful together with [answer].
+         */
+        val private: Boolean = false,
     ) : ToolResult
 
     data class Failure(val error: ToolError) : ToolResult

@@ -61,7 +61,68 @@ object NativeCommands {
     }
 
     private fun single(text: String, clock: Clock): One? =
-        flashlight(text) ?: youtube(text) ?: alarm(text, clock) ?: website(text) ?: deviceInfo(text) ?: calls(text)
+        flashlight(text) ?: youtube(text) ?: alarm(text, clock) ?: website(text) ?: deviceInfo(text) ?: time(text) ?: weather(text) ?: calls(text) ?: phone(text) ?: offline(text) ?: openApp(text)
+
+    // ---- weather ---------------------------------------------------------------------------------------------------
+    //
+    // A plain weather question is answered straight from the weather service, with no AI call, so it is fast and works without a key.
+
+    private const val CITY = """[\p{L}][\p{L}\p{M} .'\-]{1,40}?"""
+    private const val WHEN = """(?:today|tomorrow|tonight|now|currently)"""
+    private const val LEAD = """(?:(?:tell me|give me|show me|check|get|find|fetch) )?(?:(?:what(?:'s| is)|how(?:'s| is)) )?(?:the )?"""
+    private const val NOUN = """(?:weather|temperature|forecast)"""
+    private val WEATHER_IN = Regex(
+        """^$LEAD(?:(?:today|tomorrow|tonight)(?:'s)? )?$NOUN(?: (?:forecast|report|update|like|outside))?(?: $WHEN)? (?:in|at|for|of|near) ($CITY)(?: $WHEN)?$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val CITY_WEATHER = Regex("""^$LEAD($CITY) $NOUN(?: (?:forecast|report))?(?: $WHEN)?$""", RegexOption.IGNORE_CASE)
+    private val WEATHER_NO_CITY = Regex(
+        """^$LEAD(?:(?:today|tomorrow|tonight)(?:'s)? )?$NOUN(?: (?:forecast|report|update|like|outside))?(?: (?:$WHEN|here|outside))?$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val NOT_A_CITY = setOf(
+        "the", "what", "whats", "what's", "how", "hows", "how's", "today", "tomorrow", "tonight", "is", "my", "this", "that", "current",
+        "tell", "give", "show", "me", "check", "get", "find", "fetch", "like", "outside", "here", "now", "weather", "temperature", "forecast",
+    )
+
+    private fun weather(text: String): One? {
+        val tomorrow = Regex("""\btomorrow\b""", RegexOption.IGNORE_CASE).containsMatchIn(text)
+        val named = (WEATHER_IN.matchEntire(text) ?: CITY_WEATHER.matchEntire(text))?.groupValues?.get(1)?.trim()
+        val city = named?.takeIf { c -> NAME_LIKE.matches(c) && c.split(' ').none { it.lowercase(Locale.ROOT) in NOT_A_CITY } }
+        if (city != null) {
+            return One.Step(
+                "get_weather",
+                "Weather in ${city.take(40)}${if (tomorrow) " tomorrow" else ""}",
+                buildJsonObject {
+                    put("city", city)
+                    put("day", if (tomorrow) "tomorrow" else "today")
+                },
+            )
+        }
+        if (WEATHER_NO_CITY.matches(text)) return One.Ask("Which city? For example, say \"weather in Delhi\".")
+        return null
+    }
+
+    // ---- open an app -------------------------------------------------------------------------------------
+    //
+    // "open WhatsApp", "launch the camera app". Checked after the more specific commands (YouTube, web addresses, flashlight, alarms).
+    // The app is looked up on the phone when the step runs; nothing is guessed here.
+
+    private val OPEN_APP = Regex("""^(?:open|launch|start|run|go to|switch to) (?:up )?(?:the |my )?([\p{L}\p{N}][\p{L}\p{M}\p{N} .&'+\-]{0,38}?)(?: app| application)?$""", RegexOption.IGNORE_CASE)
+    private val NOT_AN_APP = setOf(
+        "a", "an", "some", "this", "that", "it", "up", "new", "door", "window", "file", "files", "link", "page", "tab", "website", "web",
+        "site", "browser tab", "everything", "all", "me", "us", "them", "something", "anything", "one", "two", "three",
+    )
+
+    private val NOT_PART_OF_AN_APP_NAME = setOf("door", "window", "tab", "form", "file", "files", "folder", "link", "page", "website", "account")
+
+    private fun openApp(text: String): One? {
+        val name = OPEN_APP.matchEntire(text)?.groupValues?.get(1)?.trim() ?: return null
+        val words = name.lowercase(Locale.ROOT).split(' ')
+        if (name.lowercase(Locale.ROOT) in NOT_AN_APP || words.first() in NOT_AN_APP || words.size > 4 || words.any { it in NOT_PART_OF_AN_APP_NAME }) return null
+        if ('.' in name && name.any { it.isLetter() } && !name.contains(' ')) return null
+        return One.Step("open_app", "Open $name", buildJsonObject { put("name", name) })
+    }
 
     // ---- phone calls -------------------------------------------------------------------------------------
     //
@@ -294,11 +355,102 @@ object NativeCommands {
             null
         }
 
+    // ---- the phone itself: screen, navigation, notifications -------------------------------------------------------------
+    //
+    // Whole-phrase matches only. These run the tools in ScreenTools; if the matching Android access is off, the tool says so.
+
+    private val NAV_PATTERNS = listOf(
+        Regex("""^(?:go |press |navigate )?back$""", RegexOption.IGNORE_CASE) to "back",
+        Regex("""^(?:go (?:to )?(?:the )?home(?: screen)?|press home|(?:show |open )?(?:the )?home screen)$""", RegexOption.IGNORE_CASE) to "home",
+        Regex("""^(?:open |show )?(?:the )?(?:recent apps|recents|recent screen|app switcher)$""", RegexOption.IGNORE_CASE) to "recents",
+        Regex("""^(?:open|show|pull down|pull down the) (?:the )?(?:notification (?:shade|panel|drawer|tray)|notifications|notifications panel)$""", RegexOption.IGNORE_CASE) to "notifications",
+        Regex("""^(?:(?:open|show) (?:the )?)?quick settings$""", RegexOption.IGNORE_CASE) to "quick_settings",
+        Regex("""^lock (?:the |my )?(?:phone|screen|device)$""", RegexOption.IGNORE_CASE) to "lock",
+        Regex("""^(?:(?:take|capture) (?:a )?)?screenshot$""", RegexOption.IGNORE_CASE) to "screenshot",
+    )
+    private val SCROLL = Regex("""^(?:scroll|page) (up|down)$""", RegexOption.IGNORE_CASE)
+    private val READ_SCREEN_PATTERNS = listOf(
+        Regex("""^(?:read|read out|read aloud) (?:the |this |my )?(?:screen|page)(?: out| aloud)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^read this(?: out)?(?: to me)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^what(?:'s| is) on (?:the |my )?screen$""", RegexOption.IGNORE_CASE),
+        Regex("""^what am i looking at$""", RegexOption.IGNORE_CASE),
+    )
+    private val READ_NOTIFICATION_PATTERNS = listOf(
+        Regex("""^(?:read|read out|check|tell me) (?:my |the |all )*(?:new )?notifications$""", RegexOption.IGNORE_CASE),
+        Regex("""^what(?:'s| is| are) (?:my |the )?(?:new )?notifications$""", RegexOption.IGNORE_CASE),
+        Regex("""^what notifications do i have$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:do i have|any|have i got) (?:any )?(?:new )?notifications$""", RegexOption.IGNORE_CASE),
+    )
+    private val CLEAR_NOTIFICATIONS = Regex("""^(?:clear|dismiss|remove) (?:all |my |the )*notifications$""", RegexOption.IGNORE_CASE)
+
+    private fun phone(text: String): One? {
+        NAV_PATTERNS.firstOrNull { it.first.matches(text) }?.let { (_, action) ->
+            return One.Step("phone_navigate", "Phone: ${action.replace('_', ' ')}", buildJsonObject { put("action", action) })
+        }
+        SCROLL.matchEntire(text)?.let { match ->
+            val direction = match.groupValues[1].lowercase(Locale.ROOT)
+            return One.Step("screen_scroll", "Scroll $direction", buildJsonObject { put("direction", direction) })
+        }
+        if (READ_SCREEN_PATTERNS.any { it.matches(text) }) return One.Step("read_screen", "Read the text on the screen", JsonObject(emptyMap()))
+        if (READ_NOTIFICATION_PATTERNS.any { it.matches(text) }) return One.Step("read_notifications", "Read the current notifications", JsonObject(emptyMap()))
+        if (CLEAR_NOTIFICATIONS.matches(text)) return One.Step("clear_notifications", "Dismiss all notifications", JsonObject(emptyMap()))
+        return null
+    }
+
+    // ---- time and date -----------------------------------------------------------------------------------
+    //
+    // Whole-phrase matches only, so "what time is the meeting" or "what time does the shop open" still go to the assistant.
+
+    private val TIME_PATTERNS = listOf(
+        Regex("""^what(?:'s| is) the (?:current |local )?time(?: today)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^what time is it(?: today)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:tell me |give me |show me )?the (?:current |local )?time$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:current|local) time$""", RegexOption.IGNORE_CASE),
+        Regex("""^time$""", RegexOption.IGNORE_CASE),
+        Regex("""^what(?:'s| is) (?:the |today's |todays )?(?:date|day)(?: today)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^what (?:day|date) is it(?: today)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:tell me |give me |show me )?(?:today's|todays|the) (?:date|day)$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:today's|todays) date$""", RegexOption.IGNORE_CASE),
+        Regex("""^date today$""", RegexOption.IGNORE_CASE),
+    )
+
+    private fun time(text: String): One? =
+        if (TIME_PATTERNS.any { it.matches(text) }) {
+            One.Step("get_time", "Read the time and date", JsonObject(emptyMap()))
+        } else {
+            null
+        }
+
+    // ---- offline library ---------------------------------------------------------------------------------------------
+    //
+    // Only an explicit "offline" request is answered from the saved library without asking an AI. An ordinary "who is ..." question
+    // goes to the assistant as before; the app falls back to the library only when no AI service can be reached.
+
+    private const val OFFLINE = """(?:offline library|offline wikipedia|offline encyclopedia|offline pack|offline data|offline)"""
+    private val OFFLINE_PATTERNS = listOf(
+        Regex("""^(?:search|look up|lookup|find|check|ask|read)(?: up)? (?:the |my )?$OFFLINE(?: (?:for|about|on))? (.+)$""", RegexOption.IGNORE_CASE),
+        Regex("""^$OFFLINE[:,]? (.+)$""", RegexOption.IGNORE_CASE),
+        Regex("""^(.+?) (?:in|from|on|using|with) (?:the |my )?$OFFLINE$""", RegexOption.IGNORE_CASE),
+    )
+
+    private val OFFLINE_VERB = Regex("""^(?:look up|lookup|search for|search|find|check|read up on|ask about)\s+""", RegexOption.IGNORE_CASE)
+
+    private fun offline(text: String): One? {
+        for (p in OFFLINE_PATTERNS) {
+            val raw = p.matchEntire(text)?.groupValues?.get(1)?.trim() ?: continue
+            val bare = raw.replace(OFFLINE_VERB, "")
+            val topic = (com.jarvis.ai.knowledge.OfflineQuestions.subject(bare) ?: bare).trim().trim('"', '\'')
+            if (topic.isEmpty() || topic.length > 80) return null
+            return One.Step("offline_lookup", "Look up \"${topic.take(40)}\" offline", buildJsonObject { put("topic", topic) })
+        }
+        return null
+    }
+
     // ---- text clean-up -----------------------------------------------------------------------------------
 
     private val SPLIT = Regex("""\s*(?:,\s*(?:and\s+)?then\s+|\s+and then\s+|\s+then\s+|\s+and\s+|\s*;\s*|\s*,\s*)""", RegexOption.IGNORE_CASE)
     private val PREFIXES = listOf(
-        "hey jarvis ", "ok jarvis ", "okay jarvis ", "jarvis, ", "jarvis ", "please ", "can you ", "could you ",
+        "hey jarvis, ", "hello jarvis, ", "hi jarvis, ", "hey jarvis ", "hello jarvis ", "hi jarvis ", "ok jarvis ", "okay jarvis ", "jarvis, ", "jarvis ", "please ", "can you ", "could you ",
         "would you ", "will you ", "i want you to ", "i'd like you to ",
     )
     private val SUFFIXES = listOf(" please", " for me", " right now", " now")

@@ -23,6 +23,14 @@ import kotlin.test.assertTrue
 
 class FeatureCatalogTest {
 
+    /** Features that exist in the app today. Update this list in the same change that makes another feature selectable. */
+    private val BUILT_TODAY = setOf(
+        FeatureId.AI_ASSISTANT, FeatureId.CLOUD_AI, FeatureId.DEVICE_CONTROL, FeatureId.VOICE_ASSISTANT, FeatureId.PHONE_ASSISTANT,
+        FeatureId.AUTOMATION_STUDIO, FeatureId.AI_MEMORY, FeatureId.SMART_PLANNER, FeatureId.CUSTOM_AGENT_CREATOR,
+        FeatureId.SECURITY_CENTER, FeatureId.OFFLINE_PREPARATION_CENTER,
+        FeatureId.HANDS_FREE, FeatureId.APPLICATION_LAUNCHER, FeatureId.NOTIFICATION_INTELLIGENCE,
+    )
+
     /** Same catalogue with every feature treated as built, to exercise dependency rules that matter once the phases land. */
     private val everythingBuilt: (FeatureId) -> Feature =
         { id -> FeatureCatalog.feature(id).copy(readiness = Readiness.Available) }
@@ -78,7 +86,7 @@ class FeatureCatalogTest {
     @Test
     fun onlyFeaturesThatExistTodayAreSelectable() {
         assertEquals(
-            setOf(FeatureId.AI_ASSISTANT, FeatureId.CLOUD_AI, FeatureId.DEVICE_CONTROL),
+            BUILT_TODAY,
             FeatureCatalog.all.filter { it.selectable }.map { it.id }.toSet(),
         )
     }
@@ -100,13 +108,22 @@ class FeatureCatalogTest {
 
     @Test
     fun noPermissionIsRequestedThatNoFeatureNeeds_andNoBroadStorageAccessExists() {
-        assertTrue(PermissionId.entries.none { "STORAGE" in it.name || "ACCESSIBILITY" in it.name || "SMS" in it.name })
+        assertTrue(PermissionId.entries.none { "STORAGE" in it.name || "SMS" in it.name })
+    }
+
+    @Test
+    fun screenAccessIsOnlyEverAnOptionalExtra_neverRequiredByAFeature() {
+        // The person chose to allow Accessibility for screen reading and navigation. No feature may make it a condition of working.
+        for (feature in FeatureCatalog.all) {
+            val need = feature.permissions.firstOrNull { it.permission == PermissionId.ACCESSIBILITY } ?: continue
+            assertFalse(need.required, "${feature.id} must not require Accessibility")
+        }
     }
 
     @Test
     fun specialAccessIsNeverInstallTime() {
         assertEquals(
-            setOf(PermissionId.NOTIFICATION_LISTENER, PermissionId.USAGE_ACCESS, PermissionId.EXACT_ALARMS),
+            setOf(PermissionId.NOTIFICATION_LISTENER, PermissionId.USAGE_ACCESS, PermissionId.EXACT_ALARMS, PermissionId.OVERLAY, PermissionId.ACCESSIBILITY),
             PermissionCatalog.all.filter { it.kind == PermissionKind.SPECIAL_ACCESS }.map { it.id }.toSet(),
         )
     }
@@ -131,9 +148,9 @@ class FeatureCatalogTest {
 
     @Test
     fun aFeatureThatIsNotBuiltIsRejectedWithItsPhase() {
-        val r = FeatureResolver.resolve(setOf(FeatureId.VOICE_ASSISTANT, FeatureId.CLOUD_AI))
+        val r = FeatureResolver.resolve(setOf(FeatureId.WHATSAPP_ASSISTANT, FeatureId.CLOUD_AI))
         assertEquals(setOf(FeatureId.CLOUD_AI), r.explicit)
-        assertTrue("Phase 6" in r.rejected.getValue(FeatureId.VOICE_ASSISTANT))
+        assertTrue("Phase 6" in r.rejected.getValue(FeatureId.WHATSAPP_ASSISTANT))
         assertTrue(r.capabilities.isEmpty())
     }
 
@@ -164,7 +181,7 @@ class FeatureCatalogTest {
     fun aPermissionIsRequiredIfAnyActiveFeatureRequiresIt() {
         val r = FeatureResolver.resolve(setOf(FeatureId.HANDS_FREE), everythingBuilt)
         assertEquals(true, r.permissions[PermissionId.RECORD_AUDIO])
-        assertEquals(false, r.permissions[PermissionId.NOTIFICATION_LISTENER])
+        assertEquals(false, r.permissions[PermissionId.OVERLAY], "an optional need stays optional")
     }
 
     @Test
@@ -181,11 +198,11 @@ class FeatureCatalogTest {
     fun aBuiltFeatureNeedingAnUnbuiltOneReportsItAsUnmet() {
         val custom: (FeatureId) -> Feature = {
             val f = FeatureCatalog.feature(it)
-            if (it == FeatureId.DEVICE_CONTROL) f.copy(requires = f.requires + FeatureId.VOICE_ASSISTANT) else f
+            if (it == FeatureId.DEVICE_CONTROL) f.copy(requires = f.requires + FeatureId.FILE_MANAGER) else f
         }
         val r = FeatureResolver.resolve(setOf(FeatureId.DEVICE_CONTROL), custom)
-        assertEquals(mapOf(FeatureId.DEVICE_CONTROL to setOf(FeatureId.VOICE_ASSISTANT)), r.unmet)
-        assertFalse(FeatureId.VOICE_ASSISTANT in r.active)
+        assertEquals(mapOf(FeatureId.DEVICE_CONTROL to setOf(FeatureId.FILE_MANAGER)), r.unmet)
+        assertFalse(FeatureId.FILE_MANAGER in r.active)
     }
 
     // ---- editing a selection -----------------------------------------------------------------
@@ -196,7 +213,7 @@ class FeatureCatalogTest {
         assertEquals(setOf(FeatureId.CLOUD_AI), ok.selection.chosen)
         assertNull(ok.refused)
 
-        val refused = FeatureSelection().select(FeatureId.AI_MEMORY)
+        val refused = FeatureSelection().select(FeatureId.WHATSAPP_ASSISTANT)
         assertTrue(refused.selection.chosen.isEmpty())
         assertTrue("not built yet" in refused.refused!!)
     }
@@ -220,7 +237,7 @@ class FeatureCatalogTest {
     @Test
     fun selectAllOnlySelectsBuiltFeaturesAndDeselectAllClears() {
         val all = FeatureSelection().selectAll()
-        assertEquals(setOf(FeatureId.AI_ASSISTANT, FeatureId.CLOUD_AI, FeatureId.DEVICE_CONTROL), all.chosen)
+        assertEquals(BUILT_TODAY, all.chosen)
         assertTrue(all.deselectAll().chosen.isEmpty())
     }
 
@@ -229,8 +246,9 @@ class FeatureCatalogTest {
     @Test
     fun presetsKeepOnlyBuiltFeaturesAndReportTheRest() {
         val (sel, notBuilt) = FeatureSelection.fromPreset(ProfilePreset.ESSENTIAL)
-        assertEquals(setOf(FeatureId.AI_ASSISTANT, FeatureId.CLOUD_AI, FeatureId.DEVICE_CONTROL), sel.chosen)
-        assertTrue(FeatureId.SMART_PLANNER in notBuilt && FeatureId.SECURITY_CENTER in notBuilt)
+        assertEquals(ProfilePreset.ESSENTIAL.intended.filter { it in BUILT_TODAY }.toSet(), sel.chosen)
+        assertEquals(ProfilePreset.ESSENTIAL.intended.filter { it !in BUILT_TODAY }.toSet(), notBuilt)
+        assertTrue(FeatureId.SMART_PLANNER in sel.chosen && FeatureId.SECURITY_CENTER in sel.chosen)
     }
 
     @Test
@@ -270,7 +288,7 @@ class FeatureCatalogTest {
 
     @Test
     fun aFeatureThatIsNotBuiltOnlyEverSaysSo() {
-        assertEquals(setOf(FeatureStatus.NOT_BUILT_YET), status(FeatureId.VOICE_ASSISTANT, built = false))
+        assertEquals(setOf(FeatureStatus.NOT_BUILT_YET), status(FeatureId.WHATSAPP_ASSISTANT, built = false))
     }
 
     @Test

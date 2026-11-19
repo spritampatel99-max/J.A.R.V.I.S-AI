@@ -16,6 +16,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -170,5 +171,124 @@ class FallbackLlmClientTest {
         val client = FallbackLlmClient(providers = { listOf(claude, gemini) }, retry = policy, time = time)
 
         assertEquals(ProviderId.ANTHROPIC, client.complete(request).provider)
+    }
+
+    // ---- speed: no same-provider retry after a timeout, and hedging ----------------------------------------------
+
+    private fun slow(ms: Long, text: String): Script = { kotlinx.coroutines.delay(ms); text }
+
+    private fun hedged(hedgeMs: Long, vararg providers: FakeProvider) =
+        FallbackLlmClient(providers = { providers.toList() }, retry = policy, time = time, hedgeAfterMs = hedgeMs)
+
+    @Test
+    fun aTimeoutMovesStraightToTheNextProviderWhenTimeoutRetriesAreOff() = runTest {
+        val gemini = FakeProvider(ProviderId.GEMINI, true, fail(ProviderError.Timeout("slow")), ok("would be a retry"))
+        val groq = FakeProvider(ProviderId.GROQ, true, ok("from groq"))
+        val noTimeoutRetry = policy.copy(retryTimeouts = false)
+
+        val response = FallbackLlmClient(providers = { listOf(gemini, groq) }, retry = noTimeoutRetry, time = time).complete(request)
+
+        assertEquals(ProviderId.GROQ, response.provider)
+        assertEquals(1, gemini.calls, "no second try after a timeout")
+        assertEquals(0L, currentTime, "and no backoff wait")
+    }
+
+    @Test
+    fun otherRetryableErrorsAreStillRetriedWhenTimeoutRetriesAreOff() = runTest {
+        val gemini = FakeProvider(ProviderId.GEMINI, true, fail(ProviderError.Http(503, "busy")), ok("second try"))
+        val noTimeoutRetry = policy.copy(retryTimeouts = false)
+
+        val response = FallbackLlmClient(providers = { listOf(gemini) }, retry = noTimeoutRetry, time = time).complete(request)
+
+        assertEquals("second try", response.text)
+        assertEquals(2, gemini.calls)
+    }
+
+    @Test
+    fun aSlowProviderIsHedgedAndTheFasterAnswerWins() = runTest {
+        val gemini = FakeProvider(ProviderId.GEMINI, true, slow(30_000, "late gemini"))
+        val groq = FakeProvider(ProviderId.GROQ, true, slow(1_000, "quick groq"))
+
+        val response = hedged(5_000, gemini, groq).complete(request)
+
+        assertEquals("quick groq", response.text)
+        assertEquals(ProviderId.GROQ, response.provider)
+        assertEquals(6_000L, currentTime, "the second provider was asked after 5 s and took 1 s; nobody waited for the 30 s one")
+        assertEquals(1, gemini.calls)
+        assertEquals(1, groq.calls)
+    }
+
+    @Test
+    fun aProviderThatAnswersInTimeIsNeverHedged() = runTest {
+        val gemini = FakeProvider(ProviderId.GEMINI, true, slow(2_000, "gemini"))
+        val groq = FakeProvider(ProviderId.GROQ, true, ok("must not be asked"))
+
+        val response = hedged(5_000, gemini, groq).complete(request)
+
+        assertEquals(ProviderId.GEMINI, response.provider)
+        assertEquals(0, groq.calls)
+    }
+
+    @Test
+    fun theFirstProviderStillWinsIfItFinishesAfterTheHedgeStartedButBeforeTheSecond() = runTest {
+        val gemini = FakeProvider(ProviderId.GEMINI, true, slow(7_000, "gemini"))
+        val groq = FakeProvider(ProviderId.GROQ, true, slow(10_000, "groq"))
+
+        val response = hedged(5_000, gemini, groq).complete(request)
+
+        assertEquals(ProviderId.GEMINI, response.provider)
+        assertEquals(7_000L, currentTime)
+    }
+
+    @Test
+    fun aHedgedProviderThatFailsFallsBackToTheOthersAndTheFailuresStayInConfiguredOrder() = runTest {
+        val gemini = FakeProvider(ProviderId.GEMINI, true, slow(30_000, "late"))
+        val groq = FakeProvider(ProviderId.GROQ, true, fail(ProviderError.Http(401, "bad key")))
+        val openRouter = FakeProvider(ProviderId.OPENROUTER, true, ok("third"))
+
+        val response = hedged(5_000, gemini, groq, openRouter).complete(request)
+
+        assertEquals(ProviderId.OPENROUTER, response.provider)
+        assertEquals(listOf(ProviderId.GROQ), response.failures.map { it.provider })
+        assertEquals(10_000L, currentTime, "each further provider is asked after another hedge interval")
+    }
+
+    @Test
+    fun whenEveryHedgedProviderFailsTheErrorListsThemInConfiguredOrder() = runTest {
+        val gemini = FakeProvider(ProviderId.GEMINI, true, { kotlinx.coroutines.delay(8_000); throw ProviderError.Http(500, "down") }, { throw ProviderError.Http(500, "down") })
+        val groq = FakeProvider(ProviderId.GROQ, true, fail(ProviderError.Http(401, "bad key")))
+
+        val error = assertFailsWith<AllProvidersFailedException> { hedged(5_000, gemini, groq).complete(request) }
+
+        assertEquals(listOf(ProviderId.GEMINI, ProviderId.GROQ), error.failures.map { it.provider })
+        assertNull(client(gemini, groq).activeProvider.value)
+    }
+
+    @Test
+    fun hedgingNeverStartsAProviderThatIsNotConfiguredOrIsCoolingDown() = runTest {
+        val gemini = FakeProvider(ProviderId.GEMINI, true, slow(20_000, "slow gemini"))
+        val groq = FakeProvider(ProviderId.GROQ, false)
+
+        val response = hedged(5_000, gemini, groq).complete(request)
+
+        assertEquals(ProviderId.GEMINI, response.provider)
+        assertEquals(0, groq.calls)
+        assertEquals(20_000L, currentTime)
+    }
+
+    @Test
+    fun cancellingARequestCancelsEveryProviderInFlight() = runTest {
+        var geminiCancelled = false
+        var groqCancelled = false
+        val gemini = FakeProvider(ProviderId.GEMINI, true, { try { awaitCancellation() } finally { geminiCancelled = true } })
+        val groq = FakeProvider(ProviderId.GROQ, true, { try { awaitCancellation() } finally { groqCancelled = true } })
+        val job = launch { hedged(1_000, gemini, groq).complete(request) }
+        advanceTimeBy(1_500)
+        runCurrent()
+
+        job.cancel()
+        runCurrent()
+
+        assertTrue(geminiCancelled && groqCancelled)
     }
 }

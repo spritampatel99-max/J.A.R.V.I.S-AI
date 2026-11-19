@@ -45,6 +45,9 @@ enum class SubPage(val title: String) {
     MODELS("On-device models"),
     CLOUD("Cloud AI"),
     ACCESS("Access"),
+    HANDS_FREE("Hands-free"),
+    SCREEN_CONTROL("Phone control"),
+    OFFLINE_LIBRARY("Offline library"),
     AGENTS("Agents"),
     MEMORY("Memory"),
     PLANNER("Planner"),
@@ -102,6 +105,12 @@ fun PrefsScreen(vm: AgentViewModel, appVersion: String, onOpen: (SubPage) -> Uni
                 )
             }
             GlowButton("Preview voice", onClick = vm::previewVoice, subtle = true)
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            NavRow("Hands-free", "Say \"Jarvis\" to wake it. No tapping the mic.", Glyph.MIC) { onOpen(SubPage.HANDS_FREE) }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            NavRow("Phone control", "Read the screen, scroll, go back or home, read and clear notifications.", Glyph.DEVICE) { onOpen(SubPage.SCREEN_CONTROL) }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            NavRow("Offline library", "Wikipedia saved on this phone (1-2 GB). Answers with no internet.", Glyph.STORAGE) { onOpen(SubPage.OFFLINE_LIBRARY) }
         }
 
         // ---- Appearance --------------------------------------------------------------------------

@@ -53,21 +53,21 @@ enum class ModelChoice {
 data class ModelSpec(
     val id: ModelId,
     val tier: ModelTier,
-    val displayName: String,
+    override val displayName: String,
     val category: String,
     val repo: String,
-    val fileName: String,
+    override val fileName: String,
     /** True when the repository needs the user to accept a licence and sign in before downloading. */
-    val gated: Boolean,
+    override val gated: Boolean,
     val license: String,
     val bestFor: List<String>,
     val capabilityNote: String,
     /** What the vendor says about memory use, with its source. It is not a requirement for other phones. */
     val vendorMemoryNote: String?,
-) {
+) : InstallTarget {
     val host: String get() = "huggingface.co"
     val metadataUrl: String get() = "https://$host/api/models/$repo/tree/main"
-    val downloadUrl: String get() = "https://$host/$repo/resolve/main/$fileName"
+    override val downloadUrl: String get() = "https://$host/$repo/resolve/main/$fileName"
 }
 
 /**

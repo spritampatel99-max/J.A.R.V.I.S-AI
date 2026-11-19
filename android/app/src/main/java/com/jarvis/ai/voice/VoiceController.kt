@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -48,22 +50,34 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
 
     private var recognizer: SpeechRecognizer? = null
     private var onFinal: ((String) -> Unit)? = null
+    private var onNothing: (() -> Unit)? = null
+    private val main = Handler(Looper.getMainLooper())
+    private var utteranceCounter = 0
+    private var currentUtterance: String? = null
+    private val whenSpoken = HashMap<String, () -> Unit>()
     private var tts: TextToSpeech? = null
     private var ttsReady = false
 
     /** A reply asked for before the speech engine finished starting; it is spoken as soon as the engine is ready. */
-    private var pendingSpeech: String? = null
+    private var pendingSpeech: Pair<String, (() -> Unit)?>? = null
 
     // ---- listening ------------------------------------------------------------------------------------------------
 
-    fun startListening(onFinal: (String) -> Unit) {
+    /**
+     * Starts one listening session. [onFinal] gets the words that were heard. [onNothing] runs instead when the session ends
+     * with nothing usable (silence, an error, no recogniser), so a caller that is waiting never hangs. Neither runs when the
+     * session is ended with [cancelListening].
+     */
+    fun startListening(onFinal: (String) -> Unit, onNothing: (() -> Unit)? = null) {
         if (!SpeechRecognizer.isRecognitionAvailable(appContext)) {
             flow.update { it.copy(message = "This phone has no speech recogniser installed.", recognizerAvailable = false) }
+            onNothing?.invoke()
             return
         }
         stopSpeaking()
         destroyRecognizer()
         this.onFinal = onFinal
+        this.onNothing = onNothing
 
         val onDevice = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && SpeechRecognizer.isOnDeviceRecognitionAvailable(appContext)
         val created = if (onDevice) SpeechRecognizer.createOnDeviceSpeechRecognizer(appContext) else SpeechRecognizer.createSpeechRecognizer(appContext)
@@ -89,6 +103,7 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
     /** Ends the session and discards it. */
     fun cancelListening() {
         onFinal = null
+        onNothing = null
         destroyRecognizer()
         flow.update { it.copy(listening = false, level = 0f, partial = "") }
     }
@@ -121,17 +136,22 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
         override fun onResults(results: Bundle?) {
             val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
             val deliver = onFinal
+            val nothing = onNothing
             onFinal = null
+            onNothing = null
             destroyRecognizer()
             flow.update { it.copy(listening = false, level = 0f, partial = "", message = if (text.isEmpty()) "I did not catch anything. Try again." else null) }
-            if (text.isNotEmpty()) deliver?.invoke(text)
+            if (text.isNotEmpty()) deliver?.invoke(text) else nothing?.invoke()
         }
 
         override fun onError(error: Int) {
+            val nothing = onNothing
             onFinal = null
+            onNothing = null
             destroyRecognizer()
             val message = if (VoiceErrors.isRoutine(error)) "I did not catch anything. Try again." else VoiceErrors.message(error)
             flow.update { it.copy(listening = false, level = 0f, partial = "", message = message) }
+            nothing?.invoke()
         }
     }
 
@@ -151,51 +171,87 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
         tts = TextToSpeech(appContext) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
             if (ttsReady) {
-                pendingSpeech?.let { speakNow(it) }
-                pendingSpeech = null
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
                         flow.update { it.copy(speaking = true) }
                     }
 
                     override fun onDone(utteranceId: String?) {
-                        flow.update { it.copy(speaking = false) }
+                        finished(utteranceId)
+                    }
+
+                    override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                        finished(utteranceId)
                     }
 
                     @Deprecated("Required override on older API levels")
                     override fun onError(utteranceId: String?) {
-                        flow.update { it.copy(speaking = false) }
+                        finished(utteranceId)
                     }
                 })
+                pendingSpeech?.let { speakNow(it.first, it.second) }
+                pendingSpeech = null
             } else {
                 flow.update { it.copy(message = "Text-to-speech is not available on this phone.") }
+                // Whoever was waiting for the reply to be spoken must not wait forever.
+                pendingSpeech?.second?.let { main.post(it) }
+                pendingSpeech = null
+                flow.update { it.copy(speaking = false) }
             }
         }
     }
 
-    /** Reads a reply aloud. Web content and markup are stripped first; nothing is spoken if only that remains. */
-    fun speak(reply: String) {
-        val text = SpeechText.forSpeaking(reply) ?: return
-        ensureTts()
-        if (!ttsReady) {
-            pendingSpeech = text
+    /**
+     * Reads a reply aloud. Web content and markup are stripped first; nothing is spoken if only that remains.
+     * [onDone] runs on the main thread once the speech has ended, been stopped, or failed, and also at once when there is
+     * nothing to say, so a caller that waits for it is never left waiting.
+     */
+    fun speak(reply: String, onDone: (() -> Unit)? = null) {
+        val text = SpeechText.forSpeaking(reply)
+        if (text == null) {
+            onDone?.let { main.post(it) }
             return
         }
-        speakNow(text)
+        // Marked as speaking at once, so anything watching the voice state does not see a quiet gap before the engine starts.
+        flow.update { it.copy(speaking = true) }
+        ensureTts()
+        if (!ttsReady) {
+            pendingSpeech = text to onDone
+            return
+        }
+        speakNow(text, onDone)
     }
 
-    private fun speakNow(text: String) {
+    private fun speakNow(text: String, onDone: (() -> Unit)?) {
         val engine = tts ?: return
         val settings = prefs()
         engine.setSpeechRate(settings.speechRate)
         settings.voiceName?.let { wanted ->
             engine.voices?.firstOrNull { it.name == wanted }?.let { engine.voice = it }
         }
-        engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-reply")
+        val id = "jarvis-${utteranceCounter++}"
+        currentUtterance = id
+        if (onDone != null) whenSpoken[id] = onDone
+        if (engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) == TextToSpeech.ERROR) finished(id)
+    }
+
+    /** Called from the speech engine's own thread. */
+    private fun finished(utteranceId: String?) {
+        main.post {
+            val callback = utteranceId?.let { whenSpoken.remove(it) }
+            // A flushed utterance reports its end after the next one has started; only the current one may clear "speaking".
+            if (utteranceId == currentUtterance || currentUtterance == null) {
+                currentUtterance = null
+                flow.update { it.copy(speaking = false) }
+            }
+            callback?.invoke()
+        }
     }
 
     fun stopSpeaking() {
+        pendingSpeech?.second?.let { main.post(it) }
         pendingSpeech = null
+        currentUtterance = null
         tts?.stop()
         flow.update { it.copy(speaking = false) }
     }
@@ -217,5 +273,6 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
         tts?.shutdown()
         tts = null
         ttsReady = false
+        whenSpoken.clear()
     }
 }

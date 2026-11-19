@@ -169,7 +169,8 @@ class NativeCommandsTest {
         assertEquals("https://news.site.org/a?b=1", firstParam("go to https://news.site.org/a?b=1", "url"))
         assertEquals("open_url", run("visit the website wikipedia.org").steps.single().tool)
         assertNull(NativeCommands.match("open notes.txt", clock))
-        assertNull(NativeCommands.match("open facebook", clock))
+        // A bare name is an app, not a website: "open facebook" opens the Facebook app (the tool says so if it is not installed).
+        assertEquals("open_app", run("open facebook").steps.single().tool)
         assertNull(NativeCommands.match("open javascript:alert(1)", clock))
     }
 

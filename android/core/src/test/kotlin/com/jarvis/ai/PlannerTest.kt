@@ -238,4 +238,38 @@ class PlannerTest {
         assertTrue(prompt.contains("set_alarm - Alarm at 06:00"))
         assertFalse(prompt.contains("AIzaSy"), "keys echoed in an error must not be sent onward")
     }
+
+    // ---- spoken requests: shorter answers, sooner ---------------------------------------------------------------
+
+    private val plainReply = """{"reply": "It is sunny.", "clarification": null, "steps": []}"""
+
+    @Test
+    fun aSpokenRequestAsksForShortAnswersAndGetsASmallerOutputBudget() = runTest {
+        val llm = FakeLlm(plainReply)
+        planner(llm).plan("how is the weather", spoken = true)
+
+        val sent = llm.requests.single()
+        assertTrue("read aloud" in sent.system && "two short sentences" in sent.system)
+        assertEquals(700, sent.maxTokens)
+    }
+
+    @Test
+    fun aTypedRequestKeepsTheNormalPromptAndBudget() = runTest {
+        val llm = FakeLlm(plainReply)
+        planner(llm).plan("how is the weather")
+
+        val sent = llm.requests.single()
+        assertFalse("read aloud" in sent.system)
+        assertEquals(1_536, sent.maxTokens)
+    }
+
+    @Test
+    fun theShortAnswerRuleSitsBesideTheSafetyRulesAndNeverReplacesThem() = runTest {
+        val llm = FakeLlm(plainReply)
+        planner(llm).plan("hi", spoken = true)
+
+        val system = llm.requests.single().system
+        assertTrue("You cannot confirm, approve or cancel anything." in system)
+        assertTrue("TOOLS:" in system && "OUTPUT: return ONLY one JSON object" in system)
+    }
 }

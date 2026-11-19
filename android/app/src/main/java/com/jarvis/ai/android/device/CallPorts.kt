@@ -1,11 +1,11 @@
 package com.jarvis.ai.android.device
 
 import android.Manifest
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Bundle
 import android.provider.ContactsContract
 import android.telecom.TelecomManager
 import androidx.core.content.ContextCompat
@@ -17,6 +17,7 @@ import com.jarvis.ai.ai.tools.builtin.CallStart
 import com.jarvis.ai.ai.tools.builtin.ContactSearch
 import com.jarvis.ai.ai.tools.builtin.ContactsPort
 import com.jarvis.ai.ai.tools.builtin.EndCallResult
+import com.jarvis.ai.ai.tools.builtin.LaunchResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -68,21 +69,32 @@ class AndroidContactsPort(context: Context) : ContactsPort {
 /**
  * Starts, answers and ends calls through Android. Android does not report back whether a call connected, so every
  * result here only says what was asked of the system.
+ *
+ * With the phone permission, a call is placed through Android's telephony service, which also works while the app is in
+ * the background (hands-free). Without it, the phone's dialer is opened with the number filled in, which Android only
+ * allows while one of this app's screens is showing or "Display over other apps" is allowed.
  */
-class AndroidCallPort(context: Context) : CallPort {
+class AndroidCallPort(context: Context, private val foreground: ForegroundTracker) : CallPort {
     private val context = context.applicationContext
 
+    @Suppress("MissingPermission")
     override fun call(number: String, allowDirect: Boolean): CallStart {
-        val direct = allowDirect && context.has(Manifest.permission.CALL_PHONE)
-        val intent = Intent(if (direct) Intent.ACTION_CALL else Intent.ACTION_DIAL, Uri.fromParts("tel", number, null))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return try {
-            context.startActivity(intent)
-            if (direct) CallStart.Placed else CallStart.DialerOpened
-        } catch (e: ActivityNotFoundException) {
-            CallStart.NoHandler
-        } catch (e: SecurityException) {
-            CallStart.Failed("Android refused to start the call.")
+        val uri = Uri.fromParts("tel", number, null)
+        if (allowDirect && context.has(Manifest.permission.CALL_PHONE)) {
+            val telecom = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+            if (telecom != null) {
+                try {
+                    telecom.placeCall(uri, Bundle())
+                    return CallStart.Placed
+                } catch (e: SecurityException) {
+                    // Fall through to the dialer below.
+                }
+            }
+        }
+        return when (val result = startActivitySafely(context, foreground, Intent(Intent.ACTION_DIAL, uri), "phone calls")) {
+            LaunchResult.Launched -> CallStart.DialerOpened
+            is LaunchResult.NoHandler -> CallStart.NoHandler
+            is LaunchResult.Failed -> CallStart.Failed(result.reason)
         }
     }
 

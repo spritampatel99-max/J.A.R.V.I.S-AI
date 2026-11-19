@@ -267,6 +267,7 @@ private fun MessageBubble(item: ChatItem, animate: Boolean, time: String, modifi
         append(who)
         if (item.viaVoice) append(" · Voice")
         append(" · ").append(time)
+        item.tookMs?.let { append(" · ").append(formatTook(it)) }
     }
 
     Box(
@@ -327,9 +328,12 @@ private fun reportText(text: String) = buildAnnotatedString {
  * own description of the exact, validated action (for a call: the resolved contact and number), never from model output
  * or from speech. It can only be answered by tapping: voice, notifications and the AI have no way to press these buttons.
  * Tapping outside or going back counts as Cancel, and an unanswered request expires.
+ *
+ * One exception, chosen by the person: a call they SPOKE and the app's own command patterns matched is read back and goes
+ * ahead after a 3-second countdown ([countdown]) unless they say "stop" or tap Cancel. That timer is app code, never the AI.
  */
 @Composable
-fun ConfirmationOverlay(request: ConfirmationRequest, onAllow: () -> Unit, onDeny: () -> Unit) {
+fun ConfirmationOverlay(request: ConfirmationRequest, onAllow: () -> Unit, onDeny: () -> Unit, countdown: CountdownUi? = null) {
     val call = CallSummary.parse(request.toolName, request.summary)
     var now by remember(request.id) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(request.id) {
@@ -379,9 +383,13 @@ fun ConfirmationOverlay(request: ConfirmationRequest, onAllow: () -> Unit, onDen
                 Text(request.summary, style = MaterialTheme.typography.titleMedium, color = JarvisColors.Ink, textAlign = TextAlign.Center)
             }
             Text(
-                "Risk: ${request.risk.name.lowercase()}. Only a tap here can allow this. It expires in ${seconds}s if you do not answer.",
+                if (countdown != null) {
+                    "Going ahead in ${countdown.secondsLeft}…  Say \"stop\" or tap Cancel."
+                } else {
+                    "Risk: ${request.risk.name.lowercase()}. Only a tap here can allow this. It expires in ${seconds}s if you do not answer."
+                },
                 style = MaterialTheme.typography.bodySmall,
-                color = JarvisColors.Muted,
+                color = if (countdown != null) JarvisColors.Cyan else JarvisColors.Muted,
                 textAlign = TextAlign.Center,
             )
             GlowButton(if (call != null) "Confirm & Call" else "Allow", onClick = onAllow, modifier = Modifier.fillMaxWidth())
@@ -412,3 +420,7 @@ private fun initials(name: String): String {
         else -> (parts.first().take(1) + parts.last().take(1)).uppercase()
     }
 }
+
+/** "0.4 s" or "12 s": how long an answer took, so slow providers can be seen and reordered. */
+internal fun formatTook(ms: Long): String =
+    if (ms < 10_000L) String.format(java.util.Locale.US, "%.1f s", ms / 1000.0) else "${ms / 1000} s"

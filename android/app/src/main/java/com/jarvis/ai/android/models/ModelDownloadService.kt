@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -41,21 +42,22 @@ class ModelDownloadService : Service() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
         )
         if (watcher?.isActive != true) {
-            val manager = (application as JarvisApplication).container.modelManager
+            val container = (application as JarvisApplication).container
             watcher = scope.launch {
-                manager.states.collect { states ->
+                combine(container.modelManager.states, container.library.state) { models, library -> models to library }.collect { (states, library) ->
                     val busy = states.values.filter { it.busy }
-                    if (busy.isEmpty()) {
+                    if (busy.isEmpty() && !library.busy) {
                         ServiceCompat.stopForeground(this@ModelDownloadService, ServiceCompat.STOP_FOREGROUND_REMOVE)
                         stopSelf()
                     } else {
-                        val first = busy.first()
-                        val progress = first.progress
+                        val first = busy.firstOrNull()
+                        val name = first?.spec?.displayName ?: "Offline library"
+                        val progress = first?.progress ?: library.progress
                         val text = when {
                             progress?.totalBytes != null ->
-                                "${first.spec.displayName}: ${ByteFormat.format(progress.bytesDone)} of ${ByteFormat.format(progress.totalBytes!!)}"
-                            progress != null -> "${first.spec.displayName}: ${ByteFormat.format(progress.bytesDone)}"
-                            else -> "${first.spec.displayName}: checking…"
+                                "$name: ${ByteFormat.format(progress.bytesDone)} of ${ByteFormat.format(progress.totalBytes!!)}"
+                            progress != null -> "$name: ${ByteFormat.format(progress.bytesDone)}"
+                            else -> "$name: checking…"
                         }
                         val percent = progress?.fraction?.let { (it * 100).toInt() }
                         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text, percent))
@@ -68,7 +70,9 @@ class ModelDownloadService : Service() {
 
     /** Android 15 limits a data-sync service to about six hours. Downloads are resumable, so stopping is safe. */
     override fun onTimeout(startId: Int, fgsType: Int) {
-        (application as JarvisApplication).container.modelManager.cancelAll()
+        val container = (application as JarvisApplication).container
+        container.modelManager.cancelAll()
+        container.library.cancel()
         stopSelf()
     }
 
@@ -79,7 +83,7 @@ class ModelDownloadService : Service() {
 
     private fun createChannel() {
         val channel = NotificationChannel(CHANNEL_ID, "Model downloads", NotificationManager.IMPORTANCE_LOW)
-        channel.description = "Progress of on-device AI model downloads"
+        channel.description = "Progress of on-device AI model and offline library downloads"
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
@@ -92,7 +96,7 @@ class ModelDownloadService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("J.A.R.V.I.S. model")
+            .setContentTitle("J.A.R.V.I.S. download")
             .setContentText(text)
             .setProgress(100, percent ?: 0, percent == null)
             .setOngoing(true)

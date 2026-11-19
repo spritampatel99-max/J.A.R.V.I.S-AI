@@ -37,6 +37,22 @@ fun interface DownloadSource {
     suspend fun open(url: String, headers: Map<String, String>, startAt: Long): DownloadResponse
 }
 
+/** What the installer needs to know about the file it is fetching. Models and the offline library both provide it. */
+interface InstallTarget {
+    val displayName: String
+    val fileName: String
+    val downloadUrl: String
+
+    /** True when the host needs the person to accept a licence and sign in first. Only models can be gated. */
+    val gated: Boolean
+
+    /** Who serves the file, for messages. */
+    val hostName: String get() = "Hugging Face"
+
+    /** "model file" or "file", for messages. */
+    val noun: String get() = "model file"
+}
+
 /** What the repository says the finished file must be. Either value may be unknown. */
 data class ExpectedFile(val sizeBytes: Long?, val sha256: String?) {
     companion object {
@@ -91,7 +107,7 @@ class ModelInstaller(
 ) {
 
     suspend fun download(
-        spec: ModelSpec,
+        spec: InstallTarget,
         expected: ExpectedFile,
         dir: File,
         accessToken: String?,
@@ -127,7 +143,7 @@ class ModelInstaller(
 
     /** Installs a file the user already has (picked with the system file chooser). */
     suspend fun importFrom(
-        spec: ModelSpec,
+        spec: InstallTarget,
         expected: ExpectedFile,
         dir: File,
         input: InputStream,
@@ -159,7 +175,7 @@ class ModelInstaller(
 
     /** @return null when the body was fully written to [part]; otherwise why not. */
     private suspend fun transfer(
-        spec: ModelSpec,
+        spec: InstallTarget,
         part: File,
         resumeFrom: Long,
         total: Long?,
@@ -203,14 +219,14 @@ class ModelInstaller(
                     401, 403 -> InstallResult.Failed(
                         FailureReason.ACCESS_DENIED,
                         if (spec.gated) {
-                            "Hugging Face refused access. ${spec.displayName} is gated: accept its licence on the model page " +
+                            "${spec.hostName} refused access. ${spec.displayName} is gated: accept its licence on the model page " +
                                 "and use an access token that has read permission."
                         } else {
-                            "Hugging Face refused access (HTTP ${r.code})."
+                            "${spec.hostName} refused access (HTTP ${r.code})."
                         },
                         canResume = part.isFile,
                     )
-                    404 -> InstallResult.Failed(FailureReason.NOT_FOUND, "The model file was not found on Hugging Face (HTTP 404). It may have been renamed.")
+                    404 -> InstallResult.Failed(FailureReason.NOT_FOUND, "The ${spec.noun} was not found on ${spec.hostName} (HTTP 404). It may have been renamed.")
                     else -> InstallResult.Failed(FailureReason.SERVER, "The download server answered HTTP ${r.code}.", canResume = part.isFile)
                 }
             }
@@ -279,7 +295,7 @@ class ModelInstaller(
     }
 
     private suspend fun finish(
-        spec: ModelSpec,
+        spec: InstallTarget,
         expected: ExpectedFile,
         dir: File,
         part: File,
@@ -364,7 +380,7 @@ class ModelInstaller(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun partFile(dir: File, spec: ModelSpec) = File(dir, spec.fileName + PART_SUFFIX)
+    private fun partFile(dir: File, spec: InstallTarget) = File(dir, spec.fileName + PART_SUFFIX)
 
     companion object {
         const val PART_SUFFIX = ".part"

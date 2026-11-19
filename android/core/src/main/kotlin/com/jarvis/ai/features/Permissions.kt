@@ -11,7 +11,7 @@ enum class PermissionKind {
     SPECIAL_ACCESS,
 }
 
-enum class PermissionId { INTERNET, ACCESS_NETWORK_STATE, SET_ALARM, RECORD_AUDIO, POST_NOTIFICATIONS, FOREGROUND_SERVICE_MICROPHONE, NOTIFICATION_LISTENER, READ_CONTACTS, CALL_PHONE, USAGE_ACCESS, EXACT_ALARMS }
+enum class PermissionId { INTERNET, ACCESS_NETWORK_STATE, SET_ALARM, RECORD_AUDIO, POST_NOTIFICATIONS, FOREGROUND_SERVICE_MICROPHONE, NOTIFICATION_LISTENER, READ_CONTACTS, CALL_PHONE, USAGE_ACCESS, EXACT_ALARMS, OVERLAY, ACCESSIBILITY }
 
 /** The five things Part 25 says to explain for every permission. */
 data class PermissionInfo(
@@ -65,7 +65,7 @@ object PermissionCatalog {
         ),
         PermissionInfo(
             PermissionId.NOTIFICATION_LISTENER, "Notification access", PermissionKind.SPECIAL_ACCESS,
-            "Reading and summarising notifications from the apps you allow.",
+            "Reading out and dismissing the notifications that are showing now. Notifications from banking and payment apps and password managers are left out.",
             "The title and text of notifications that other apps post. Message notifications can contain private conversations.",
             "Settings > Notifications > Device & app notifications > J.A.R.V.I.S.-AI (the location varies by manufacturer).",
         ),
@@ -86,6 +86,18 @@ object PermissionCatalog {
             "Showing which apps used mobile data.",
             "Per-app usage statistics. Without it only whole-phone totals are possible.",
             "Settings > Apps > Special app access > Usage access (the location varies by manufacturer).",
+        ),
+        PermissionInfo(
+            PermissionId.ACCESSIBILITY, "Accessibility (screen access)", PermissionKind.SPECIAL_ACCESS,
+            "Reading the text on the screen when you ask, scrolling, and pressing Back, Home, Recents, lock and screenshot.",
+            "The text of whatever app is in front while it is asked to read. It does not tap or type inside other apps, and it never reads J.A.R.V.I.S. itself, payment apps or password managers.",
+            "Settings > Accessibility > J.A.R.V.I.S. (the location varies by manufacturer).",
+        ),
+        PermissionInfo(
+            PermissionId.OVERLAY, "Display over other apps", PermissionKind.SPECIAL_ACCESS,
+            "A small status card while hands-free works, and permission for the app to open another app when you ask by voice while J.A.R.V.I.S. is not on screen.",
+            "Nothing. It lets the app draw over other apps; it cannot read what they show.",
+            "Settings > Apps > Special app access > Display over other apps (the location varies by manufacturer).",
         ),
         PermissionInfo(
             PermissionId.EXACT_ALARMS, "Exact alarms", PermissionKind.SPECIAL_ACCESS,

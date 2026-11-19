@@ -65,6 +65,7 @@ fun JarvisApp(vm: AgentViewModel, container: AppContainer, onRunSetupAgain: () -
     var tab by rememberSaveable { mutableIntStateOf(AppTab.HOME.ordinal) }
     var sub by rememberSaveable { mutableStateOf<SubPage?>(null) }
     val pending by vm.pendingConfirmation.collectAsStateWithLifecycle()
+    val countdown by vm.countdown.collectAsStateWithLifecycle()
     val imeOpen = keyboardOpen()
 
     fun open(target: AppTab) {
@@ -95,6 +96,9 @@ fun JarvisApp(vm: AgentViewModel, container: AppContainer, onRunSetupAgain: () -
                         subPage == SubPage.MODELS -> ModelsScreen(container.modelManager, container.keys)
                         subPage == SubPage.CLOUD -> ProvidersScreen(vm, showTitle = false)
                         subPage == SubPage.ACCESS -> AccessScreen()
+                        subPage == SubPage.HANDS_FREE -> HandsFreeScreen(container)
+                        subPage == SubPage.SCREEN_CONTROL -> ScreenAccessScreen(container)
+                        subPage == SubPage.OFFLINE_LIBRARY -> OfflineLibraryScreen(container)
                         subPage == SubPage.AGENTS -> AgentsScreen(container)
                         subPage == SubPage.MEMORY -> MemoryScreen(container)
                         subPage == SubPage.PLANNER -> PlannerScreen(container)
@@ -134,7 +138,14 @@ fun JarvisApp(vm: AgentViewModel, container: AppContainer, onRunSetupAgain: () -
         }
     }
 
-    pending?.let { request -> ConfirmationOverlay(request, onAllow = { vm.approve(request.id) }, onDeny = { vm.deny(request.id) }) }
+    pending?.let { request ->
+        ConfirmationOverlay(
+            request,
+            onAllow = { vm.approve(request.id) },
+            onDeny = { vm.deny(request.id) },
+            countdown = countdown?.takeIf { it.requestId == request.id },
+        )
+    }
 }
 
 /** The bar shown on pages that open from Prefs: a back arrow and the page name. */

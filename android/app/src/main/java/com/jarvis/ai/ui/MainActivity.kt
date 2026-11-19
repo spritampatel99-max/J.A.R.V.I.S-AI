@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jarvis.ai.JarvisApplication
+import com.jarvis.ai.android.voice.HandsFreeService
 
 class MainActivity : ComponentActivity() {
 
@@ -50,14 +51,17 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        // Nothing keeps listening or talking once the app is out of sight.
-        container.voice.cancelListening()
-        container.voice.stopSpeaking()
+        // Nothing keeps listening or talking once the app is out of sight, unless the person turned Hands-free on: its service
+        // then owns the microphone and the voice, and leaving the app is exactly when it is meant to keep working.
+        if (!HandsFreeService.isRunning) {
+            container.voice.cancelListening()
+            container.voice.stopSpeaking()
+        }
         super.onStop()
     }
 
     override fun onDestroy() {
-        if (isFinishing) container.voice.shutdown()
+        if (isFinishing && !HandsFreeService.isRunning) container.voice.shutdown()
         super.onDestroy()
     }
 }

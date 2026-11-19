@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.app.AlarmManager
 import android.app.AppOpsManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -15,6 +16,7 @@ import android.os.Process
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.jarvis.ai.android.screen.JarvisAccessibilityService
 
 enum class AccessKind {
     /** Android shows its own allow/deny dialog. */
@@ -63,8 +65,9 @@ enum class AccessKey(
     ),
     MICROPHONE(
         "Microphone", AccessKind.RUNTIME, Manifest.permission.RECORD_AUDIO, true,
-        "For voice commands. It listens only while you hold a listening session open with the mic button; there is no always-listening mode.",
-        "Sound is passed to Android's speech recogniser for that one request. The app does not record or store audio. " +
+        "For voice commands. It listens when you tap the mic button, and, only if you turn on Hands-free in Prefs, for the word \"Jarvis\".",
+        "Sound is passed to Android's speech recogniser for each request. While Hands-free is on, a small on-device detector also hears the microphone, " +
+            "but it only reports the word \"Jarvis\". The app does not record or store audio. " +
             "Depending on your phone, the recogniser may send the sound to its provider (usually Google) to turn it into text; " +
             "on Android 13 and later the app asks for the on-device recogniser when your phone has one.",
         "Settings > Apps > J.A.R.V.I.S. > Permissions > Microphone.",
@@ -94,18 +97,35 @@ enum class AccessKey(
         "Nothing is read. It only lets the app schedule precise timers.",
         "Settings > Apps > Special access > Alarms & reminders.",
     ),
+    OVERLAY(
+        "Display over other apps", AccessKind.SPECIAL, Manifest.permission.SYSTEM_ALERT_WINDOW, true,
+        "Lets hands-free show a small card (\"Listening…\", the answer, the call countdown with Cancel) on top of other apps, and lets the app open " +
+            "another app when you ask by voice while J.A.R.V.I.S. is not on screen. Without it, opening apps by voice works only while J.A.R.V.I.S. is open.",
+        "It can draw over other apps. It cannot read what is on them.",
+        "Settings > Apps > Special access > Display over other apps.",
+    ),
     USAGE_ACCESS(
         "Usage access", AccessKind.SPECIAL, Manifest.permission.PACKAGE_USAGE_STATS, false,
         "For a data and screen-time monitor. That monitor is not built yet.",
         "Which apps you use and for how long. Powerful, so leave it off until the monitor exists unless you want it.",
         "Settings > Apps > Special access > Usage access.",
     ),
+    ACCESSIBILITY(
+        "Phone control (Accessibility)", AccessKind.SPECIAL, null, true,
+        "Lets you say \"read my screen\", \"scroll down\", \"go back\", \"go home\", \"lock the phone\" or \"take a screenshot\". " +
+            "It reads the text of the window in front aloud and presses Android's own navigation buttons.",
+        "The text of the screen in front, only when you ask. It skips password fields, text boxes you type in, banking, payment and password apps, " +
+            "and J.A.R.V.I.S. itself. It cannot tap or type in other apps. What it reads is shown to you and spoken, not saved and not sent to an AI. " +
+            "If Android greys the switch out (apps installed outside the Play Store), open Settings > Apps > J.A.R.V.I.S., tap the three dots and choose \"Allow restricted settings\", then try again.",
+        "Settings > Accessibility > J.A.R.V.I.S. > switch off.",
+    ),
     NOTIFICATION_ACCESS(
-        "Read notifications", AccessKind.UNAVAILABLE, null, false,
-        "For summarising your notifications. Android lists an app on its switch page only after the app has a notification " +
-            "service, which is not built yet, so there is nothing to turn on.",
-        "Would be the text of notifications from other apps.",
-        "Settings > Notifications > Device and app notifications.",
+        "Read notifications", AccessKind.SPECIAL, null, true,
+        "Lets you say \"read my notifications\" or \"clear my notifications\".",
+        "The title and text of the notifications showing now, only when you ask. It skips ongoing ones (music, calls), notifications you marked secret, " +
+            "and banking, payment and password apps. What it reads is shown to you and spoken, not saved and not sent to an AI. " +
+            "If Android greys the switch out, use \"Allow restricted settings\" on this app's page in Settings, as above.",
+        "Settings > Notifications > Device and app notifications > J.A.R.V.I.S. > off.",
     ),
 }
 
@@ -132,13 +152,26 @@ object AccessChecks {
                 if (alarms.canScheduleExactAlarms()) AccessState.ALLOWED else AccessState.NOT_ALLOWED
             }
 
+        AccessKey.OVERLAY ->
+            if (Settings.canDrawOverlays(context)) AccessState.ALLOWED else AccessState.NOT_ALLOWED
+
         AccessKey.USAGE_ACCESS -> {
             val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
             val mode = ops.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
             if (mode == AppOpsManager.MODE_ALLOWED) AccessState.ALLOWED else AccessState.NOT_ALLOWED
         }
 
-        AccessKey.NOTIFICATION_ACCESS -> AccessState.NOT_ALLOWED
+        AccessKey.NOTIFICATION_ACCESS ->
+            if (NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)) AccessState.ALLOWED else AccessState.NOT_ALLOWED
+
+        AccessKey.ACCESSIBILITY -> if (accessibilityEnabled(context)) AccessState.ALLOWED else AccessState.NOT_ALLOWED
+    }
+
+    /** True when the person has switched the accessibility service on in Settings (Android lists it in a colon-separated setting). */
+    fun accessibilityEnabled(context: Context): Boolean {
+        val mine = ComponentName(context, JarvisAccessibilityService::class.java)
+        val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+        return enabled.split(':').any { ComponentName.unflattenFromString(it.trim()) == mine }
     }
 
     private fun granted(context: Context, permission: String): Boolean =
@@ -161,7 +194,10 @@ object AccessChecks {
             AccessKey.BATTERY -> Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, packageUri)
             AccessKey.EXACT_ALARMS ->
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri) else null
+            AccessKey.OVERLAY -> Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, packageUri)
             AccessKey.USAGE_ACCESS -> Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            AccessKey.ACCESSIBILITY -> Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            AccessKey.NOTIFICATION_ACCESS -> Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
             AccessKey.NOTIFICATIONS -> Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
             else -> null
         }

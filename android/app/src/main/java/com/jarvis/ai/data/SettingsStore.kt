@@ -78,6 +78,26 @@ class SettingsStore(context: Context) {
             prefs.edit().putBoolean(KEY_USE_MEMORY, value).apply()
         }
 
+    /**
+     * Whether the person turned hands-free listening on. Android does not let a microphone service start by itself after a
+     * restart, so this only says what they last chose; the service is started from the screen.
+     */
+    var handsFreeOn: Boolean
+        get() = prefs.getBoolean(KEY_HANDS_FREE, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_HANDS_FREE, value).apply()
+        }
+
+    /**
+     * Apps the person never wants read or controlled through the screen tools, on top of the built-in banking, payment and
+     * password-app rules. Package names. Stored on this phone only.
+     */
+    var screenBlocklist: Set<String>
+        get() = prefs.getStringSet(KEY_SCREEN_BLOCKLIST, emptySet())?.toSet().orEmpty()
+        set(value) {
+            prefs.edit().putStringSet(KEY_SCREEN_BLOCKLIST, value.toSet()).apply()
+        }
+
     /** When on, MEDIUM-risk actions (for example setting an alarm) also ask first. HIGH always asks. */
     var confirmMediumActions: Boolean
         get() = prefs.getBoolean(KEY_CONFIRM_MEDIUM, false)
@@ -107,6 +127,8 @@ class SettingsStore(context: Context) {
         const val KEY_ORDER = "provider_order"
         const val KEY_CONFIRM_MEDIUM = "confirm_medium_actions"
         const val KEY_USE_MEMORY = "use_memory_in_chat"
+        const val KEY_HANDS_FREE = "hands_free_on"
+        const val KEY_SCREEN_BLOCKLIST = "screen_blocklist"
         const val KEY_AMBIENT = "ui_ambient"
         const val KEY_REDUCE_MOTION = "ui_reduce_motion"
         const val KEY_FLARE = "ui_flare"

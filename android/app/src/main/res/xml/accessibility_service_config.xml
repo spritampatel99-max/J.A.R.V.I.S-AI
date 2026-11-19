@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Read the text of the window in front, scroll it, and press the system's Back, Home, Recents, Notifications, Quick settings,
+  Lock and Screenshot controls. Gestures (taps, swipes, typing into other apps) are deliberately NOT requested.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault"
+    android:canPerformGestures="false"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/accessibility_service_description"
+    android:notificationTimeout="200" />

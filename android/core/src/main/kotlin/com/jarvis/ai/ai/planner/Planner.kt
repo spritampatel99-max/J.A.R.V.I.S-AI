@@ -44,9 +44,13 @@ class Planner(
     private val persona: String? = null,
 ) : Replanner {
 
-    suspend fun plan(goal: String, history: List<ChatMessage> = emptyList()): PlanResult {
+    /**
+     * [spoken] is true when the person said the request aloud. The answer will be read out, so the model is told to keep it to a
+     * couple of short sentences (a shorter answer is also generated sooner) and is given a smaller output budget.
+     */
+    suspend fun plan(goal: String, history: List<ChatMessage> = emptyList(), spoken: Boolean = false): PlanResult {
         val messages = history.takeLast(MAX_HISTORY_MESSAGES) + ChatMessage(ChatRole.USER, goal)
-        return run(goal, systemPrompt(), messages)
+        return run(goal, systemPrompt(spoken), messages, if (spoken) SPOKEN_MAX_TOKENS else MAX_TOKENS)
     }
 
     override suspend fun replan(
@@ -68,10 +72,10 @@ class Planner(
             append("Return a revised plan for only the remaining work, using a different approach or tool. ")
             append("If nothing else can work, return no steps and explain in \"reply\".")
         }
-        return run(goal, systemPrompt(), listOf(ChatMessage(ChatRole.USER, prompt)))
+        return run(goal, systemPrompt(false), listOf(ChatMessage(ChatRole.USER, prompt)), MAX_TOKENS)
     }
 
-    private suspend fun run(goal: String, system: String, initial: List<ChatMessage>): PlanResult {
+    private suspend fun run(goal: String, system: String, initial: List<ChatMessage>, maxTokens: Int): PlanResult {
         val messages = initial.toMutableList()
         var lastProblems: List<String> = emptyList()
 
@@ -81,7 +85,7 @@ class Planner(
                     LlmRequest(
                         system = system,
                         messages = messages.toList(),
-                        maxTokens = 1_536,
+                        maxTokens = maxTokens,
                         temperature = 0.2,
                         jsonMode = true,
                         weight = TaskWeight.HEAVY,
@@ -200,7 +204,7 @@ class Planner(
         return primitive.content.trim().takeIf { it.isNotEmpty() }
     }
 
-    private fun systemPrompt(): String {
+    private fun systemPrompt(spoken: Boolean): String {
         val now: ZonedDateTime = ZonedDateTime.now(clock)
         return buildString {
             appendLine("You are the planning module of J.A.R.V.I.S., an assistant running on an Android phone.")
@@ -220,6 +224,9 @@ class Planner(
             appendLine("- Never invent a tool or a parameter. If no tool fits, answer in \"reply\" and say honestly what you cannot do on this phone.")
             appendLine("- If something essential is missing (for example the time of an alarm), ask ONE short question in \"clarification\" and return no steps.")
             appendLine("- Set \"critical\": true only when the request fails without that step AND a different tool or approach could plausibly achieve it. Otherwise false.")
+            if (spoken) {
+                appendLine("- The person is speaking to you and your \"reply\" will be read aloud: answer in at most two short sentences, in plain words with no lists or symbols, unless they asked for detail.")
+            }
             appendLine("- You cannot confirm, approve or cancel anything. Sensitive actions are confirmed by the user in the app, outside this conversation.")
             appendLine("- ${UntrustedContent.SYSTEM_RULE}")
             appendLine()
@@ -239,6 +246,8 @@ class Planner(
 
     companion object {
         const val MAX_STEPS = 5
+        private const val MAX_TOKENS = 1_536
+        private const val SPOKEN_MAX_TOKENS = 700
         private const val MAX_ATTEMPTS = 2
         private const val MAX_HISTORY_MESSAGES = 10
     }

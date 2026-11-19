@@ -16,8 +16,9 @@ object HttpClients {
         .followRedirects(false)
         .followSslRedirects(false)
         .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .callTimeout(90, TimeUnit.SECONDS)
+        .readTimeout(35, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
+        // A person is waiting for the answer. A provider that has said nothing for this long is handed over to the next one.
+        .callTimeout(45, TimeUnit.SECONDS)
         .build()
 }

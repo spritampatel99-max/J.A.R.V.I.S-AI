@@ -4,6 +4,7 @@ import android.content.Context
 import com.jarvis.ai.ai.executor.ExecutionPolicy
 import com.jarvis.ai.ai.executor.Executor
 import com.jarvis.ai.ai.fallback.FallbackLlmClient
+import com.jarvis.ai.ai.fallback.RetryPolicy
 import com.jarvis.ai.ai.planner.Planner
 import com.jarvis.ai.ai.providers.AnthropicProvider
 import com.jarvis.ai.ai.providers.GeminiProvider
@@ -18,7 +19,12 @@ import com.jarvis.ai.ai.providers.ProviderSettings
 import com.jarvis.ai.ai.tools.ToolRegistry
 import com.jarvis.ai.ai.tools.builtin.BuiltinTools
 import com.jarvis.ai.ai.tools.builtin.DevicePorts
+import com.jarvis.ai.ai.tools.screen.GuardedNotifications
+import com.jarvis.ai.ai.tools.screen.GuardedScreenControl
+import com.jarvis.ai.ai.tools.screen.ScreenGuard
+import com.jarvis.ai.ai.tools.screen.ScreenTools
 import com.jarvis.ai.android.device.AndroidAlarmLauncher
+import com.jarvis.ai.android.device.AndroidAppLauncher
 import com.jarvis.ai.android.device.AndroidAppSize
 import com.jarvis.ai.android.device.AndroidDeviceAnalyzer
 import com.jarvis.ai.android.device.AndroidContactsPort
@@ -34,7 +40,11 @@ import com.jarvis.ai.android.device.AccessChecks
 import com.jarvis.ai.android.device.AccessKey
 import com.jarvis.ai.android.device.AccessState
 import com.jarvis.ai.android.device.AndroidStatus
+import com.jarvis.ai.android.knowledge.AndroidClusterDecoder
+import com.jarvis.ai.android.knowledge.KnowledgeLibrary
 import com.jarvis.ai.android.models.ModelManager
+import com.jarvis.ai.android.screen.AndroidNotificationPort
+import com.jarvis.ai.android.screen.AndroidRawScreen
 import com.jarvis.ai.android.schedule.AndroidNotifier
 import com.jarvis.ai.android.schedule.AndroidWakeScheduler
 import com.jarvis.ai.android.schedule.ScheduleEngine
@@ -67,13 +77,23 @@ import com.jarvis.ai.models.ModelMetadataClient
 import com.jarvis.ai.models.OkHttpDownloadSource
 import com.jarvis.ai.productivity.ProductivityStore
 import com.jarvis.ai.productivity.ProductivityTools
+import com.jarvis.ai.knowledge.OfflineTools
+import com.jarvis.ai.web.GeminiGroundedSearch
+import com.jarvis.ai.web.WeatherClient
+import com.jarvis.ai.web.WebTools
+import com.jarvis.ai.web.WikipediaClient
 import com.jarvis.ai.security.SecurityReport
 import com.jarvis.ai.security.SecurityReview
 import com.jarvis.ai.security.SecuritySnapshot
 import com.jarvis.ai.setup.SetupRepository
 import com.jarvis.ai.setup.StorageCalculator
+import com.jarvis.ai.ui.AgentViewModel
 import com.jarvis.ai.voice.VoiceController
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import java.time.LocalDate
 
 /**
  * Manual dependency injection: one place that wires the real Android pieces into the
@@ -111,6 +131,14 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         installed = installedModels,
         modelsDir = modelsDir,
         hfToken = { keys.get(HF_TOKEN_KEY) },
+    )
+
+    /** The offline encyclopedia (a Kiwix Wikipedia file) on this phone, if the person downloaded or imported one. */
+    val library = KnowledgeLibrary(
+        context = appContext,
+        installer = ModelInstaller(OkHttpDownloadSource()),
+        dir = File(appContext.filesDir, "knowledge"),
+        decoder = AndroidClusterDecoder(),
     )
 
     /** Size of the installed app, read once; it does not change while the app runs. */
@@ -173,7 +201,15 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     /** Asks a provider which models the given key can use. */
     val modelLister = ModelLister(cloudHttp)
 
-    val llm = FallbackLlmClient(providers = { settings.providerOrder.mapNotNull { providersById[it] } })
+    /**
+     * Built for a person waiting on the answer: a provider that times out is not asked again (the next one is tried at once), and
+     * if one has not answered after [HEDGE_AFTER_MS] the next configured provider is asked too and the first answer wins.
+     */
+    val llm = FallbackLlmClient(
+        providers = { settings.providerOrder.mapNotNull { providersById[it] } },
+        retry = RetryPolicy(maxAttemptsPerProvider = 2, baseDelayMs = 300L, maxDelayMs = 2_000L, retryTimeouts = false),
+        hedgeAfterMs = HEDGE_AFTER_MS,
+    )
 
     private val ports = DevicePorts(
         torch = AndroidTorchController(appContext),
@@ -181,11 +217,18 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         urls = AndroidUrlOpener(appContext, foreground),
         deviceInfo = AndroidDeviceInfoReader(appContext),
         contacts = AndroidContactsPort(appContext),
-        calls = AndroidCallPort(appContext),
+        calls = AndroidCallPort(appContext, foreground),
+        apps = AndroidAppLauncher(appContext, foreground),
     )
+
+    /** Work that must outlive any one screen (the assistant's requests, the hands-free service). Runs on the main thread. */
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /** The conversation history shown in the Logs tab. Stored in a private file, redacted of keys, deletable by the person. */
     val history = ConversationStore(HistoryFileStorage(appContext), SystemTimeSource)
+
+    /** The one assistant. Every screen and the hands-free service share it, so spoken and typed requests land in the same chat. */
+    val assistant: AgentViewModel by lazy { AgentViewModel(this) }
 
     /**
      * Speech in and out. Created on first use, which is always on the main thread (the UI), as its recogniser requires.
@@ -201,8 +244,27 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     val notifier = AndroidNotifier(appContext)
     val status = AndroidStatus(appContext)
 
-    /** What the assistant can do: the phone tools plus the planner and reminder tools. */
-    val registry = ToolRegistry(BuiltinTools.create(ports) + ProductivityTools.create(productivity, wake, notifier))
+    /**
+     * Reading and steering the phone through Android's own accessibility and notification access. The guard sits in front of
+     * the Android code, so it cannot be skipped: J.A.R.V.I.S. itself, banking, payment and password apps and the person's own
+     * list are never read, and system settings and permission dialogs are never acted on.
+     */
+    private val screenGuard = ScreenGuard(appContext.packageName) { settings.screenBlocklist }
+    private val screenControl = GuardedScreenControl(AndroidRawScreen(), screenGuard)
+    private val guardedNotifications = GuardedNotifications(AndroidNotificationPort(), screenGuard)
+
+    /** What the assistant can do: the phone tools, the planner and reminder tools, the phone-control tools and the read-only internet lookups. */
+    val registry = ToolRegistry(
+        BuiltinTools.create(ports) +
+            ScreenTools.create(screenControl, guardedNotifications) +
+            OfflineTools.create { library.encyclopedia() } +
+            ProductivityTools.create(productivity, wake, notifier) +
+            WebTools.create(
+                weather = WeatherClient(transport),
+                wiki = WikipediaClient(transport),
+                grounded = GeminiGroundedSearch(transport, { providerSettings(ProviderId.GEMINI) }, { LocalDate.now().toString() }),
+            ),
+    )
 
     val agents = AgentStore(AtomicTextStorage(appContext, "agents.json"), SystemTimeSource, registry, memory)
     val agentRuntime = AgentRuntime(registry, memory, SystemTimeSource)
@@ -300,6 +362,8 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     }
 
     companion object {
+        private const val HEDGE_AFTER_MS = 6_000L
+
         fun keyName(id: ProviderId): String = "api_key_${id.name}"
 
         /** Hugging Face access token for gated models. Stored encrypted like the AI keys; never logged. */

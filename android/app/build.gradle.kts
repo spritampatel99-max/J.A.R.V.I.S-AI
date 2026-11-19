@@ -58,6 +58,12 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
 
+    // Hands-free: on-device detector for the word "Jarvis" (needs a free Picovoice AccessKey that the person enters in Prefs).
+    implementation(libs.porcupine.android)
+    // Reading the offline library: its content blocks are zstd (current Kiwix files) or xz (older ones). zstd ships as an Android library with its native code.
+    implementation("com.github.luben:zstd-jni:${libs.versions.zstdJni.get()}@aar")
+    implementation(libs.xz)
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)

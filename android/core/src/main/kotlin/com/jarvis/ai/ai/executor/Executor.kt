@@ -62,6 +62,8 @@ data class StepOutcome(
     val verification: Verification? = null,
     val attempts: Int = 0,
     val data: Map<String, String> = emptyMap(),
+    /** The tool's own text, unwrapped, when the tool's result is the answer itself. Only set for successes. */
+    val answer: String? = null,
 )
 
 data class ExecutionReport(
@@ -77,7 +79,16 @@ data class ExecutionReport(
      * cannot claim success that did not happen. A step that was merely handed to another
      * app is marked as such rather than as confirmed.
      */
-    fun summary(): String = buildString {
+    fun summary(): String {
+        // When every step is an answer (weather, a fact), the reply is just the answer text: nothing to tick off.
+        if (outcomes.isNotEmpty() && outcomes.all { it.status == StepStatus.SUCCEEDED && it.answer != null }) {
+            return outcomes.joinToString("\n\n") { it.answer.orEmpty() }.trim() +
+                if (replans > 0) "\n(Re-planned $replans time${if (replans == 1) "" else "s"} after a failure.)" else ""
+        }
+        return checklist()
+    }
+
+    private fun checklist(): String = buildString {
         for (o in outcomes) {
             val mark = when (o.status) {
                 StepStatus.SUCCEEDED -> if (o.verification == Verification.CONFIRMED) "✔" else "➜"
@@ -216,10 +227,19 @@ class Executor(
             val (result, attempts) = executeWithRetries(tool, args)
             when (result) {
                 is ToolResult.Success -> {
-                    if (spec.risk >= Risk.MEDIUM) audit(AuditKind.EXECUTED, spec.name, spec.risk, tool.describe(args), result.message)
-                    val shown = if (result.untrusted) UntrustedContent.wrap(spec.name, result.message) else result.message
+                    if (spec.risk >= Risk.MEDIUM) {
+                        audit(AuditKind.EXECUTED, spec.name, spec.risk, tool.describe(args), if (result.private) PRIVATE_NOTE else result.message)
+                    }
+                    val shown = when {
+                        result.private -> PRIVATE_NOTE
+                        result.untrusted -> UntrustedContent.wrap(spec.name, result.message)
+                        else -> result.message
+                    }
                     StepRun(
-                        StepOutcome(step, StepStatus.SUCCEEDED, shown, result.verification, attempts, result.data),
+                        StepOutcome(
+                            step, StepStatus.SUCCEEDED, shown, result.verification, attempts, result.data,
+                            answer = if (result.answer) result.message else null,
+                        ),
                         untrusted = result.untrusted,
                     )
                 }
@@ -319,5 +339,6 @@ class Executor(
 
     private companion object {
         const val RETRY_BASE_DELAY_MS = 300L
+        const val PRIVATE_NOTE = "Done. (The content is private: it was shown to you only, not logged and not given to any AI model.)"
     }
 }

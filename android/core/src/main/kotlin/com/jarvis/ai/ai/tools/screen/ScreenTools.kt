@@ -1,0 +1,178 @@
+package com.jarvis.ai.ai.tools.screen
+
+import com.jarvis.ai.ai.tools.ParamSpec
+import com.jarvis.ai.ai.tools.ParamType
+import com.jarvis.ai.ai.tools.Tool
+import com.jarvis.ai.ai.tools.ToolArgs
+import com.jarvis.ai.ai.tools.ToolError
+import com.jarvis.ai.ai.tools.ToolResult
+import com.jarvis.ai.ai.tools.ToolSpec
+import com.jarvis.ai.ai.tools.Verification
+import com.jarvis.ai.core.security.Risk
+
+/**
+ * Tools that look at the phone beyond J.A.R.V.I.S.: the screen in front, system navigation, and notifications. They need the
+ * person to have switched on the matching Android access (Accessibility, Notification access). What they read from other apps is
+ * outside content, so it is marked untrusted: it can never approve anything, and any later step of the same request that
+ * changes something asks for a tap.
+ */
+object ScreenTools {
+    const val READ_SCREEN = "read_screen"
+    const val SCREEN_SCROLL = "screen_scroll"
+    const val PHONE_NAVIGATE = "phone_navigate"
+    const val READ_NOTIFICATIONS = "read_notifications"
+    const val CLEAR_NOTIFICATIONS = "clear_notifications"
+
+    const val MAX_SCREEN_CHARS = 3_000
+    const val MAX_NOTIFICATIONS = 8
+    const val MAX_NOTIFICATION_CHARS = 160
+
+    fun create(screen: ScreenControl?, notifications: NotificationPort?): List<Tool> = buildList {
+        if (screen != null) {
+            add(ReadScreenTool(screen))
+            add(ScreenScrollTool(screen))
+            add(PhoneNavigateTool(screen))
+        }
+        if (notifications != null) {
+            add(ReadNotificationsTool(notifications))
+            add(ClearNotificationsTool(notifications))
+        }
+    }
+}
+
+private const val SCREEN_OFF = "Screen access is off. Turn on J.A.R.V.I.S. in Settings > Accessibility (Prefs > Access has a shortcut), then ask again."
+private const val NOTIFICATIONS_OFF = "Notification access is off. Allow J.A.R.V.I.S. in Settings > Notification access (Prefs > Access has a shortcut), then ask again."
+
+private fun offLimits(app: String) =
+    ToolError.Unsupported("I do not read or control $app. Payment apps, password managers, system permission screens and J.A.R.V.I.S. itself are off limits.")
+
+class ReadScreenTool(private val screen: ScreenControl) : Tool {
+    override val spec = ToolSpec(
+        name = ScreenTools.READ_SCREEN,
+        description = "Read out the text that is on the phone's screen right now, in whatever app is in front. Use it for \"what is on my screen\" or \"read this\".",
+        params = emptyList(),
+        risk = Risk.MEDIUM,
+        timeoutMs = 10_000L,
+        resultFormat = "CONFIRMED: the visible text as Android's accessibility service reports it, marked as outside content.",
+    )
+
+    override fun describe(args: ToolArgs): String = "Read the text on the screen"
+
+    override suspend fun execute(args: ToolArgs): ToolResult = when (val read = screen.read()) {
+        ScreenRead.NotEnabled -> ToolResult.Failure(ToolError.Unavailable(SCREEN_OFF))
+        is ScreenRead.OffLimits -> ToolResult.Failure(offLimits(read.app))
+        ScreenRead.Empty -> ToolResult.Failure(ToolError.Failed("I could not read anything from the screen. Some apps hide their content from accessibility."))
+        is ScreenRead.Text -> {
+            val joined = read.lines.joinToString("\n")
+            val text = if (joined.length > ScreenTools.MAX_SCREEN_CHARS) joined.take(ScreenTools.MAX_SCREEN_CHARS) + "\n(cut short)" else joined
+            if (text.isBlank()) {
+                ToolResult.Failure(ToolError.Failed("${read.app} is in front but shows no text I can read."))
+            } else {
+                ToolResult.Success("On screen in ${read.app}:\n$text", Verification.CONFIRMED, untrusted = true, answer = true, private = true)
+            }
+        }
+    }
+}
+
+class ScreenScrollTool(private val screen: ScreenControl) : Tool {
+    override val spec = ToolSpec(
+        name = ScreenTools.SCREEN_SCROLL,
+        description = "Scroll the page in front up or down by one screen.",
+        params = listOf(ParamSpec("direction", ParamType.ENUM, "Which way", enumValues = listOf("down", "up"))),
+        risk = Risk.MEDIUM,
+        timeoutMs = 8_000L,
+        resultFormat = "HANDED_OFF: Android was asked to scroll; whether the page moved is not reported back.",
+    )
+
+    override fun describe(args: ToolArgs): String = "Scroll ${args.string("direction")}"
+
+    override suspend fun execute(args: ToolArgs): ToolResult =
+        when (val result = screen.scroll(down = args.string("direction").equals("down", ignoreCase = true))) {
+            ScreenAct.NotEnabled -> ToolResult.Failure(ToolError.Unavailable(SCREEN_OFF))
+            is ScreenAct.OffLimits -> ToolResult.Failure(offLimits(result.app))
+            is ScreenAct.Failed -> ToolResult.Failure(ToolError.Failed(result.reason))
+            is ScreenAct.Done -> ToolResult.Success(
+                "Asked Android to scroll ${args.string("direction")}${result.app?.let { " in $it" }.orEmpty()}. It does not report whether the page moved.",
+                Verification.HANDED_OFF,
+            )
+        }
+}
+
+class PhoneNavigateTool(private val screen: ScreenControl) : Tool {
+    override val spec = ToolSpec(
+        name = ScreenTools.PHONE_NAVIGATE,
+        description = "Press one of the phone's own navigation controls: back, home, recents, the notification shade, quick settings, lock the screen, or take a screenshot.",
+        params = listOf(ParamSpec("action", ParamType.ENUM, "Which control", enumValues = PhoneAction.entries.map { it.wire })),
+        risk = Risk.MEDIUM,
+        timeoutMs = 8_000L,
+        resultFormat = "HANDED_OFF: Android was asked to do it; the result is not reported back.",
+    )
+
+    override fun describe(args: ToolArgs): String = "Phone: ${args.string("action").replace('_', ' ')}"
+
+    override suspend fun execute(args: ToolArgs): ToolResult {
+        val action = PhoneAction.fromWire(args.string("action"))
+            ?: return ToolResult.Failure(ToolError.InvalidArguments("Unknown phone action"))
+        return when (val result = screen.perform(action)) {
+            ScreenAct.NotEnabled -> ToolResult.Failure(ToolError.Unavailable(SCREEN_OFF))
+            is ScreenAct.OffLimits -> ToolResult.Failure(offLimits(result.app))
+            is ScreenAct.Failed -> ToolResult.Failure(ToolError.Failed(result.reason))
+            is ScreenAct.Done -> ToolResult.Success("${action.done} (asked Android to; it does not report back).", Verification.HANDED_OFF)
+        }
+    }
+}
+
+class ReadNotificationsTool(private val notifications: NotificationPort) : Tool {
+    override val spec = ToolSpec(
+        name = ScreenTools.READ_NOTIFICATIONS,
+        description = "Read out the notifications that are showing on the phone now: which app, who or what, and the first part of the text.",
+        params = emptyList(),
+        risk = Risk.MEDIUM,
+        timeoutMs = 8_000L,
+        resultFormat = "CONFIRMED: the notifications Android currently lists, marked as outside content. Nothing is stored.",
+    )
+
+    override fun describe(args: ToolArgs): String = "Read the current notifications"
+
+    override suspend fun execute(args: ToolArgs): ToolResult {
+        if (!notifications.enabled) return ToolResult.Failure(ToolError.Unavailable(NOTIFICATIONS_OFF))
+        val all = notifications.active()
+        if (all.isEmpty()) return ToolResult.Success("You have no notifications.", Verification.CONFIRMED, answer = true)
+
+        val shown = all.take(ScreenTools.MAX_NOTIFICATIONS)
+        val lines = shown.mapIndexed { index, n ->
+            val body = listOf(n.title, n.text).filter { it.isNotBlank() }.joinToString(": ").take(ScreenTools.MAX_NOTIFICATION_CHARS)
+            "${index + 1}. ${n.app}${if (body.isNotEmpty()) " - $body" else ""}"
+        }
+        val more = if (all.size > shown.size) "\n(${all.size - shown.size} more not shown)" else ""
+        val head = if (all.size == 1) "You have 1 notification:" else "You have ${all.size} notifications:"
+        return ToolResult.Success("$head\n${lines.joinToString("\n")}$more", Verification.CONFIRMED, untrusted = true, answer = true, private = true)
+    }
+}
+
+class ClearNotificationsTool(private val notifications: NotificationPort) : Tool {
+    override val spec = ToolSpec(
+        name = ScreenTools.CLEAR_NOTIFICATIONS,
+        description = "Dismiss all notifications that can be dismissed. Ongoing ones, such as a music player, stay.",
+        params = emptyList(),
+        risk = Risk.MEDIUM,
+        timeoutMs = 8_000L,
+        resultFormat = "CONFIRMED: how many notifications were showing before and after, as Android lists them.",
+    )
+
+    override fun describe(args: ToolArgs): String = "Dismiss all notifications"
+
+    override suspend fun execute(args: ToolArgs): ToolResult {
+        if (!notifications.enabled) return ToolResult.Failure(ToolError.Unavailable(NOTIFICATIONS_OFF))
+        val result = notifications.clearAll() ?: return ToolResult.Failure(ToolError.Failed("Android did not let me dismiss them."))
+        return when {
+            result.before == 0 -> ToolResult.Success("There were no notifications to clear.", Verification.CONFIRMED)
+            result.after < result.before -> ToolResult.Success(
+                "Cleared ${result.before - result.after} of ${result.before} notifications" +
+                    (if (result.after > 0) " (${result.after} are ongoing or cannot be dismissed)." else "."),
+                Verification.CONFIRMED,
+            )
+            else -> ToolResult.Failure(ToolError.Failed("Android still lists all ${result.before} notifications. They may be ongoing ones that cannot be dismissed."))
+        }
+    }
+}
