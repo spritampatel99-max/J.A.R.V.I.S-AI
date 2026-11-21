@@ -181,6 +181,30 @@ fun PrefsScreen(vm: AgentViewModel, appVersion: String, onOpen: (SubPage) -> Uni
         // ---- AI ----------------------------------------------------------------------------------
         SectionTitle(Glyph.CHIP, "AI", "models and providers")
         GlassCard {
+            val aiMode by vm.aiMode.collectAsStateWithLifecycle()
+            if (vm.localEngineAvailable) {
+                Text("Where answers come from", style = MaterialTheme.typography.titleSmall, color = JarvisColors.Ink)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (mode in listOf(com.jarvis.ai.ai.router.AiMode.LOCAL_FIRST, com.jarvis.ai.ai.router.AiMode.CLOUD_ASSISTED, com.jarvis.ai.ai.router.AiMode.LOCAL_ONLY)) {
+                        GlassChip(mode.label, onClick = { vm.setAiMode(mode) }, selected = mode == aiMode)
+                    }
+                }
+                Text(
+                    when (aiMode) {
+                        com.jarvis.ai.ai.router.AiMode.LOCAL_ONLY -> "Nothing leaves this phone. If no installed model can answer, you get a clear message instead."
+                        com.jarvis.ai.ai.router.AiMode.CLOUD_ASSISTED -> "Your cloud AI first; an installed model answers when the cloud cannot."
+                        else -> "An installed model first; your cloud AI only when it cannot answer."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = JarvisColors.Muted,
+                )
+            } else {
+                SettingRow(
+                    "On-device AI",
+                    "Not in this build. Installed models are stored and checked, but nothing runs them yet, so answers come from your cloud AI. See docs/ai/LOCAL_MODELS.md to switch the engine on.",
+                ) {}
+            }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
             NavRow("On-device models", "Download or import a model that runs on this phone.", Glyph.STORAGE) { onOpen(SubPage.MODELS) }
             HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
             NavRow("Cloud AI", "API keys, models and the order they are tried in.", Glyph.CLOUD) { onOpen(SubPage.CLOUD) }

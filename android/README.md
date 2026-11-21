@@ -3,7 +3,7 @@
 A standalone personal AI assistant for Android 11+ (API 30). It is built to run on the phone itself: no
 desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
 
-**Status: early foundation, no release build.** `:core:test` passes under Gradle on the owner's PC, and an earlier version of the debug app was built, installed and shown running on the owner's phone (screenshots, 2026-11-08). The latest rounds of changes (model install, access screen, built-in commands, the Stitch-based screens, voice and calls, memory, planner, automations, custom agents, offline and security screens) have **not been compiled yet**. See
+**Status: early foundation, no release build.** `:core:test` passes under Gradle on the owner's PC, and an earlier version of the debug app was built, installed and shown running on the owner's phone (screenshots, 2026-11-08). The latest rounds of changes (model install, access screen, built-in commands, the Stitch-based screens, voice and calls, memory, planner, automations, custom agents, offline and security screens, hands-free, phone control, the offline library, messages / timers / media keys and the AI-mode router) have **not been compiled yet**: the workspace that wrote them cannot reach Google's Android build servers. `:core` is tested offline (798 tests); `:app` is not. See
 [`docs/testing/BUILD_AND_TEST_REPORT.md`](docs/testing/BUILD_AND_TEST_REPORT.md) for exactly what was and was not run, and
 [`docs/ROADMAP.md`](docs/ROADMAP.md) for the ten-phase plan.
 
@@ -11,13 +11,17 @@ desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
 
 - Chat with an AI agent that plans a request into steps (at most five), then runs registered tools.
 - **Built-in commands that need no AI:** flashlight, alarm, YouTube, open a website, battery/storage. They run on the phone with no AI key, and go through the same safety checks as AI plans.
-- Five cloud providers with ordered fallback: Gemini, Groq, OpenRouter, OpenAI, Claude. Keys are encrypted with the Android Keystore. The Cloud tab can **load the models your own key can use** and **test** a model, because pre-filled model names go stale.
-- **Models tab:** download (with resume and a progress notification), import a file, verify and remove the on-device models Gemma 3 1B and Gemma 4 E2B. An installed model cannot answer chat yet; that needs the on-device engine, the next step. See [`docs/ai/LOCAL_MODELS.md`](docs/ai/LOCAL_MODELS.md).
+- Six cloud providers with ordered fallback: Gemini, Groq, OpenRouter, OpenAI, Mistral, Claude. Keys are encrypted with the Android Keystore. The Cloud tab can **load the models your own key can use** and **test** a model, because pre-filled model names go stale.
+- **Models tab:** download (with resume and a progress notification), import a file, verify and remove the on-device models Gemma 3 1B and Gemma 4 E2B. **AI mode** (Prefs): Local only, Local first, Cloud assisted, Manual. The router is wired in, but the default build has **no on-device engine**, so an installed model cannot answer chat. A LiteRT-LM engine is written as an opt-in build (`enableLiteRt`), never compiled; the steps and the risks are in [`docs/ai/LOCAL_MODELS.md`](docs/ai/LOCAL_MODELS.md).
 - **Access tab:** real permission requests with the state Android reports and an "Allow all" walk-through. See [`docs/setup/ACCESS.md`](docs/setup/ACCESS.md).
 - **The Stitch design** (Prismatic Spectral Core): five tabs (Home, Chat, Tools, Logs, Prefs), a living orb tied to the real voice state, glass cards, a floating tab bar, and two bundled open-licence fonts (Inter, Space Grotesk; licences in `docs/legal`). Only dark is built. What was taken from the design and what was left out is in [`docs/ui/DESIGN_NOTES.md`](docs/ui/DESIGN_NOTES.md).
-- **Voice and calls:** push-to-talk with Android's speech recogniser, spoken replies for spoken requests, calling a contact or number, answering and ending a call. Every call needs a tap on a confirmation that shows the exact name and number. See [`docs/VOICE_AND_CALLS.md`](docs/VOICE_AND_CALLS.md).
+- **Voice:** push-to-talk with Android's speech recogniser, spoken replies for spoken requests, and an optional always-listening **"Jarvis" wake word** (Picovoice Porcupine; needs your own free AccessKey; costs battery; the app must be opened once after a reboot).
+- **Calls:** calling a contact or number, answering and ending a call. A call you **speak** as a plain built-in command is read back ("Calling Mom, mobile") and dialled after a 3-second countdown unless you say "stop" or tap Cancel. A call that is **typed**, or planned by the AI, needs a tap on a card that shows the exact name and number. See [`docs/VOICE_AND_CALLS.md`](docs/VOICE_AND_CALLS.md).
+- **Messages, timers and media keys:** "text Mom hello" and "WhatsApp Mom hello" open the messaging app with the text ready; **you press Send** (the app never sends, and it says so). "Set a timer for 10 minutes" starts the Clock app's countdown. "Pause", "next track", "volume up" send media keys. Each result says what was *asked* of Android, not that it happened.
+- **Phone control (read-only plus system buttons):** an accessibility service reads the visible screen text, scrolls, and presses Back / Home / Recents / lock / screenshot; a notification listener reads and clears notifications. It does **not** tap or type inside other apps. Screen and notification text stays on the phone and is never logged or handed to a model. Both services are off until you switch them on in Android Settings.
+- **Offline library:** a Kiwix `.zim` Wikipedia file (Simple English about 1 GB, Top articles about 2.1 GB) you download or import with a tap. "Search offline for black hole" answers from it with no internet. It looks things up; it does not chat.
 - **Logs:** conversations saved on the phone only (keys removed), searchable, deletable, plus the action record.
-- Fifteen Android tools: flashlight, alarm (handed to the system Clock app), open a web link, open YouTube, device info, call a contact, call a number, answer a call, end a call, plus add task, add note, add reminder, daily overview, show notification and notify overview.
+- Thirty tools. **Phone:** flashlight, alarm and timer (handed to the Clock app), open a link, open YouTube, open an app, media keys, device info, current time. **Calls and messages:** call a contact, call a number, answer, end, text (SMS), WhatsApp. **Phone control:** read screen, scroll, navigate (Back/Home/Recents/lock/screenshot), read and clear notifications. **Productivity:** add task, add note, add reminder, daily overview, show notification, notify overview. **Lookups (read-only):** weather, Wikipedia, a grounded web answer, and the offline library. Lookup text is untrusted content: it can be shown and read aloud but cannot approve or trigger anything.
 - **Memory** that saves only what you add or clearly ask to remember ("remember that …"), with delete and clear in Prefs. See [`docs/ai/MEMORY_AND_PLANNER.md`](docs/ai/MEMORY_AND_PLANNER.md).
 - **Tasks, notes and reminders** with one Android alarm wake-up, re-armed after reboot and app update, and honest "not shown" reporting when notifications are blocked.
 - **Automations** limited to four low-risk actions (add task, add note, show notification, notify overview) on a daily, weekly or every-N-minutes schedule. See [`docs/AUTOMATIONS.md`](docs/AUTOMATIONS.md).
@@ -28,7 +32,7 @@ desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
   measured / estimate / not available, a model recommendation that explains its reasons, a feature chooser, a storage review
   and a permissions step. It downloads nothing and asks for nothing until you tap. See [`docs/setup/ONBOARDING.md`](docs/setup/ONBOARDING.md).
 
-**Not built yet:** the on-device engine (LiteRT-LM) that would let an installed model answer (so AI chat needs internet and a cloud key), a light theme, a wake word, web research, document reading, agent knowledge sources, a memory-suggestion generator, editing an automation, and a signed release build. See the roadmap for the state of each phase.
+**Not built yet:** a working on-device chat engine (the LiteRT-LM engine is an unverified opt-in, so AI chat needs internet and a cloud key by default), tapping or typing inside other apps (deliberately not requested from Android), streaming replies, a light theme, a floating orb, document reading, agent knowledge sources, a memory-suggestion generator, editing an automation, and a signed release build. See the roadmap for the state of each phase.
 
 ## Requirements
 
@@ -54,7 +58,7 @@ The versions in `gradle/libs.versions.toml` resolved on a real Windows PC (JDK 1
 
 Open the **Cloud** tab, paste a key for any provider you want, press **Load models** to see what that key can use, pick one,
 press Save, then **Test**. Nothing is required: with no key the built-in commands still work and chat says no provider is configured.
-OpenAI has no pre-filled model. Reorder providers with Up/Down to change the fallback order. Keys must never go in source code, commits or logs. If a
+OpenAI and Mistral have no pre-filled model: press Load models. Reorder providers with Up/Down to change the fallback order. Keys must never go in source code, commits or logs. If a
 key was ever committed to a repository, revoke it and make a new one.
 
 ## Release build (not done; see [`docs/release/RELEASE_CHECKLIST.md`](docs/release/RELEASE_CHECKLIST.md))
@@ -67,8 +71,10 @@ settings through `~/.gradle/gradle.properties` or environment variables, add a `
 
 - Android 11+ does not let apps silently switch Wi-Fi, Bluetooth or airplane mode; the app can only open the right settings screen.
 - Alarms are handed to the system Clock app; the app reports success only after Android lists the alarm.
-- An app can only start another app while it is in the foreground.
-- Messages can be prepared and opened in the target app, but the app cannot confirm that a message was sent.
+- Android blocks starting an app from the background unless the app has "Display over other apps" (the Access tab asks for it). Android 14 and 15 tighten this further and may still refuse on some phones; the app then says so.
+- Messages can be prepared and opened in the target app, but the app cannot press Send and cannot confirm that a message was sent. WhatsApp opens a chat directly only for a number that starts with `+`; otherwise it opens WhatsApp's own picker with the text ready.
+- Timers and media keys are *requests*: Android does not report back, so the app says "asked", not "done".
+- "Jarvis" is the only wake word. Porcupine ships it as a built-in keyword; "hyee" or other words would need a custom keyword file trained in the Picovoice console.
 - Reminders and automations run when Android wakes the app. Without the "Alarms & reminders" special access the time can be minutes late, and some phone makers delay background work further.
 
 ## Documentation

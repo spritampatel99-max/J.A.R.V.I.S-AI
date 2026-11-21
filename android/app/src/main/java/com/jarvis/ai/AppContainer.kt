@@ -3,7 +3,13 @@ package com.jarvis.ai
 import android.content.Context
 import com.jarvis.ai.ai.executor.ExecutionPolicy
 import com.jarvis.ai.ai.executor.Executor
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.jarvis.ai.ai.fallback.FallbackLlmClient
+import com.jarvis.ai.ai.local.LocalEngine
+import com.jarvis.ai.ai.router.RoutedLlmClient
+import com.jarvis.ai.ai.router.RoutingSettings
+import com.jarvis.ai.android.local.LocalEngines
 import com.jarvis.ai.ai.fallback.RetryPolicy
 import com.jarvis.ai.ai.planner.Planner
 import com.jarvis.ai.ai.providers.AnthropicProvider
@@ -29,6 +35,9 @@ import com.jarvis.ai.android.device.AndroidAppSize
 import com.jarvis.ai.android.device.AndroidDeviceAnalyzer
 import com.jarvis.ai.android.device.AndroidContactsPort
 import com.jarvis.ai.android.device.AndroidCallPort
+import com.jarvis.ai.android.device.AndroidMediaKeys
+import com.jarvis.ai.android.device.AndroidMessagingPort
+import com.jarvis.ai.android.device.AndroidTimerLauncher
 import com.jarvis.ai.android.device.AndroidDeviceInfoReader
 import com.jarvis.ai.android.device.AndroidPermissionChecker
 import com.jarvis.ai.android.device.AndroidTorchController
@@ -184,6 +193,14 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         sendTemperature = false,
     )
 
+    // Mistral speaks the OpenAI chat-completions format (POST /v1/chat/completions, Bearer key, max_tokens).
+    private val mistral = OpenAiCompatibleProvider(
+        id = ProviderId.MISTRAL,
+        http = cloudHttp,
+        endpoint = "https://api.mistral.ai/v1/chat/completions",
+        settings = { providerSettings(ProviderId.MISTRAL) },
+    )
+
     private val anthropic = AnthropicProvider(cloudHttp, { providerSettings(ProviderId.ANTHROPIC) })
 
     private val providersById: Map<ProviderId, LlmProvider> = mapOf(
@@ -192,6 +209,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         ProviderId.OPENROUTER to openRouter,
         ProviderId.OPENAI to openAi,
         ProviderId.ANTHROPIC to anthropic,
+        ProviderId.MISTRAL to mistral,
     )
 
     fun isConfigured(id: ProviderId): Boolean = providersById.getValue(id).isConfigured()
@@ -211,6 +229,29 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         hedgeAfterMs = HEDGE_AFTER_MS,
     )
 
+    /** The on-device engine. Null in the default build, which has none (see LocalEngines); then every answer comes from the cloud. */
+    val localEngine: LocalEngine? = LocalEngines.create(appContext)
+
+    /**
+     * Picks on-device or cloud for each request by the person's AI mode. The planner and the agent chats ask this; its cloud route is
+     * [llm] itself, so provider order, retries and hedging are unchanged.
+     */
+    val routedLlm = RoutedLlmClient(
+        engine = localEngine,
+        installedModels = {
+            installedModels.all().mapNotNull { model -> installedModels.fileFor(model.id)?.let { model.id to it.absolutePath } }.toMap()
+        },
+        cloud = llm,
+        cloudConfigured = { cloudKeyCount() > 0 },
+        settings = { RoutingSettings(mode = settings.aiMode, online = isOnline()) },
+    )
+
+    private fun isOnline(): Boolean {
+        val manager = appContext.getSystemService(ConnectivityManager::class.java) ?: return true
+        val capabilities = manager.getNetworkCapabilities(manager.activeNetwork ?: return false) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
     private val ports = DevicePorts(
         torch = AndroidTorchController(appContext),
         alarms = AndroidAlarmLauncher(appContext, foreground),
@@ -219,6 +260,9 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         contacts = AndroidContactsPort(appContext),
         calls = AndroidCallPort(appContext, foreground),
         apps = AndroidAppLauncher(appContext, foreground),
+        messaging = AndroidMessagingPort(appContext, foreground),
+        timers = AndroidTimerLauncher(appContext, foreground),
+        media = AndroidMediaKeys(appContext),
     )
 
     /** Work that must outlive any one screen (the assistant's requests, the hands-free service). Runs on the main thread. */
@@ -269,7 +313,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     val agents = AgentStore(AtomicTextStorage(appContext, "agents.json"), SystemTimeSource, registry, memory)
     val agentRuntime = AgentRuntime(registry, memory, SystemTimeSource)
 
-    val planner = Planner(llm, registry)
+    val planner = Planner(routedLlm, registry)
     val gate = ConfirmationGate()
     val audit = FileAuditLog(File(appContext.filesDir, "audit.jsonl"), redactor = redactor)
 
@@ -296,8 +340,8 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
 
     // ---- readiness and security reviews -------------------------------------------------------------------
 
-    /** True only when an on-device inference engine is part of this build. It is not yet, so downloaded models cannot answer. */
-    val localEngineBuilt: Boolean = false
+    /** True only when an on-device inference engine is part of this build. The default build has none (see LocalEngines), so downloaded models cannot answer there. */
+    val localEngineBuilt: Boolean = LocalEngines.AVAILABLE
 
     private fun cloudKeyCount(): Int = ProviderId.entries.count { isConfigured(it) }
 

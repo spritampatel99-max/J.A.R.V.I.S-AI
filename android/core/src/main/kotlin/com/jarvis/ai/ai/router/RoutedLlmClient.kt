@@ -85,7 +85,8 @@ class RoutedLlmClient(
             }
         }
 
-        throw NoRouteException(unavailableMessage(plan, notes, installed.isEmpty(), cloudConfigured()), notes)
+        // "Install a local model" is only advice when this build can run one.
+        throw NoRouteException(unavailableMessage(plan, notes, engine != null && installed.isEmpty(), cloudConfigured()), notes)
     }
 
     private sealed interface LocalResult {

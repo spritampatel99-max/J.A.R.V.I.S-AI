@@ -32,3 +32,22 @@
 - Fix: the Offline screen's built-in-commands line named "volume" and "opening apps", which are not built-in commands; it now lists flashlight, alarms, battery and storage, and calls.
 - 618 offline tests pass. 27 of 29 new safety mutation checks are caught; the 2 that survive are the automation runner's backup layers (its own registry filter and its deny-all confirmation), which cannot be told apart from the save-time check (see the test report).
 - Release documentation added (`docs/release/RELEASE_CHECKLIST.md`). **No APK or signed build exists.**
+
+## Round 2026-11-11 to 11-19 (commit 89339a4; core tested, `:app` not compiled)
+
+- New (core): web answers (weather, Wikipedia, a grounded web answer) shown in chat and spoken, with no browser redirect; offline time and date; hedged provider calls and shorter spoken replies for speed; the voice-direct call countdown (a spoken, plain built-in call command is read back and dialled after 3 seconds unless cancelled; typed and AI-planned calls still need a tap).
+- New (core): screen and notification tools behind `ScreenGuard` (read results are private: not logged, not given to a model; no tap, type or gesture tools); open-app tool.
+- New (core): offline library: openZIM reader, HTML lead extraction, title lookup, the `offline_lookup` tool, "search offline for …", and a fallback when no AI is reachable. The installer was generalised (`InstallTarget`) so the library reuses resume and atomic rename.
+- New (app, uncompiled): Picovoice Porcupine hands-free "Jarvis" service, app launcher, Telecom call placing, accessibility service (reads the screen, scrolls, system buttons; no gestures), notification listener, library manager with a zstd / xz decoder, and the Prefs screens for hands-free, phone control and the offline library.
+- 756 offline tests passed at that commit.
+
+## Round 2026-11-19 to 11-21 (core tested, `:app` not compiled)
+
+- New (core): `send_sms` and `send_whatsapp` (high risk, always a tap, never sent by the app: the messaging app opens with the text ready and the result says "has not been sent"), `set_timer` (Clock app countdown), `media_control` (play, pause, next, previous, stop, volume up / down). Natural-language commands for all of them, including "text Mom hello", "WhatsApp +91… hello", "set a timer for 10 minutes", "next track", "volume up". Contact lookup shared with calls (`ContactLookup`).
+- New (core): Mistral as a sixth cloud provider with live model listing. OpenAI and Mistral have no pre-filled model.
+- Changed (core): the "install a local model" hint is shown only when the build actually has an engine.
+- New (app, uncompiled): the AI-mode router is wired into the planner and chat (Prefs > AI mode: Local only, Local first, Cloud assisted, Manual), Android implementations of messaging, timers and media keys, manifest `<queries>` for the messaging apps.
+- New (app, uncompiled, opt-in): a LiteRT-LM engine in `app/src/litert/`, compiled only with `enableLiteRt=true`; the default build uses an empty stand-in. It needs a Kotlin upgrade and will probably need small API fixes on its first build (`docs/ai/LOCAL_MODELS.md`).
+- 798 offline tests pass. 16 of 17 new mutation checks are caught; the survivor is equivalent (no observable change).
+- Reviewed from `JARVIS-Project.zip`: the parts that could be built honestly were rebuilt; the rest was left out on purpose (list in `STATUS.md`).
+- Docs brought in line with the code: README, `VOICE_AND_CALLS.md`, `STATUS.md`, `ROADMAP.md`, `ACCESS.md`, `LOCAL_MODELS.md`, `RELEASE_CHECKLIST.md`.

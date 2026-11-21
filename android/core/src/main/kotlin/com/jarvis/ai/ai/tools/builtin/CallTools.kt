@@ -62,43 +62,13 @@ class CallContactTool(private val contacts: ContactsPort, private val calls: Cal
     override suspend fun prepare(args: ToolArgs): Prepared {
         val query = args.string("name").trim()
         if (query.isEmpty()) return Prepared.Stop(ToolError.InvalidArguments("No contact name was given."))
-
-        var found = search(query) ?: return Prepared.Stop(ToolError.Failed("Contacts could not be searched."))
-        var label: String? = null
-        if (found is ContactSearch.Found && found.contacts.isEmpty()) {
-            // "mom mobile": the last word may name the number type rather than be part of the name.
-            val (namePart, labelPart) = ContactResolver.splitTrailingLabel(query)
-            if (labelPart != null) {
-                found = search(namePart) ?: return Prepared.Stop(ToolError.Failed("Contacts could not be searched."))
-                label = labelPart
-            }
-        }
-        return when (found) {
-            ContactSearch.PermissionMissing -> Prepared.Stop(
-                ToolError.PermissionDenied(setOf(CallPermissions.READ_CONTACTS), "Contacts access is off. Allow it in the Access tab and ask again."),
+        return when (val found = ContactLookup.resolve(contacts, query)) {
+            is ContactLookup.Found -> Prepared.Ready(
+                ToolArgs(mapOf("name" to query, "contact" to found.name, "number" to found.number, "label" to found.label)),
             )
-            is ContactSearch.Failed -> Prepared.Stop(ToolError.Failed(found.reason))
-            is ContactSearch.Found -> {
-                val queryForMatching = if (label != null) ContactResolver.splitTrailingLabel(query).first else query
-                when (val choice = ContactResolver.choose(queryForMatching, found.contacts, label)) {
-                    is ContactChoice.Chosen -> Prepared.Ready(
-                        ToolArgs(mapOf("name" to query, "contact" to choice.name, "number" to choice.number, "label" to choice.label)),
-                    )
-                    is ContactChoice.Ask -> Prepared.Stop(ToolError.NeedsInput(choice.question))
-                    is ContactChoice.NoMatch -> Prepared.Stop(ToolError.Unavailable(choice.message))
-                }
-            }
+            is ContactLookup.Stop -> Prepared.Stop(found.error)
         }
     }
-
-    private suspend fun search(query: String): ContactSearch? =
-        try {
-            contacts.search(query)
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
-        }
 
     override fun describe(args: ToolArgs): String {
         val number = args.stringOrNull("number")

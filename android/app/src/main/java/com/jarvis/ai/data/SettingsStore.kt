@@ -32,6 +32,14 @@ class SettingsStore(context: Context) {
             prefs.edit().putString(KEY_ORDER, value.distinct().joinToString(",") { it.name }).apply()
         }
 
+    /** Where answers come from: this phone, the cloud, or both. Manual is not offered, so a saved Manual falls back to the default. */
+    var aiMode: com.jarvis.ai.ai.router.AiMode
+        get() = com.jarvis.ai.ai.router.AiMode.entries.firstOrNull { it.name == prefs.getString(KEY_AI_MODE, null) && it != com.jarvis.ai.ai.router.AiMode.MANUAL }
+            ?: com.jarvis.ai.ai.router.AiMode.LOCAL_FIRST
+        set(value) {
+            prefs.edit().putString(KEY_AI_MODE, value.name).apply()
+        }
+
     fun model(id: ProviderId): String =
         prefs.getString(modelKey(id), null)?.takeIf { it.isNotBlank() } ?: ProviderDefaults.modelFor(id)
 
@@ -125,6 +133,7 @@ class SettingsStore(context: Context) {
     private companion object {
         const val PREFS_NAME = "jarvis_settings"
         const val KEY_ORDER = "provider_order"
+        const val KEY_AI_MODE = "ai_mode"
         const val KEY_CONFIRM_MEDIUM = "confirm_medium_actions"
         const val KEY_USE_MEMORY = "use_memory_in_chat"
         const val KEY_HANDS_FREE = "hands_free_on"

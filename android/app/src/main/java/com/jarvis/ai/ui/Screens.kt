@@ -302,7 +302,7 @@ private fun ProviderCard(
                     when (row.id) {
                         ProviderId.OPENROUTER -> "Models (comma-separated, tried in order)"
                         ProviderId.GROQ -> "Models (comma-separated, tried in order)"
-                        ProviderId.OPENAI -> "Model (required: enter the model you want to use)"
+                        ProviderId.OPENAI, ProviderId.MISTRAL -> "Model (required: enter the model you want to use)"
                         else -> "Model"
                     },
                 )

@@ -7,11 +7,12 @@ enum class ProviderId(val displayName: String) {
     OPENROUTER("OpenRouter"),
     OPENAI("OpenAI"),
     ANTHROPIC("Claude"),
+    MISTRAL("Mistral"),
     ;
 
     companion object {
         /** Starting order; the user can reorder it and any provider may be left unconfigured. */
-        val DEFAULT_ORDER: List<ProviderId> = listOf(GEMINI, GROQ, OPENROUTER, OPENAI, ANTHROPIC)
+        val DEFAULT_ORDER: List<ProviderId> = listOf(GEMINI, GROQ, OPENROUTER, OPENAI, ANTHROPIC, MISTRAL)
     }
 }
 
@@ -27,8 +28,8 @@ enum class ProviderId(val displayName: String) {
  *    2026-11-08), so one model being unavailable to a key does not stop the provider.
  *  - OpenRouter: `openrouter/free`, OpenRouter's router that picks a currently available free model.
  *  - Claude: from Anthropic's API reference.
- *  - OpenAI has no default on purpose: no current model name was verified, so that provider
- *    stays unconfigured until the user picks one.
+ *  - OpenAI and Mistral have no default on purpose: no current model name was verified, so those providers
+ *    stay unconfigured until the user picks one (the Load models button lists what the key can use).
  */
 object ProviderDefaults {
     const val GEMINI_MODEL = "gemini-3.8-flash"
@@ -42,6 +43,7 @@ object ProviderDefaults {
         ProviderId.OPENROUTER -> OPENROUTER_MODELS
         ProviderId.OPENAI -> ""
         ProviderId.ANTHROPIC -> ANTHROPIC_MODEL
+        ProviderId.MISTRAL -> ""
     }
 
     /**

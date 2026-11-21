@@ -57,6 +57,16 @@
         <intent>
             <action android:name="android.intent.action.SET_ALARM" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.SET_TIMER" />
+        </intent>
+        <!-- Messages: the text app and WhatsApp are opened with the message already typed in; the person presses Send. -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="smsto" />
+        </intent>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
         <!-- "Open WhatsApp": which apps on the phone have a launcher icon. Only icon apps are visible, not every installed package. -->
         <intent>
             <action android:name="android.intent.action.MAIN" />

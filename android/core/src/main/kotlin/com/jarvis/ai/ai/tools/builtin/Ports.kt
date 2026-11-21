@@ -73,4 +73,8 @@ class DevicePorts(
     val calls: CallPort? = null,
     /** Lets "open WhatsApp" work. Without it the open-app tool is simply not offered. */
     val apps: AppLauncher? = null,
+    /** Without these, the matching tools are simply not offered. */
+    val messaging: MessagingPort? = null,
+    val timers: TimerLauncher? = null,
+    val media: MediaKeys? = null,
 )

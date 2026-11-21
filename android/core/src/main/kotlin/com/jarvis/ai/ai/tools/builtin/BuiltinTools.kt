@@ -27,7 +27,11 @@ object BuiltinTools {
             OpenYoutubeTool(ports.urls),
             DeviceInfoTool(ports.deviceInfo),
             TimeTool(clock),
-        ) + listOfNotNull(ports.apps?.let { OpenAppTool(it) })
+        ) + listOfNotNull(
+            ports.apps?.let { OpenAppTool(it) },
+            ports.timers?.let { SetTimerTool(it) },
+            ports.media?.let { MediaControlTool(it) },
+        ) + ports.messaging?.let { listOf(SendSmsTool(ports.contacts, it), SendWhatsAppTool(ports.contacts, it)) }.orEmpty()
         val contacts = ports.contacts
         val calls = ports.calls
         if (contacts == null || calls == null) return base

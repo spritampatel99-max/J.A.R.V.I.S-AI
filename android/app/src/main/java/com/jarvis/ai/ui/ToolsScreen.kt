@@ -43,6 +43,10 @@ private val EXAMPLES = mapOf(
     "call_number" to "Call ",
     "answer_call" to "Answer the call",
     "end_call" to "Hang up",
+    "send_sms" to "Text mom saying I'll be late",
+    "send_whatsapp" to "WhatsApp dad saying call me",
+    "set_timer" to "Set a timer for 10 minutes",
+    "media_control" to "Pause the music",
 )
 
 private val QUICK = listOf(

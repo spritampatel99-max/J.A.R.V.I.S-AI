@@ -399,7 +399,19 @@ class RoutedLlmClientTest {
         val message = error.message.orEmpty()
         assertTrue(message.contains("No AI is available right now"))
         assertTrue(message.contains("add a cloud key in the Cloud tab"))
-        assertTrue(message.contains("install a local model in the Models tab"))
+        // This build cannot run a model, so telling the person to install one would be advice that cannot work.
+        assertFalse(message.contains("install a local model"), message)
+    }
+
+    @Test
+    fun withAnEngineAndNothingInstalledTheMessageAlsoSuggestsInstallingAModel() = runTest {
+        val error = assertFailsWith<NoRouteException> {
+            client(engine = FakeEngine(), installed = emptyMap(), cloudConfigured = false).complete(request)
+        }
+
+        val message = error.message.orEmpty()
+        assertTrue(message.contains("add a cloud key in the Cloud tab"), message)
+        assertTrue(message.contains("install a local model in the Models tab"), message)
     }
 
     @Test

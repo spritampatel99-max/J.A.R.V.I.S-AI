@@ -1,6 +1,6 @@
 # Cloud providers
 
-All five are optional. With no key entered the app has no AI provider, and says so rather than pretending
+All six are optional. With no key entered the app has no AI provider, and says so rather than pretending
 (`No AI provider is configured. Add an API key in the Cloud tab.`). Built-in commands (flashlight, alarm, YouTube, open a website, battery and storage) do not need a provider: see "Built-in commands" below. Every request goes over https only:
 `JsonHttp` refuses any other address and the OkHttp client is restricted to modern TLS with redirects off.
 
@@ -10,6 +10,7 @@ All five are optional. With no key entered the app has no AI provider, and says 
 | Groq | `https://api.groq.com/openai/v1/chat/completions` | `Authorization: Bearer` | OpenAI chat format, `max_tokens`, `temperature`, JSON mode | Carried over from the desktop project; **not re-checked** against Groq's current docs |
 | OpenRouter | `https://openrouter.ai/api/v1/chat/completions` | `Authorization: Bearer`, plus an `X-Title` header | Same format; the model field may be a comma-separated list, tried in order | Carried over from the desktop project; **not re-checked** |
 | OpenAI | `https://api.openai.com/v1/chat/completions` | `Authorization: Bearer` | Sends `max_completion_tokens` (the official OpenAPI spec marks `max_tokens` as deprecated and unsupported by its reasoning models) and **no temperature** (some models accept only the default) | OpenAI's published OpenAPI spec |
+| Mistral | `POST https://api.mistral.ai/v1/chat/completions` | `Authorization: Bearer` | OpenAI chat format with `max_tokens` and `temperature` (same adapter as Groq). | **Not re-checked** against Mistral's current docs. Use **Load models** and **Test**: they show at once whether the key and model work |
 | Claude | `POST https://api.anthropic.com/v1/messages` | `Authorization: Bearer`; header `anthropic-version: 2026-10-21` | `model`, `max_tokens`, `messages`, `system` as a string. **`temperature`, `top_p` and `top_k` are never sent**: the docs say that version rejects them with HTTP 400 | Anthropic API reference, checked 2026-11-07 |
 
 ## Models
@@ -25,6 +26,7 @@ Groq key without access to `llama-3.3-70b-versatile`), so no command could run. 
 | OpenRouter | `openrouter/free` | OpenRouter's router, which picks a currently available free model. |
 | Claude | `claude-haiku-5-5` | Anthropic's API reference. |
 | OpenAI | none | No current model name was verified; the provider stays unconfigured until you pick one. |
+| Mistral | none | Same reason as OpenAI: press **Load models** with your key and pick one. |
 
 A saved value equal to one of the retired defaults is dropped once at start-up (`SettingsStore`), so an old install moves to the
 new default without the user doing anything. A model name the user typed or picked themselves is never touched.
@@ -33,14 +35,15 @@ new default without the user doing anything. A model name the user typed or pick
 (`GET /models`, no tokens spent, and it also shows at once whether the key is accepted), and tapping a model fills the field.
 Groq and OpenRouter add the model to their ordered list; the others replace it. **Test** sends one tiny request with the saved key and
 model and shows the provider's own error if it fails. Endpoints used for the lists: Gemini `v1beta/models`, Groq and OpenAI
-`/v1/models`, OpenRouter `/api/v1/models` (public, no key), Claude `/v1/models`. Non-chat models (embeddings, image, audio) are filtered
+`/v1/models`, Mistral `/v1/models`, OpenRouter `/api/v1/models` (public, no key), Claude `/v1/models`. Non-chat models (embeddings, image, audio) are filtered
 out, and free OpenRouter models are listed first.
 
 ## Built-in commands (no AI needed)
 
 `NativeCommands` runs plain-language commands on the phone with no provider, no internet and no local model:
 `turn on/off the flashlight`, `open YouTube`, `search/play X on YouTube`, `set an alarm for 6:30 am / in 20 minutes`,
-`open example.com`, and `battery` / `storage` / `device info`. Several can be chained ("turn on the flashlight and open YouTube").
+`set a timer for 10 minutes`, `pause` / `next track` / `volume up`, `open <app>`, `call Mom`, `text Mom hello`, `WhatsApp Mom hello`,
+`open example.com`, `search offline for black hole`, and `battery` / `storage` / `device info`. Several can be chained ("turn on the flashlight and open YouTube").
 The matcher only accepts a whole sentence of a known shape, so a question such as "how do I set an alarm?" still goes to the AI.
 When a detail matters and is missing (6 AM or 6 PM?) it asks instead of guessing. These commands go through the same executor as
 AI-written plans: argument validation, permission checks, the confirmation gate, the audit log and honest result reporting.

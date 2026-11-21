@@ -47,6 +47,12 @@ kotlin {
     }
 }
 
+// On-device AI (LiteRT-LM) is opt-in: it needs a newer Kotlin than the one pinned in libs.versions.toml and has never been compiled
+// here. With `-PenableLiteRt=true` (or enableLiteRt=true in gradle.properties) the real engine in src/litert replaces the empty one in
+// src/noLocal. See docs/ai/LOCAL_MODELS.md for the steps.
+val enableLiteRt = providers.gradleProperty("enableLiteRt").orNull == "true"
+android.sourceSets.getByName("main").java.srcDir(if (enableLiteRt) "src/litert/java" else "src/noLocal/java")
+
 dependencies {
     implementation(project(":core"))
 
@@ -63,6 +69,8 @@ dependencies {
     // Reading the offline library: its content blocks are zstd (current Kiwix files) or xz (older ones). zstd ships as an Android library with its native code.
     implementation("com.github.luben:zstd-jni:${libs.versions.zstdJni.get()}@aar")
     implementation(libs.xz)
+
+    if (enableLiteRt) implementation(libs.litertlm)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

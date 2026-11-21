@@ -148,9 +148,30 @@ class ModelListerTest {
     }
 
     @Test
-    fun everyProviderButOpenAiHasANonBlankDefault() {
+    fun everyProviderButOpenAiAndMistralHasANonBlankDefault() {
         for (id in ProviderId.entries) {
-            if (id == ProviderId.OPENAI) assertEquals("", ProviderDefaults.modelFor(id)) else assertTrue(ProviderDefaults.modelFor(id).isNotBlank())
+            if (id == ProviderId.OPENAI || id == ProviderId.MISTRAL) assertEquals("", ProviderDefaults.modelFor(id)) else assertTrue(ProviderDefaults.modelFor(id).isNotBlank())
         }
+    }
+
+    @Test
+    fun mistralListUsesTheOpenAiStyleEndpointWithABearerKeyAndDropsNonChatModels() = runTest {
+        transport.reply(
+            200,
+            """{"object":"list","data":[{"id":"mistral-small-latest"},{"id":"mistral-embed"},{"id":"mistral-ocr-latest"},{"id":"mistral-moderation-latest"},{"id":"open-mistral-nemo"}]}""",
+        )
+
+        val models = lister.list(ProviderId.MISTRAL, "mk_test")
+
+        assertEquals(listOf("mistral-small-latest", "open-mistral-nemo"), models.map { it.id })
+        val (url, headers) = transport.gets.single()
+        assertEquals("https://api.mistral.ai/v1/models", url)
+        assertEquals("Bearer mk_test", headers["Authorization"])
+        assertFalse(url.contains("mk_test"), "the key must never be in the address")
+    }
+
+    @Test
+    fun mistralNeedsAKeyToListModels() = runTest {
+        assertFailsWith<ProviderError.MissingConfig> { lister.list(ProviderId.MISTRAL, null) }
     }
 }

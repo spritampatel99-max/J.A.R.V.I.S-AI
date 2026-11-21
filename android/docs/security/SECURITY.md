@@ -12,7 +12,8 @@ Only implemented behaviour is listed. Code marked "unit-tested" was tested offli
    (`CONFIRMATION_MISMATCH` in the audit log).
 3. **Single use, short life.** One request is pending at a time, it expires after 120 s, and a cancelled run withdraws it.
 4. **Risk levels.** Tools are LOW, MEDIUM or HIGH. HIGH is always confirmed; MEDIUM is confirmed when the "confirm
-   medium actions" setting is on. HIGH tools are never retried automatically.
+   medium actions" setting is on. HIGH tools are never retried automatically. Confirmation is by a tap, with one exception (rule 15).
+   Texts and WhatsApp messages are HIGH and are only ever *prepared*: the app opens the messaging app and the person presses Send.
 5. **Outside content tightens the rules.** Text from web pages or files is wrapped as untrusted data, and once a run has
    seen any, the confirmation threshold drops to MEDIUM for the rest of that run.
 6. **No code execution.** There is no path that runs model-written Python, shell or Kotlin. A plan can only name
@@ -20,8 +21,8 @@ Only implemented behaviour is listed. Code marked "unit-tested" was tested offli
 7. **Success is only reported after the system confirms it.** `set_alarm` checks `AlarmManager.nextAlarmClock`; the
    flashlight checks the torch callback; `open_url` and `open_youtube` report "handed to the system", not "loaded".
    A tool that can only hand off says so (`HANDED_OFF`), and the run summary shows it differently from a confirmed result.
-8. **Foreground-only launches.** Android blocks activity starts from the background, so the app refuses to launch other
-   apps when it is not in the foreground, instead of claiming it did.
+8. **Honest launches.** Android blocks activity starts from the background unless the app has "Display over other apps".
+   The app launches from the background only when that is granted, and otherwise refuses and says so instead of claiming it did.
 9. **Only http(s) links** are opened; `javascript:`, `file:`, `intent:` and links with `user:pass@` are rejected.
 
 ## Memory, automations and agents (added in Phase 7 to 9)
@@ -29,8 +30,12 @@ Only implemented behaviour is listed. Code marked "unit-tested" was tested offli
 10. **Memory saves only on an explicit act:** the Add button, a clear "remember that …" phrase, or approving a suggestion. Text is redacted before storing; chat cannot delete or edit memory. Memory is handed to the model as the person's notes (data) before the fixed rules, never as instructions.
 11. **Automations can only run four low-risk actions** (add task, add note, show notification, notify overview), validated at save time, re-validated against the full registry before every run, and executed with a deny-all confirmation and no re-planner. The last two layers are backup and not independently tested (see the test report).
 12. **Agents are configuration, not code.** A new agent is a draft with no tools; only the person's Approve tap activates it. Tools are derived from the chosen features, must be low risk, and are re-derived at run time so a hand-edited file grants nothing. Fixed safety rules come after the owner's text. An agent never sees another agent's memory.
-13. **Voice cannot approve a confirmation.** Confirmations are answered by tapping only.
+13. **Voice cannot approve a confirmation card.** Cards are answered by tapping only. The one voice path is rule 15.
 14. **Security review** lists what it checked and what it did not; it never reports the phone as "secure" and only counts API keys.
+15. **Spoken call countdown.** A call the person *spoke* as a plain built-in command (the app's own fixed patterns, no AI model involved) is read back from the resolved contact or parsed number and dialled after 3 seconds unless the person says stop or taps Cancel. Only `call_contact`, `call_number`, `answer_call` and `end_call` qualify. Anything an AI model planned, anything typed, any message, and any run that has seen outside content still needs a tap. The approval goes through the same fingerprint-bound gate as a tap.
+16. **Screen and notification text is private.** Reading the screen or notifications (accessibility service and notification listener, both off until the person enables them in Android Settings) returns text to the person only: it is not written to the audit log or conversation log, and it is not given to a model. The service cannot tap, type or swipe in other apps (its configuration declares no gesture capability), and a blocklist (`ScreenGuard`) keeps it out of the app's own screens and chosen apps.
+17. **Lookup answers are untrusted.** Weather, Wikipedia, web answers and the offline library are shown and spoken as the person's answer, flagged untrusted, and can never approve or trigger an action.
+18. **Hands-free key.** The Picovoice AccessKey is stored in the Keystore-backed store like API keys, never in source, resources or logs. The wake-word detector only listens for "Jarvis"; it does not transcribe, store or send audio.
 
 ## Secrets
 

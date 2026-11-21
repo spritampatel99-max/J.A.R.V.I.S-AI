@@ -14,12 +14,16 @@ page for each special one. Every step can be declined. Nothing is granted withou
 |---|---|---|
 | Notifications | Runtime (Android 13+) | **Yes**: model download progress |
 | Run in the background (battery optimisation) | Settings page | **Yes**: keeps a long download alive |
-| Microphone | Runtime | No: voice input is not built |
-| Contacts | Runtime | No: calling is not built |
-| Phone calls | Runtime | No: calling is not built; every call would still ask first |
-| Exact alarms and reminders | Settings page | No: reminders are not built (alarms are handed to the Clock app) |
+| Microphone | Runtime | **Yes** (written, uncompiled): push-to-talk and the hands-free "Jarvis" service |
+| Contacts | Runtime | **Yes** (written, uncompiled): calls and messages look up a name |
+| Phone calls, Answer phone calls | Runtime | **Yes** (written, uncompiled): call, answer, end. A typed or AI-planned call asks for a tap; a spoken one is read back and dialled after 3 seconds unless you say stop |
+| Exact alarms and reminders | Settings page | **Yes**: reminders and automations (alarms and timers are handed to the Clock app) |
+| Display over other apps | Settings page | **Yes**: lets the app start another app from the background, and shows the hands-free overlay |
+| Accessibility service | Settings page | **Yes**: read the visible screen text, scroll, press Back / Home / Recents / lock / screenshot. It never taps or types in other apps, and screen text is not logged or given to a model |
+| Notification access | Settings page | **Yes**: read and clear notifications. Text stays on the phone and is not logged or given to a model |
 | Usage access | Settings page | No: the data monitor is not built |
-| Read notifications | Not available | Android lists an app on that switch page only once it has a notification-listener service |
+
+Android may grey out the Accessibility and Notification-access switches for an app that was installed outside the Play Store. If so: Settings > Apps > J.A.R.V.I.S. > three dots > "Allow restricted settings", then try again.
 
 Each row shows what it reaches, how to turn it off, and an honest **Used by the app now / Not used yet** tag. Allowing something that is
 not used yet is harmless, but the screen does not pretend the feature exists.
@@ -29,6 +33,7 @@ not used yet is harmless, but the screen does not pretend the feature exists.
 - The state shown is read from Android each time the screen resumes, so changes made in Settings appear when you come back.
 - After two denials Android stops showing a permission dialog. The app remembers that it has asked and, when Android will no longer ask,
   the button becomes **Open Settings** (the app's own page).
-- The manifest declares only permissions with a row above, plus `INTERNET`, `ACCESS_NETWORK_STATE`, `SET_ALARM` and the foreground-service ones.
+- The manifest declares only permissions with a row above, plus `INTERNET`, `ACCESS_NETWORK_STATE`, `SET_ALARM`, `RECEIVE_BOOT_COMPLETED` and the foreground-service ones (`dataSync` for model downloads, `microphone` for hands-free).
+- Messages (SMS and WhatsApp) need **no** SMS permission: the app opens the messaging app and you press Send.
 - Not requested and not promised: Wi-Fi, Bluetooth and airplane-mode control (Android does not allow apps to switch them silently),
-  accessibility service, device admin, "all files access".
+  tapping or typing inside other apps, device admin, "all files access", reading your SMS.

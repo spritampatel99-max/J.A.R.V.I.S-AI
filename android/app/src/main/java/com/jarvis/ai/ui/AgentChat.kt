@@ -82,7 +82,7 @@ class AgentChatController(private val container: AppContainer, private val confi
         job = scope.launch {
             try {
                 val registry = container.agentRuntime.registryFor(config, preview)
-                val planner = Planner(container.llm, registry, persona = container.agentRuntime.persona(config, preview))
+                val planner = Planner(container.routedLlm, registry, persona = container.agentRuntime.persona(config, preview))
                 val history = lines.dropLast(1).filter { !it.isSystem }.takeLast(10)
                     .map { ChatMessage(if (it.fromUser) ChatRole.USER else ChatRole.ASSISTANT, it.text) }
                 when (val result = planner.plan(clean, history)) {

@@ -41,6 +41,11 @@ object NativeCommands {
 
     /** @return null when the text is not a command this matcher knows (the model should handle it). */
     fun match(text: String, clock: Clock = Clock.systemDefaultZone()): Match? {
+        // A message's words belong to the person: they are matched before the generic clean-up, which would trim a
+        // trailing "now" or "please" and the punctuation off the end of what they want to say.
+        val lead = leadClean(text)
+        if (lead.isNotEmpty() && lead.length <= MAX_LENGTH) messaging(lead)?.let { return toMatch(listOf(it)) }
+
         val whole = clean(text)
         if (whole.isEmpty() || whole.length > MAX_LENGTH) return null
 
@@ -61,7 +66,7 @@ object NativeCommands {
     }
 
     private fun single(text: String, clock: Clock): One? =
-        flashlight(text) ?: youtube(text) ?: alarm(text, clock) ?: website(text) ?: deviceInfo(text) ?: time(text) ?: weather(text) ?: calls(text) ?: phone(text) ?: offline(text) ?: openApp(text)
+        flashlight(text) ?: youtube(text) ?: timer(text) ?: media(text) ?: alarm(text, clock) ?: website(text) ?: deviceInfo(text) ?: time(text) ?: weather(text) ?: calls(text) ?: phone(text) ?: offline(text) ?: openApp(text)
 
     // ---- weather ---------------------------------------------------------------------------------------------------
     //
@@ -446,6 +451,160 @@ object NativeCommands {
         return null
     }
 
+    // ---- messages ---------------------------------------------------------------------------------------------------
+    //
+    // "text mom saying I'm late" becomes a send_sms step. Like a call, a message is a high-risk tool: the app shows the exact
+    // name, number and words and waits for a tap, and the messages app then opens with the text typed in for the person to send.
+    // The recipient and the words are separated by a joining word ("saying", "that", "with", a colon), so the matcher never has to
+    // guess where a name ends; "text mom I'm late" is therefore not matched and is left to the planner.
+
+    private const val SAYING = """(?:\s+(?:saying|that says|that|with the message|with the text|with)\s+|\s*:\s*)"""
+    private const val WA = """what'?s ?app"""
+    private const val NOUN_SMS = """(?:text message|text|sms|message)"""
+    private const val SEND_LEAD = """(?:(?:send|write|compose|type) (?:an? |my )?)?"""
+
+    private val WHATSAPP_PATTERNS = listOf(
+        Regex("""^$SEND_LEAD$WA(?: message| text)?(?: to)? (.{1,60}?)$SAYING(.{1,1000})$""", RegexOption.IGNORE_CASE),
+        Regex("""^$SEND_LEAD$NOUN_SMS (?:to )?(.{1,60}?) (?:on|via|using|through|in) $WA$SAYING(.{1,1000})$""", RegexOption.IGNORE_CASE),
+        Regex("""^send (.{1,60}?) an? $WA(?: message| text)?$SAYING(.{1,1000})$""", RegexOption.IGNORE_CASE),
+    )
+    private val SMS_PATTERNS = listOf(
+        Regex("""^$SEND_LEAD$NOUN_SMS(?: to)? (.{1,60}?)$SAYING(.{1,1000})$""", RegexOption.IGNORE_CASE),
+        Regex("""^send (.{1,60}?) an? $NOUN_SMS$SAYING(.{1,1000})$""", RegexOption.IGNORE_CASE),
+    )
+    private val MESSAGE_NO_WORDS = Regex("""^$SEND_LEAD(?:(?:$WA)(?: message| text)?|$NOUN_SMS)(?: to)? (.{1,60})$""", RegexOption.IGNORE_CASE)
+
+    /** Only the front of the sentence is cleaned (a wake word, "please", "can you"); the person's own words stay as spoken. */
+    private fun leadClean(raw: String): String {
+        var t = raw.trim().replace(Regex("""[ \t]+"""), " ")
+        var changed = true
+        while (changed) {
+            changed = false
+            for (prefix in PREFIXES) {
+                if (t.length > prefix.length && t.startsWith(prefix, ignoreCase = true)) {
+                    t = t.substring(prefix.length).trimStart()
+                    changed = true
+                }
+            }
+        }
+        return t
+    }
+
+    /** A name of up to four words or a number; null when it is anything else (several people, "me", a carrier code). */
+    private fun recipient(rawTarget: String): String? {
+        var target = rawTarget.trim().trim(',', '.').removeSuffix(" please").trim()
+        if (target.isEmpty()) return null
+        if (target.any { it.isDigit() || it == '*' || it == '#' || it == '+' }) return target.takeIf { NUMBER_LIKE.matches(it) }
+        target = target.removePrefix("my ").trim()
+        val words = target.split(' ')
+        if (words.size > 4 || words.first().lowercase(Locale.ROOT) in NOT_A_NAME || !NAME_LIKE.matches(target)) return null
+        if (JOINERS.containsMatchIn(target)) return null
+        return target
+    }
+
+    private fun messaging(text: String): One? {
+        for ((patterns, tool, what) in listOf(Triple(WHATSAPP_PATTERNS, "send_whatsapp", "WhatsApp"), Triple(SMS_PATTERNS, "send_sms", "Text"))) {
+            for (p in patterns) {
+                val m = p.matchEntire(text) ?: continue
+                val to = recipient(m.groupValues[1]) ?: continue
+                val body = m.groupValues[2].trim().trim('"', '“', '”').trim()
+                if (body.isEmpty()) continue
+                return One.Step(
+                    tool,
+                    "$what $to",
+                    buildJsonObject {
+                        put("to", to)
+                        put("message", body)
+                    },
+                )
+            }
+        }
+        // "text mom" with nothing to say: ask for the words instead of guessing them.
+        // Only a single-word name or a number counts: "text mom I'm late" has no joining word, so it is left to the planner.
+        val bare = MESSAGE_NO_WORDS.matchEntire(text)?.groupValues?.get(1)
+        val to = bare?.let { recipient(it) }?.takeIf { ' ' !in it || it.all { c -> c.isDigit() || c == ' ' || c == '+' || c == '-' || c == '(' || c == ')' } } ?: return null
+        val kind = if (Regex(WA, RegexOption.IGNORE_CASE).containsMatchIn(text)) "WhatsApp" else "text"
+        return One.Ask("What should the message to $to say? Say it in one go, for example: $kind $to saying I'll be there in ten minutes.")
+    }
+
+    // ---- timers ----------------------------------------------------------------------------------------------------
+    //
+    // "set a timer for 10 minutes" starts a countdown in the Clock app. Only a whole sentence that is a timer is matched.
+
+    private val DURATION_PART = Regex(
+        """(\d{1,5}(?:\.\d)?|an?|half an?|half) ?(hours?|hrs?|hr|h|minutes?|mins?|min|m|seconds?|secs?|sec|s)\b""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val DURATION_FILLER = Regex("""(?:,|\band\b|\s)+""", RegexOption.IGNORE_CASE)
+    private val DURATION_PHRASES = mapOf("an hour and a half" to 5400, "a minute and a half" to 90, "a quarter of an hour" to 900, "an hour and a quarter" to 4500)
+
+    /** Seconds for a spoken length like "10 minutes", "1 hour 30 minutes" or "half an hour"; null if it is anything else. */
+    private fun duration(raw: String): Int? {
+        val text = raw.trim().lowercase(Locale.ROOT).removePrefix("for ").removePrefix("of ").trim()
+        DURATION_PHRASES[text]?.let { return it }
+        val parts = DURATION_PART.findAll(text).toList()
+        if (parts.isEmpty()) return null
+        if (DURATION_PART.replace(text, " ").replace(DURATION_FILLER, "").isNotEmpty()) return null
+        var seconds = 0.0
+        for (part in parts) {
+            val amount = when (val a = part.groupValues[1]) {
+                "a", "an" -> 1.0
+                "half", "half a", "half an" -> 0.5
+                else -> a.toDoubleOrNull() ?: return null
+            }
+            val unit = part.groupValues[2][0]
+            seconds += amount * when (unit) {
+                'h' -> 3600
+                'm' -> 60
+                else -> 1
+            }
+        }
+        val whole = Math.round(seconds).toInt()
+        return whole.takeIf { it in 1..MAX_TIMER_SECONDS }
+    }
+
+    private val TIMER_PATTERNS = listOf(
+        Regex("""^(?:set|start|create|make|begin)(?: me)?(?: (?:an?|the))? timer (?:for|of) (.+)$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:set|start|create|make|begin)(?: me)?(?: (?:an?|the))? (.+?) timer$""", RegexOption.IGNORE_CASE),
+        Regex("""^timer (?:for )?(.+)$""", RegexOption.IGNORE_CASE),
+        Regex("""^(.+?) timer$""", RegexOption.IGNORE_CASE),
+    )
+
+    private fun timer(text: String): One? {
+        for (p in TIMER_PATTERNS) {
+            val seconds = p.matchEntire(text)?.groupValues?.get(1)?.let { duration(it) } ?: continue
+            return One.Step("set_timer", "Start a timer", buildJsonObject { put("seconds", seconds) })
+        }
+        return null
+    }
+
+    // ---- media ------------------------------------------------------------------------------------------------------
+
+    private const val MEDIA_NOUN = """(?:music|song|songs|track|video|playback|media|playing)"""
+    private val MEDIA_PATTERNS: List<Pair<Regex, String>> = listOf(
+        Regex("""^(?:play|unpause)(?: the)?(?: $MEDIA_NOUN)?$""", RegexOption.IGNORE_CASE) to "play",
+        Regex("""^(?:resume|continue)(?: the)? $MEDIA_NOUN$""", RegexOption.IGNORE_CASE) to "play",
+        Regex("""^pause(?: the| this)?(?: $MEDIA_NOUN)?$""", RegexOption.IGNORE_CASE) to "pause",
+        Regex("""^stop (?:the |this )?$MEDIA_NOUN$""", RegexOption.IGNORE_CASE) to "stop",
+        Regex("""^(?:play )?(?:the )?next (?:song|track|video)$""", RegexOption.IGNORE_CASE) to "next",
+        Regex("""^skip(?: to)?(?: the| this| that)? (?:next )?(?:song|track|video)$""", RegexOption.IGNORE_CASE) to "next",
+        Regex("""^(?:play )?(?:the )?(?:previous|last) (?:song|track|video)$""", RegexOption.IGNORE_CASE) to "previous",
+        Regex("""^go back (?:a|one|to the previous) (?:song|track|video)$""", RegexOption.IGNORE_CASE) to "previous",
+        Regex("""^(?:volume up|sound up|louder|turn it up|make it louder|make (?:the )?(?:music|sound) louder)$""", RegexOption.IGNORE_CASE) to "volume_up",
+        Regex("""^(?:turn|crank|pump|bring) (?:the |my )?(?:volume|sound|music) up$""", RegexOption.IGNORE_CASE) to "volume_up",
+        Regex("""^(?:turn up|raise|increase|boost) (?:the |my )?(?:volume|sound|music)$""", RegexOption.IGNORE_CASE) to "volume_up",
+        Regex("""^(?:volume down|sound down|quieter|softer|turn it down|make it (?:quieter|softer)|make (?:the )?(?:music|sound) (?:quieter|softer))$""", RegexOption.IGNORE_CASE) to "volume_down",
+        Regex("""^(?:turn|bring) (?:the |my )?(?:volume|sound|music) down$""", RegexOption.IGNORE_CASE) to "volume_down",
+        Regex("""^(?:turn down|lower|reduce|decrease) (?:the |my )?(?:volume|sound|music)$""", RegexOption.IGNORE_CASE) to "volume_down",
+    )
+
+    private fun media(text: String): One? {
+        for ((p, action) in MEDIA_PATTERNS) {
+            if (p.matches(text)) return One.Step("media_control", "Media: ${action.replace('_', ' ')}", buildJsonObject { put("action", action) })
+        }
+        return null
+    }
+
     // ---- text clean-up -----------------------------------------------------------------------------------
 
     private val SPLIT = Regex("""\s*(?:,\s*(?:and\s+)?then\s+|\s+and then\s+|\s+then\s+|\s+and\s+|\s*;\s*|\s*,\s*)""", RegexOption.IGNORE_CASE)
@@ -479,4 +638,5 @@ object NativeCommands {
     private const val MAX_LENGTH = 400
     private const val MAX_PARTS = 5
     private const val MAX_RELATIVE_MINUTES = 24 * 60L
+    private const val MAX_TIMER_SECONDS = 24 * 3600
 }

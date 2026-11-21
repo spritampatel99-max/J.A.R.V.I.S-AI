@@ -41,6 +41,7 @@ class ModelLister(private val http: JsonHttp) {
             ProviderId.OPENAI -> openAiStyle("https://api.openai.com/v1/models", bearer(key))
             ProviderId.OPENROUTER -> openAiStyle("https://openrouter.ai/api/v1/models", if (key == null) emptyMap() else bearer(key))
             ProviderId.ANTHROPIC -> anthropic(key.orEmpty())
+            ProviderId.MISTRAL -> openAiStyle("https://api.mistral.ai/v1/models", bearer(key))
         }
     }
 
@@ -99,6 +100,6 @@ class ModelLister(private val http: JsonHttp) {
 
     private companion object {
         /** Embeddings, speech, image/video generation, moderation and similar: never useful as a chat model here. */
-        val NOT_TEXT_CHAT = Regex("(embed|whisper|tts|speech|transcribe|dall-e|imagen|image|veo|lyria|moderation|guard|realtime|audio|sora|rerank|orpheus|aqa)", RegexOption.IGNORE_CASE)
+        val NOT_TEXT_CHAT = Regex("(embed|whisper|tts|speech|transcribe|dall-e|imagen|image|veo|lyria|moderation|guard|realtime|audio|sora|rerank|orpheus|aqa|ocr)", RegexOption.IGNORE_CASE)
     }
 }

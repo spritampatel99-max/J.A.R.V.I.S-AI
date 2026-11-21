@@ -34,7 +34,9 @@ AI
 
 Access and safety
 - [ ] Each permission opens its real Android dialog or settings page; denied and "don't ask again" states show correctly
-- [ ] "Call Asha" shows the exact name and number, and **nothing** dials until the Call button is tapped; voice cannot approve it
+- [ ] **Typed** "call Asha" shows the exact name and number, and **nothing** dials until the Call button is tapped
+- [ ] **Spoken** "call Asha" (push to talk) reads back "Calling Asha, mobile. Say stop to cancel.", dials after 3 seconds, and "stop" / the Cancel button prevents the call
+- [ ] A call that an AI plan produces (for example "call Asha and then …" through the cloud model) asks for a tap, never the countdown
 - [ ] Declining or leaving the confirmation expire does not call
 - [ ] Ending/answering a call needs its permission and reports honestly
 
@@ -61,10 +63,24 @@ Offline and security screens
 - [ ] Offline self-test passes
 - [ ] Security review lists real permissions and never says "secure"
 
+### Hands-free, messages, timers, media, phone control, offline library, AI mode
+
+- [ ] Hands-free: with a Picovoice AccessKey saved, saying "Jarvis" plays the tone and listens once; it never reacts to other words; a wrong key shows a clear message and no key text
+- [ ] Hands-free after a reboot does not start by itself; opening the app and switching it on does
+- [ ] "Text Asha hello" opens the messaging app with the text filled in and **does not send**; the reply says it was not sent
+- [ ] "WhatsApp +91… hello" opens that chat with the text ready; a name with no `+` number opens WhatsApp's picker with the text ready
+- [ ] A message body such as "call 100" is delivered as text and starts nothing
+- [ ] "Set a timer for 1 minute" shows a timer in the Clock app; "pause" / "next track" / "volume up" act on the player (the replies say "asked", and volume reports before and after)
+- [ ] Phone control: with the accessibility service off, "read the screen" says it is off; with it on, it reads the visible text; Back / Home / Recents work; **no** tapping or typing happens in any app
+- [ ] Notification reader: off says it is off; on lists notifications; neither screen text nor notification text appears in the Logs tab
+- [ ] "Open Maps" by voice with the screen off or the app in the background: works with "Display over other apps", and says so honestly when Android refuses (Android 14/15)
+- [ ] Offline library: download or import a `.zim`; airplane mode; "search offline for black hole" answers with the source named
+- [ ] AI mode: Local only with no engine says so and does not use the cloud; Cloud assisted answers from the cloud
+
 ## 3. Local AI (blocked)
 
-The on-device engine does not exist. Do not tick "works offline" for AI chat until a model actually answers a prompt in airplane mode on a real phone.
-Blocked on the LiteRT-LM version, the Kotlin version it requires, and its cancel API (see `PROJECT_AUDIT.md` §6).
+The default build has no on-device engine. An opt-in LiteRT-LM engine is written (`enableLiteRt`) but has never been compiled. Do not tick "works offline" for AI chat until a model actually answers a prompt in airplane mode on a real phone.
+Open items: the Kotlin version the library needs, the exact API names, and cancelling a running generation (see `docs/ai/LOCAL_MODELS.md`).
 
 ## 4. Sign and build a release
 
@@ -82,8 +98,10 @@ Blocked on the LiteRT-LM version, the Kotlin version it requires, and its cancel
 J.A.R.V.I.S.-AI for Android  <version>
 Verified on: <phone model, Android version>, <date>
 Works: <list only items ticked in section 2>
-Not built: on-device AI chat, wake word, light theme, web research, document search, agent knowledge sources
+Not built: on-device AI chat (unless you verified the opt-in engine), custom wake words other than "Jarvis", tapping or typing inside other apps, streaming replies, light theme, document search, agent knowledge sources
 Known limits: reminders can be minutes late without the Alarms & reminders access; calls can only be started, not confirmed as connected;
+              messages are opened in the messaging app and the person presses Send; timers and media keys are requests Android does not confirm;
+              hands-free listening uses battery and must be restarted by opening the app after a reboot;
               Wi-Fi/Bluetooth/airplane mode can only be opened in Settings, not toggled
 ```
 

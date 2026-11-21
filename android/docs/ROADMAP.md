@@ -3,18 +3,18 @@
 Ten phases, taken from the master prompt. "Done" means written *and* verified; the verification actually
 performed is described in `testing/BUILD_AND_TEST_REPORT.md`. The `:core` module has been built and its tests run
 under Gradle on the project owner's PC (they passed). The `:app` module (Android code and screens) has **not**
-compiled successfully yet in its latest form. An earlier version of the debug app was built and shown running on the owner's phone (screenshots), but this round's changes have not been compiled, and no release build exists.
+compiled successfully yet in its latest form (three rounds of changes since the last build). An earlier version of the debug app was built and shown running on the owner's phone (screenshots), but those rounds have not been compiled, and no release build exists. `:core` now passes 798 tests in the offline harness. See `STATUS.md`.
 
 | # | Phase | Status |
 |---|---|---|
 | 1 | Project audit | **Done**: `PROJECT_AUDIT.md` |
 | 2 | Android foundation | **Partly done** (see below) |
 | 3 | Onboarding, device analysis, feature selection | **Written; logic tested offline, screens never compiled or shown.** See `setup/ONBOARDING.md` |
-| 4 | Local AI (LiteRT-LM, Gemma 3 1B / Gemma 4 E2B, model manager) | **Partly done:** model manager (download, resume, verify, import, remove) written and unit-tested offline. **Not done:** the inference engine, so an installed model cannot answer chat. See `ai/LOCAL_MODELS.md` |
-| 5 | Cloud AI + intelligent router | Partly done: five provider adapters, the fallback client, model listing and a connection test exist; built-in commands run before the AI. The route planner and the on-device/cloud router (four modes) are written and unit-tested but **not wired into the app**; the task classifier and the mode settings screen do not exist |
-| 6 | Android integration (voice, apps, calls, messages, notifications, files, data monitor) | Started: 5 tools, and the Access screen that requests real permissions (most are "not used yet") |
+| 4 | Local AI (LiteRT-LM, Gemma 3 1B / Gemma 4 E2B, model manager) | **Partly done:** model manager (download, resume, verify, import, remove) written and unit-tested offline. A LiteRT-LM engine is written as an **opt-in build that has never been compiled** (`enableLiteRt`, needs a Kotlin bump); the default build has no engine, so an installed model cannot answer chat. See `ai/LOCAL_MODELS.md` |
+| 5 | Cloud AI + intelligent router | Partly done: six provider adapters (Gemini, Groq, OpenRouter, OpenAI, Mistral, Claude), the fallback client, model listing and a connection test exist; built-in commands run before the AI. The route planner and the on-device/cloud router (four modes) are unit-tested and **wired into the app** with an AI-mode setting in Prefs (uncompiled). Not built: the task classifier, streaming, usage metadata, cancel buttons |
+| 6 | Android integration (voice, apps, calls, messages, notifications, files, data monitor) | **Written; core tested, `:app` never compiled.** Thirty tools: phone (flashlight, alarm, timer, apps, media keys), calls, SMS / WhatsApp hand-off (you press Send), screen reading and system buttons through an accessibility service, notification reading, weather / Wikipedia / web answers, an offline Wikipedia library. "Jarvis" hands-free wake word (Porcupine). Not built: tapping or typing inside other apps (deliberately), files, the data monitor |
 | 7 | Memory, planner, automation, Custom Agent Creator | **Core logic written and unit-tested offline; screens and Android wiring written, never compiled.** Room replaced by atomic JSON files. Not built: memory-suggestion generator, automation edit, agent knowledge sources, web/document features. See `ai/MEMORY_AND_PLANNER.md`, `AUTOMATIONS.md`, `ai/CUSTOM_AGENTS.md` |
-| 8 | Offline mode and the Offline Preparation Center | **Report and self-test written (core tested, screen uncompiled).** AI chat without internet is **not built** (no engine). See `security/OFFLINE_AND_SECURITY_REVIEW.md` |
+| 8 | Offline mode and the Offline Preparation Center | **Report and self-test written (core tested, screen uncompiled).** An offline Wikipedia library (Kiwix `.zim`) answers lookups with no internet. AI chat without internet is **not verified** (the engine is an uncompiled opt-in). See `security/OFFLINE_AND_SECURITY_REVIEW.md` |
 | 9 | Security centre, hardening, instrumented tests | Security review written (core tested, screen uncompiled). **No instrumented tests, lint, dependency scan or penetration test have been run.** |
 | 10 | Release build, signed APK, final documentation | **Documentation and a release checklist only (`release/RELEASE_CHECKLIST.md`). No signed build, no APK.** |
 
@@ -36,8 +36,8 @@ compiled successfully yet in its latest form. An earlier version of the debug ap
 
 - **Security:** native confirmation gate bound to the exact action, audit log, secret redaction, untrusted-content wrapper (`docs/security/SECURITY.md`).
 - **Agent:** planner, executor, tool registry with argument validation and risk levels.
-- **Tools (Android side):** `flashlight`, `set_alarm`, `open_url`, `open_youtube`, `get_device_info`.
-- **Cloud:** Gemini, Groq, OpenRouter, OpenAI and Claude adapters with ordered fallback.
+- **Tools:** thirty, see the README for the list. Typed and AI-planned sensitive actions need a tap; only a spoken built-in call command uses the 3-second read-back countdown.
+- **Cloud:** Gemini, Groq, OpenRouter, OpenAI, Mistral and Claude adapters with ordered fallback.
 
 ## Phase 3: what exists
 
@@ -51,11 +51,11 @@ See the three documents named in the table. In short: memory with explicit savin
 
 ## Not yet built for the cloud side
 
-Streaming, usage metadata, cancel buttons, the task classifier, the four
-routing modes, and the Online/Offline/Automatic mode detector.
+Streaming, usage metadata, cancel buttons and the task classifier. (The four routing modes exist and an online check is wired in; both are uncompiled.)
 
 ## Known gaps against the prompt that are deliberately deferred
 
 - Hilt is not used (manual injection instead).
 - `minifyEnabled` is off until R8 rules are tested on a device.
-- The Kotlin version has to be raised for LiteRT-LM (audit §6).
+- The Kotlin version has to be raised for LiteRT-LM (audit §6). The LiteRT engine is behind the `enableLiteRt` switch for that reason.
+- Not built, not promised: tapping or typing inside other apps, auto-pressing Send, a light theme, a floating orb, streaming.
