@@ -5,7 +5,10 @@ import android.content.Intent
 import android.media.AudioManager
 import android.net.Uri
 import android.provider.AlarmClock
+import android.provider.MediaStore
 import android.view.KeyEvent
+import com.jarvis.ai.ai.tools.builtin.CameraLauncher
+import com.jarvis.ai.ai.tools.builtin.EmailPort
 import com.jarvis.ai.ai.tools.builtin.LaunchResult
 import com.jarvis.ai.ai.tools.builtin.MediaAction
 import com.jarvis.ai.ai.tools.builtin.MediaKeys
@@ -59,6 +62,43 @@ class AndroidMessagingPort(
 
     private companion object {
         val WHATSAPP_PACKAGES = listOf("com.whatsapp", "com.whatsapp.w4b")
+    }
+}
+
+/**
+ * Opens the person's email app with a new draft (address, subject and text already typed in). Only email apps answer a
+ * `mailto:` SENDTO request, so a text-sharing app never opens by mistake. It never presses Send.
+ */
+class AndroidEmailPort(
+    context: Context,
+    private val foreground: ForegroundTracker,
+) : EmailPort {
+
+    private val context = context.applicationContext
+
+    override fun compose(to: String?, subject: String, body: String): MessageHandoff {
+        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))
+        if (to != null) intent.putExtra(Intent.EXTRA_EMAIL, arrayOf(to))
+        if (subject.isNotEmpty()) intent.putExtra(Intent.EXTRA_SUBJECT, subject)
+        if (body.isNotEmpty()) intent.putExtra(Intent.EXTRA_TEXT, body)
+        return startActivitySafely(context, foreground, intent, "email").toHandoff()
+    }
+}
+
+/**
+ * Opens the phone's own camera app in photo or video mode. These two actions only show the camera: they take nothing and need no
+ * camera permission, and the person presses the shutter or record button.
+ */
+class AndroidCameraLauncher(
+    context: Context,
+    private val foreground: ForegroundTracker,
+) : CameraLauncher {
+
+    private val context = context.applicationContext
+
+    override fun open(video: Boolean): LaunchResult {
+        val action = if (video) MediaStore.INTENT_ACTION_VIDEO_CAMERA else MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA
+        return startActivitySafely(context, foreground, Intent(action), "the camera")
     }
 }
 

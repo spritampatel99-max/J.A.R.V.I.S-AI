@@ -257,13 +257,16 @@ private fun ProviderCard(
     vm: AgentViewModel,
 ) {
     val colors = MaterialTheme.colorScheme
+    val ownEndpoint = row.id == ProviderId.FREELLM
     var keyInput by remember(row.id) { mutableStateOf("") }
     var modelInput by remember(row.id, row.model) { mutableStateOf(row.model) }
+    var endpointInput by remember(row.id, row.endpoint) { mutableStateOf(row.endpoint) }
     var showPicker by remember(row.id) { mutableStateOf(false) }
 
     /** Saves what is typed so Test and Load models use exactly what the user sees. */
     fun commit() {
         if (keyInput.isNotBlank()) vm.saveKey(row.id, keyInput)
+        if (ownEndpoint) vm.saveEndpoint(row.id, endpointInput)
         vm.saveModel(row.id, modelInput)
         keyInput = ""
     }
@@ -273,7 +276,11 @@ private fun ProviderCard(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(row.id.displayName, style = MaterialTheme.typography.titleLarge)
                 StatusPill(
-                    if (row.configured) "Key and model saved" else "Not configured",
+                    when {
+                        !row.configured -> "Not configured"
+                        ownEndpoint -> "Address and model saved"
+                        else -> "Key and model saved"
+                    },
                     if (row.configured) JarvisColors.Good else colors.onSurfaceVariant,
                 )
             }
@@ -281,11 +288,38 @@ private fun ProviderCard(
             TextButton(onClick = { vm.move(row.id, 1) }, enabled = canMoveDown) { Text("Down") }
         }
 
+        if (ownEndpoint) {
+            Text(
+                "For an OpenAI-compatible service you choose, for example a FreeLLM-style gateway. Nothing is built in and the app does not vouch for the service: " +
+                    "everything you send in chat goes to the address below. Only https addresses are accepted. Put a token in the key field, never in the address.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = endpointInput,
+                onValueChange = { endpointInput = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("https address, for example https://your-gateway.example.com/v1") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                shape = MaterialTheme.shapes.medium,
+                colors = jarvisFieldColors(),
+            )
+        }
+
         OutlinedTextField(
             value = keyInput,
             onValueChange = { keyInput = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(if (row.hasKey) "Key saved - enter a new one to replace it" else "API key") },
+            label = {
+                Text(
+                    when {
+                        row.hasKey -> "Key saved - enter a new one to replace it"
+                        ownEndpoint -> "API key (optional)"
+                        else -> "API key"
+                    },
+                )
+            },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -302,7 +336,7 @@ private fun ProviderCard(
                     when (row.id) {
                         ProviderId.OPENROUTER -> "Models (comma-separated, tried in order)"
                         ProviderId.GROQ -> "Models (comma-separated, tried in order)"
-                        ProviderId.OPENAI, ProviderId.MISTRAL -> "Model (required: enter the model you want to use)"
+                        ProviderId.OPENAI, ProviderId.MISTRAL, ProviderId.FREELLM -> "Model (required: enter the model you want to use)"
                         else -> "Model"
                     },
                 )
@@ -315,7 +349,7 @@ private fun ProviderCard(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             GlowButton("Save", onClick = { commit() })
             GlowButton("Load models", subtle = true, onClick = {
-                vm.loadModels(row.id, keyInput)
+                vm.loadModels(row.id, keyInput, endpointInput)
                 showPicker = true
             })
             GlowButton("Test", subtle = true, enabled = test?.running != true, onClick = {

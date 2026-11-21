@@ -71,7 +71,7 @@ class StorageCalculator(
 
         // The app itself: already installed. Shown for completeness.
         lines += StorageLine(
-            label = "J.A.R.V.I.S.-AI app (already installed)",
+            label = "JARVIS 3.0 app (already installed)",
             download = Amount.NONE,
             installed = baseAppBytes.value?.let { Amount.Known(it) } ?: Amount.Unknown("Could not be read"),
             alreadyOnDevice = true,

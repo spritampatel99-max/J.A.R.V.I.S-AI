@@ -76,6 +76,10 @@ Offline and security screens
 - [ ] "Open Maps" by voice with the screen off or the app in the background: works with "Display over other apps", and says so honestly when Android refuses (Android 14/15)
 - [ ] Offline library: download or import a `.zim`; airplane mode; "search offline for black hole" answers with the source named
 - [ ] AI mode: Local only with no engine says so and does not use the cloud; Cloud assisted answers from the cloud
+- [ ] "Email sam@example.com saying hello" shows the address and words on a card; after the tap the email app opens with the draft ready and **nothing is sent**; "email Rahul saying hello" asks for a full address
+- [ ] "Open the camera" / "take a photo" opens the camera app (no photo is taken); "record a video" opens it in video mode
+- [ ] FreeLLM / own endpoint: an `http://` address or one with a password is refused with a clear message; an https address you trust lists its models and answers a chat; with no address the provider shows "Not configured"
+- [ ] The app is named "JARVIS 3.0" on the home screen, in Settings > Apps, in the hands-free notification and in the accessibility service entry
 
 ## 3. Local AI (blocked)
 
@@ -95,7 +99,7 @@ Open items: the Kotlin version the library needs, the exact API names, and cance
 ## 5. Release notes (fill in only with what was verified)
 
 ```
-J.A.R.V.I.S.-AI for Android  <version>
+JARVIS 3.0 for Android  <version>
 Verified on: <phone model, Android version>, <date>
 Works: <list only items ticked in section 2>
 Not built: on-device AI chat (unless you verified the opt-in engine), custom wake words other than "Jarvis", tapping or typing inside other apps, streaming replies, light theme, document search, agent knowledge sources

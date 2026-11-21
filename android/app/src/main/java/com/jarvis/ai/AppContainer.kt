@@ -17,6 +17,7 @@ import com.jarvis.ai.ai.providers.GeminiProvider
 import com.jarvis.ai.ai.providers.HttpClients
 import com.jarvis.ai.ai.providers.JsonHttp
 import com.jarvis.ai.ai.providers.LlmProvider
+import com.jarvis.ai.ai.providers.CustomEndpoint
 import com.jarvis.ai.ai.providers.ModelLister
 import com.jarvis.ai.ai.providers.OkHttpTransport
 import com.jarvis.ai.ai.providers.OpenAiCompatibleProvider
@@ -35,6 +36,8 @@ import com.jarvis.ai.android.device.AndroidAppSize
 import com.jarvis.ai.android.device.AndroidDeviceAnalyzer
 import com.jarvis.ai.android.device.AndroidContactsPort
 import com.jarvis.ai.android.device.AndroidCallPort
+import com.jarvis.ai.android.device.AndroidCameraLauncher
+import com.jarvis.ai.android.device.AndroidEmailPort
 import com.jarvis.ai.android.device.AndroidMediaKeys
 import com.jarvis.ai.android.device.AndroidMessagingPort
 import com.jarvis.ai.android.device.AndroidTimerLauncher
@@ -162,6 +165,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     fun providerSettings(id: ProviderId): ProviderSettings = ProviderSettings(
         apiKey = keys.get(keyName(id)),
         model = settings.model(id),
+        endpoint = if (id == ProviderId.FREELLM) settings.endpoint(id) else "",
     )
 
     private val gemini = GeminiProvider(cloudHttp, { providerSettings(ProviderId.GEMINI) })
@@ -178,7 +182,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         http = cloudHttp,
         endpoint = "https://openrouter.ai/api/v1/chat/completions",
         settings = { providerSettings(ProviderId.OPENROUTER) },
-        extraHeaders = mapOf("X-Title" to "J.A.R.V.I.S. Android"),
+        extraHeaders = mapOf("X-Title" to "JARVIS 3.0 Android"),
     )
 
     // OpenAI documents max_tokens as deprecated (and unsupported by its reasoning models), and some
@@ -201,6 +205,19 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         settings = { providerSettings(ProviderId.MISTRAL) },
     )
 
+    // "FreeLLM / own endpoint": an OpenAI-compatible service at an https address the person types in. Nothing is built in,
+    // the key is optional, and an address that CustomEndpoint refuses leaves the provider unconfigured.
+    private val freeLlm = OpenAiCompatibleProvider(
+        id = ProviderId.FREELLM,
+        http = cloudHttp,
+        endpoint = "",
+        settings = { providerSettings(ProviderId.FREELLM) },
+        endpointSource = { CustomEndpoint.chatUrl(providerSettings(ProviderId.FREELLM).endpoint) },
+        requireKey = false,
+        // An unknown gateway may reject the JSON-mode field, so it is not sent; the planner reads JSON out of plain text, as it does for Claude.
+        supportsJsonMode = false,
+    )
+
     private val anthropic = AnthropicProvider(cloudHttp, { providerSettings(ProviderId.ANTHROPIC) })
 
     private val providersById: Map<ProviderId, LlmProvider> = mapOf(
@@ -210,6 +227,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         ProviderId.OPENAI to openAi,
         ProviderId.ANTHROPIC to anthropic,
         ProviderId.MISTRAL to mistral,
+        ProviderId.FREELLM to freeLlm,
     )
 
     fun isConfigured(id: ProviderId): Boolean = providersById.getValue(id).isConfigured()
@@ -263,6 +281,8 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         messaging = AndroidMessagingPort(appContext, foreground),
         timers = AndroidTimerLauncher(appContext, foreground),
         media = AndroidMediaKeys(appContext),
+        email = AndroidEmailPort(appContext, foreground),
+        camera = AndroidCameraLauncher(appContext, foreground),
     )
 
     /** Work that must outlive any one screen (the assistant's requests, the hands-free service). Runs on the main thread. */
@@ -290,7 +310,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
 
     /**
      * Reading and steering the phone through Android's own accessibility and notification access. The guard sits in front of
-     * the Android code, so it cannot be skipped: J.A.R.V.I.S. itself, banking, payment and password apps and the person's own
+     * the Android code, so it cannot be skipped: JARVIS 3.0 itself, banking, payment and password apps and the person's own
      * list are never read, and system settings and permission dialogs are never acted on.
      */
     private val screenGuard = ScreenGuard(appContext.packageName) { settings.screenBlocklist }

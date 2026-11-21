@@ -49,6 +49,15 @@ class SettingsStore(context: Context) {
         editor.apply()
     }
 
+    /** The https address typed for the "own endpoint" provider. Only that provider reads it; it is not a secret, a token belongs in the key field. */
+    fun endpoint(id: ProviderId): String = prefs.getString(endpointKey(id), null).orEmpty()
+
+    fun setEndpoint(id: ProviderId, value: String) {
+        val editor = prefs.edit()
+        if (value.isBlank()) editor.remove(endpointKey(id)) else editor.putString(endpointKey(id), value.trim())
+        editor.apply()
+    }
+
     private val uiFlow = MutableStateFlow(readUi())
 
     /** Look and voice preferences. */
@@ -129,6 +138,8 @@ class SettingsStore(context: Context) {
     }
 
     private fun modelKey(id: ProviderId) = "model_${id.name}"
+
+    private fun endpointKey(id: ProviderId) = "endpoint_${id.name}"
 
     private companion object {
         const val PREFS_NAME = "jarvis_settings"

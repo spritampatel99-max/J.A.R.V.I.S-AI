@@ -141,7 +141,9 @@ class AppToolsTest {
     @Test
     fun spokenOpenCommandsFindTheName() {
         assertEquals("WhatsApp", appNameFor("open WhatsApp"))
-        assertEquals("camera", appNameFor("launch the camera app"))
+        assertEquals("Google Photos", appNameFor("launch the Google Photos app"))
+        // The camera has its own tool (open_camera), so the app-name lookup is not used for it.
+        assertNull(appNameFor("launch the camera app"))
         assertEquals("gallery", appNameFor("open my gallery"))
         assertEquals("Google Maps", appNameFor("Hey Jarvis, open Google Maps"))
         assertEquals("settings", appNameFor("please start settings"))

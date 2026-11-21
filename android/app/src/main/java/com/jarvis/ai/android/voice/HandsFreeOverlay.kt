@@ -58,7 +58,7 @@ class HandsFreeOverlay(context: Context) {
         fun dp(value: Int) = (value * density).toInt()
 
         val title = TextView(context).apply {
-            text = "J.A.R.V.I.S."
+            text = "JARVIS 3.0"
             setTextColor(Color.parseColor("#4FD8FF"))
             textSize = 11f
             letterSpacing = 0.15f

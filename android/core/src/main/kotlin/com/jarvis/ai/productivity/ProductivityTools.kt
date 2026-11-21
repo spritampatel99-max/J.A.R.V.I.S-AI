@@ -169,7 +169,7 @@ class ShowNotificationTool(private val notifier: Notifier) : Tool {
 
     override suspend fun execute(args: ToolArgs): ToolResult {
         if (!notifier.canNotify()) return ToolResult.Failure(ToolError.Unavailable("Android notifications are off for this app. Turn them on in Prefs > Manage access."))
-        if (!notifier.notify("manual", "J.A.R.V.I.S.", args.string("text"))) return ToolResult.Failure(ToolError.Failed("Android did not accept the notification."))
+        if (!notifier.notify("manual", "JARVIS 3.0", args.string("text"))) return ToolResult.Failure(ToolError.Failed("Android did not accept the notification."))
         return ToolResult.Success("Asked Android to show the notification.", Verification.HANDED_OFF)
     }
 }

@@ -5,7 +5,7 @@ import java.util.Locale
 /**
  * What the phone's accessibility service can be asked to do. It is deliberately small: look at the screen in front, scroll it,
  * and press the system's own navigation controls. It cannot tap or type inside another app, and it never uses screen
- * coordinates, so it cannot be steered onto J.A.R.V.I.S.'s own buttons.
+ * coordinates, so it cannot be steered onto JARVIS 3.0's own buttons.
  */
 enum class PhoneAction(val wire: String, val done: String) {
     BACK("back", "Went back"),
@@ -90,7 +90,7 @@ interface ScreenControl {
 /**
  * Which apps the screen tools must never look at or touch.
  *
- *  - Always: J.A.R.V.I.S. itself (so nothing can read or press its own confirmation buttons), payment apps, banking apps,
+ *  - Always: JARVIS 3.0 itself (so nothing can read or press its own confirmation buttons), payment apps, banking apps,
  *    password managers and authenticators, and anything the person added to their own list. This is a best-effort list by
  *    package name, not a guarantee; the person's own list covers what it misses.
  *  - Reading and looking only: system settings, permission and install dialogs and the system's own interface. These screens

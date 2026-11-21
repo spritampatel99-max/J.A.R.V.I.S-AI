@@ -1,6 +1,6 @@
 # Voice, calls, messages, timers and media
 
-Everything here is written and unit-tested in `:core` (798 tests, offline harness). The Android parts (`:app`) have **not been compiled or run on a device**.
+Everything here is written and unit-tested in `:core` (837 tests, offline harness). The Android parts (`:app`) have **not been compiled or run on a device**.
 
 ## Voice
 
@@ -50,6 +50,18 @@ Rules, all covered by tests:
 - **The app does not send.** SMS opens your messaging app with the text filled in (`ACTION_SENDTO`); you press Send. WhatsApp opens the chat directly **only when the number starts with `+`**; otherwise it opens WhatsApp's own picker with the text ready. The result is `HANDED_OFF` and says the message "has not been sent".
 - The text is cleaned of control characters, limited to 1000 characters, and a body that looks like a command ("call 100", "delete everything") is just text; it is never parsed as a command.
 - No accessibility auto-send is built, on purpose: tapping Send inside another app is the kind of action this project keeps behind your own finger.
+
+## Email and camera (hand-off only)
+
+| Say | Tool | Risk | What happens |
+|---|---|---|---|
+| "email sam@example.com saying I'll be late" | `compose_email` | high | Shows the exact address and words; after your tap, opens your email app with the draft ready. **You press Send**; the reply says "has not been sent". |
+| "write an email to sam@example.com" | `compose_email` | high | Same, with only the address filled in. |
+| "email Rahul saying hello" | none | | Asks for the full address. The app cannot look up a contact's email and does not guess one. |
+| "open the camera", "take a photo" | `open_camera` | low | Opens the phone's camera app ready for a photo. It cannot press the shutter. |
+| "record a video" | `open_camera` | low | Opens the camera app in video mode. It cannot start recording. |
+
+Email is never covered by the 3-second voice countdown, and only one plain address is accepted (no lists, no display names, no line breaks, no `Bcc` tricks). The camera needs no camera permission because it only starts the phone's own camera app.
 
 ## Timers and media keys
 

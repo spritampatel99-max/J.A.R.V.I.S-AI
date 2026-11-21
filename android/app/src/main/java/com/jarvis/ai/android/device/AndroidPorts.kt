@@ -35,7 +35,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val BACKGROUND_REASON =
-    "Android only lets J.A.R.V.I.S. open other apps while it is on screen, or when \"Display over other apps\" is allowed. " +
+    "Android only lets JARVIS 3.0 open other apps while it is on screen, or when \"Display over other apps\" is allowed. " +
         "Allow it in Prefs > Access, or keep the app open and try again."
 
 /**

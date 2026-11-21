@@ -15,7 +15,7 @@ enum class AgentCategory(val label: String) {
 
 /** What the person would like to answer for this agent. The router still decides per request what is actually available. */
 enum class ModelPreference(val label: String) {
-    ROUTER_DEFAULT("Let J.A.R.V.I.S. choose"),
+    ROUTER_DEFAULT("Let JARVIS 3.0 choose"),
     GEMMA_3_1B("Prefer Gemma 3 1B"),
     GEMMA_4_E2B("Prefer Gemma 4 E2B"),
     CLOUD("Prefer my cloud provider"),

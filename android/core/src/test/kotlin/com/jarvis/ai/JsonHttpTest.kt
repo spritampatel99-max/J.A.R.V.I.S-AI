@@ -437,9 +437,12 @@ class JsonHttpTest {
     // ---- Provider catalogue --------------------------------------------------------------
 
     @Test
-    fun theSixCloudProvidersAreListedOnceEach() {
+    fun theSevenCloudProvidersAreListedOnceEach() {
         assertEquals(
-            setOf(ProviderId.GEMINI, ProviderId.GROQ, ProviderId.OPENROUTER, ProviderId.OPENAI, ProviderId.ANTHROPIC, ProviderId.MISTRAL),
+            setOf(
+                ProviderId.GEMINI, ProviderId.GROQ, ProviderId.OPENROUTER, ProviderId.OPENAI, ProviderId.ANTHROPIC,
+                ProviderId.MISTRAL, ProviderId.FREELLM,
+            ),
             ProviderId.entries.toSet(),
         )
         assertEquals(ProviderId.entries.toList(), ProviderId.DEFAULT_ORDER.sortedBy { ProviderId.entries.indexOf(it) })
@@ -447,12 +450,12 @@ class JsonHttpTest {
     }
 
     @Test
-    fun openAiAndMistralHaveNoGuessedDefaultModelSoTheyStayUnconfiguredUntilChosen() {
-        for (blank in listOf(ProviderId.OPENAI, ProviderId.MISTRAL)) {
+    fun openAiMistralAndTheOwnEndpointHaveNoGuessedDefaultModelSoTheyStayUnconfiguredUntilChosen() {
+        for (blank in listOf(ProviderId.OPENAI, ProviderId.MISTRAL, ProviderId.FREELLM)) {
             assertEquals("", ProviderDefaults.modelFor(blank))
             assertFalse(chatCompletions(ProviderDefaults.modelFor(blank), blank).isConfigured(), "$blank must wait for a chosen model")
         }
-        for (id in ProviderId.entries - setOf(ProviderId.OPENAI, ProviderId.MISTRAL)) {
+        for (id in ProviderId.entries - setOf(ProviderId.OPENAI, ProviderId.MISTRAL, ProviderId.FREELLM)) {
             assertTrue(ProviderDefaults.modelFor(id).isNotBlank(), "$id should have a pre-filled model")
         }
     }

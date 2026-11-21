@@ -8,11 +8,17 @@ enum class ProviderId(val displayName: String) {
     OPENAI("OpenAI"),
     ANTHROPIC("Claude"),
     MISTRAL("Mistral"),
+
+    /**
+     * An OpenAI-compatible service at an https address the person types in (a FreeLLM-style gateway, for example).
+     * Nothing about it is built in: no address, no key, no model. See [CustomEndpoint].
+     */
+    FREELLM("FreeLLM / own endpoint"),
     ;
 
     companion object {
         /** Starting order; the user can reorder it and any provider may be left unconfigured. */
-        val DEFAULT_ORDER: List<ProviderId> = listOf(GEMINI, GROQ, OPENROUTER, OPENAI, ANTHROPIC, MISTRAL)
+        val DEFAULT_ORDER: List<ProviderId> = listOf(GEMINI, GROQ, OPENROUTER, OPENAI, ANTHROPIC, MISTRAL, FREELLM)
     }
 }
 
@@ -28,6 +34,7 @@ enum class ProviderId(val displayName: String) {
  *    2026-11-08), so one model being unavailable to a key does not stop the provider.
  *  - OpenRouter: `openrouter/free`, OpenRouter's router that picks a currently available free model.
  *  - Claude: from Anthropic's API reference.
+ *  - FreeLLM / own endpoint: nothing is pre-filled, because no address of such a service was verified.
  *  - OpenAI and Mistral have no default on purpose: no current model name was verified, so those providers
  *    stay unconfigured until the user picks one (the Load models button lists what the key can use).
  */
@@ -44,6 +51,7 @@ object ProviderDefaults {
         ProviderId.OPENAI -> ""
         ProviderId.ANTHROPIC -> ANTHROPIC_MODEL
         ProviderId.MISTRAL -> ""
+        ProviderId.FREELLM -> ""
     }
 
     /**
@@ -95,9 +103,12 @@ data class LlmRequest(
 data class ProviderSettings(
     val apiKey: String? = null,
     val model: String = "",
+    /** Only used by [ProviderId.FREELLM]: the address the person typed. Never printed. */
+    val endpoint: String = "",
 ) {
     override fun toString(): String =
-        "ProviderSettings(model=$model, apiKey=${if (apiKey.isNullOrBlank()) "unset" else "***"})"
+        "ProviderSettings(model=$model, apiKey=${if (apiKey.isNullOrBlank()) "unset" else "***"}, " +
+            "endpoint=${if (endpoint.isBlank()) "unset" else "set"})"
 }
 
 /** Typed provider failures. Messages are safe to show and log (keys are redacted upstream). */

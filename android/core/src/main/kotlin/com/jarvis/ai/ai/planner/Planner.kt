@@ -207,7 +207,7 @@ class Planner(
     private fun systemPrompt(spoken: Boolean): String {
         val now: ZonedDateTime = ZonedDateTime.now(clock)
         return buildString {
-            appendLine("You are the planning module of J.A.R.V.I.S., an assistant running on an Android phone.")
+            appendLine("You are the planning module of JARVIS 3.0, an assistant running on an Android phone.")
             appendLine("Decide whether the user's request needs tools, and if so produce a plan using ONLY the tools below.")
             appendLine()
             appendLine("Current local time: ${now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))} (${now.zone}), ${now.dayOfWeek}.")

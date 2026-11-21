@@ -55,7 +55,7 @@ enum class AccessKey(
         "Notifications", AccessKind.RUNTIME, Manifest.permission.POST_NOTIFICATIONS, true,
         "Shows reminders and automation notifications, and the progress of a model download.",
         "Nothing is read. The app can only show its own notifications.",
-        "Settings > Apps > J.A.R.V.I.S. > Notifications.",
+        "Settings > Apps > JARVIS 3.0 > Notifications.",
     ),
     BATTERY(
         "Run in the background", AccessKind.SPECIAL, Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, true,
@@ -70,26 +70,26 @@ enum class AccessKey(
             "but it only reports the word \"Jarvis\". The app does not record or store audio. " +
             "Depending on your phone, the recogniser may send the sound to its provider (usually Google) to turn it into text; " +
             "on Android 13 and later the app asks for the on-device recogniser when your phone has one.",
-        "Settings > Apps > J.A.R.V.I.S. > Permissions > Microphone.",
+        "Settings > Apps > JARVIS 3.0 > Permissions > Microphone.",
     ),
     CONTACTS(
         "Contacts", AccessKind.RUNTIME, Manifest.permission.READ_CONTACTS, true,
         "To find a person by name when you ask to call them.",
         "Names and phone numbers matching the name you asked for, only when a command needs one. Contacts are never uploaded by the app, " +
             "and the confirmation shows the exact name and number before anything is dialled.",
-        "Settings > Apps > J.A.R.V.I.S. > Permissions > Contacts.",
+        "Settings > Apps > JARVIS 3.0 > Permissions > Contacts.",
     ),
     PHONE_CALLS(
         "Phone calls", AccessKind.RUNTIME, Manifest.permission.CALL_PHONE, true,
         "To place a call you asked for, after you tap Confirm. Without it, the phone's dialer opens with the number filled in and you press call yourself.",
         "It lets the app start a call. It does not read your call history. Emergency numbers are never dialled by the app.",
-        "Settings > Apps > J.A.R.V.I.S. > Permissions > Phone.",
+        "Settings > Apps > JARVIS 3.0 > Permissions > Phone.",
     ),
     ANSWER_CALLS(
         "Answer and end calls", AccessKind.RUNTIME, Manifest.permission.ANSWER_PHONE_CALLS, true,
         "So you can say or type \"answer the call\" or \"hang up\". The app cannot see who is calling and does not watch for calls.",
         "It lets the app ask Android to pick up a ringing call or end the current one, only when you ask.",
-        "Settings > Apps > J.A.R.V.I.S. > Permissions > Phone.",
+        "Settings > Apps > JARVIS 3.0 > Permissions > Phone.",
     ),
     EXACT_ALARMS(
         "Exact alarms and reminders", AccessKind.SPECIAL, Manifest.permission.SCHEDULE_EXACT_ALARM, true,
@@ -100,7 +100,7 @@ enum class AccessKey(
     OVERLAY(
         "Display over other apps", AccessKind.SPECIAL, Manifest.permission.SYSTEM_ALERT_WINDOW, true,
         "Lets hands-free show a small card (\"Listening…\", the answer, the call countdown with Cancel) on top of other apps, and lets the app open " +
-            "another app when you ask by voice while J.A.R.V.I.S. is not on screen. Without it, opening apps by voice works only while J.A.R.V.I.S. is open.",
+            "another app when you ask by voice while JARVIS 3.0 is not on screen. Without it, opening apps by voice works only while JARVIS 3.0 is open.",
         "It can draw over other apps. It cannot read what is on them.",
         "Settings > Apps > Special access > Display over other apps.",
     ),
@@ -115,9 +115,9 @@ enum class AccessKey(
         "Lets you say \"read my screen\", \"scroll down\", \"go back\", \"go home\", \"lock the phone\" or \"take a screenshot\". " +
             "It reads the text of the window in front aloud and presses Android's own navigation buttons.",
         "The text of the screen in front, only when you ask. It skips password fields, text boxes you type in, banking, payment and password apps, " +
-            "and J.A.R.V.I.S. itself. It cannot tap or type in other apps. What it reads is shown to you and spoken, not saved and not sent to an AI. " +
-            "If Android greys the switch out (apps installed outside the Play Store), open Settings > Apps > J.A.R.V.I.S., tap the three dots and choose \"Allow restricted settings\", then try again.",
-        "Settings > Accessibility > J.A.R.V.I.S. > switch off.",
+            "and JARVIS 3.0 itself. It cannot tap or type in other apps. What it reads is shown to you and spoken, not saved and not sent to an AI. " +
+            "If Android greys the switch out (apps installed outside the Play Store), open Settings > Apps > JARVIS 3.0, tap the three dots and choose \"Allow restricted settings\", then try again.",
+        "Settings > Accessibility > JARVIS 3.0 > switch off.",
     ),
     NOTIFICATION_ACCESS(
         "Read notifications", AccessKind.SPECIAL, null, true,
@@ -125,7 +125,7 @@ enum class AccessKey(
         "The title and text of the notifications showing now, only when you ask. It skips ongoing ones (music, calls), notifications you marked secret, " +
             "and banking, payment and password apps. What it reads is shown to you and spoken, not saved and not sent to an AI. " +
             "If Android greys the switch out, use \"Allow restricted settings\" on this app's page in Settings, as above.",
-        "Settings > Notifications > Device and app notifications > J.A.R.V.I.S. > off.",
+        "Settings > Notifications > Device and app notifications > JARVIS 3.0 > off.",
     ),
 }
 

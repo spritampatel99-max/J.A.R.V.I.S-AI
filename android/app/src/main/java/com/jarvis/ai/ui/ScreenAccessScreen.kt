@@ -80,7 +80,7 @@ fun ScreenAccessScreen(container: AppContainer) {
             )
             GlowButton(if (screenOn) "Manage in Settings" else "Turn on in Settings", subtle = screenOn, onClick = { open(AccessKey.ACCESSIBILITY) })
             MutedText(
-                "If Android greys the switch out because the app was installed from a file, open Settings > Apps > J.A.R.V.I.S., tap the three dots " +
+                "If Android greys the switch out because the app was installed from a file, open Settings > Apps > JARVIS 3.0, tap the three dots " +
                     "and choose \"Allow restricted settings\", then switch it on.",
             )
         }
@@ -105,7 +105,7 @@ fun ScreenAccessScreen(container: AppContainer) {
         SectionTitle(Glyph.SHIELD, "Never read these apps", "${blocked.size} added")
         GlassCard {
             MutedText(
-                "Banking, payment, authenticator and password apps, and J.A.R.V.I.S. itself, are always left alone, whatever you add here. " +
+                "Banking, payment, authenticator and password apps, and JARVIS 3.0 itself, are always left alone, whatever you add here. " +
                     "That built-in list goes by app name, so add any other app you want kept private.",
             )
             if (blocked.isEmpty()) {

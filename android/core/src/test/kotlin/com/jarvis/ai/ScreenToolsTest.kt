@@ -165,11 +165,11 @@ class ScreenToolsTest {
 
     @Test
     fun jarvisOwnWindowIsNeverReadEvenIfTheAndroidSideIgnoresThePolicy() = runTest {
-        val raw = FakeRaw(front = FrontApp(own, "J.A.R.V.I.S."), lines = listOf("Allow", "Cancel"), ignoresPolicy = true)
+        val raw = FakeRaw(front = FrontApp(own, "JARVIS 3.0"), lines = listOf("Allow", "Cancel"), ignoresPolicy = true)
 
         val read = guarded(raw).read()
 
-        assertEquals(ScreenRead.OffLimits("J.A.R.V.I.S."), read, "the text of its own confirmation card must never reach a tool result")
+        assertEquals(ScreenRead.OffLimits("JARVIS 3.0"), read, "the text of its own confirmation card must never reach a tool result")
     }
 
     @Test

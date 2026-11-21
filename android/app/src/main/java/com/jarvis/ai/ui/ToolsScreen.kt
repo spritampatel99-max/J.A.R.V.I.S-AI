@@ -47,6 +47,8 @@ private val EXAMPLES = mapOf(
     "send_whatsapp" to "WhatsApp dad saying call me",
     "set_timer" to "Set a timer for 10 minutes",
     "media_control" to "Pause the music",
+    "compose_email" to "Email sam@example.com saying I'll be late",
+    "open_camera" to "Take a photo",
 )
 
 private val QUICK = listOf(

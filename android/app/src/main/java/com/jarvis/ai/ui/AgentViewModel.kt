@@ -12,6 +12,7 @@ import com.jarvis.ai.ai.planner.PlanStep
 import com.jarvis.ai.ai.planner.Planner
 import com.jarvis.ai.ai.providers.ChatMessage
 import com.jarvis.ai.ai.providers.ChatRole
+import com.jarvis.ai.ai.providers.CustomEndpoint
 import com.jarvis.ai.ai.providers.LlmRequest
 import com.jarvis.ai.ai.providers.ProviderError
 import com.jarvis.ai.ai.providers.ProviderId
@@ -78,6 +79,8 @@ data class ProviderRow(
     val hasKey: Boolean,
     val configured: Boolean,
     val model: String,
+    /** Only the "own endpoint" provider has one; empty for the others. */
+    val endpoint: String = "",
 )
 
 /** The result of asking a provider which models the user's own key can use. */
@@ -477,6 +480,17 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
         refreshSettings(null)
     }
 
+    /** Saves the typed address for the "own endpoint" provider, or says why it cannot be used (the reason never repeats the address). */
+    fun saveEndpoint(id: ProviderId, endpoint: String) {
+        val parsed = CustomEndpoint.parse(endpoint)
+        if (endpoint.isNotBlank() && parsed is CustomEndpoint.Parsed.Bad) {
+            refreshSettings(parsed.reason)
+            return
+        }
+        container.settings.setEndpoint(id, endpoint)
+        refreshSettings(null)
+    }
+
     fun move(id: ProviderId, delta: Int) {
         val order = container.settings.providerOrder.toMutableList()
         val from = order.indexOf(id)
@@ -493,13 +507,14 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
      * Asks the provider which models this key can use. It spends no tokens, and it also tells the user at once whether
      * the key is accepted. [typedKey] is a key the user has typed but not saved yet; it is used for this one request only.
      */
-    fun loadModels(id: ProviderId, typedKey: String) {
+    fun loadModels(id: ProviderId, typedKey: String, typedEndpoint: String = "") {
         if (modelListFlow.value[id]?.loading == true) return
         val key = typedKey.trim().ifEmpty { container.keys.get(AppContainer.keyName(id)).orEmpty() }
+        val endpoint = typedEndpoint.trim().ifEmpty { container.settings.endpoint(id) }
         setModelList(id, ModelListState(loading = true))
         scope.launch {
             val next = try {
-                ModelListState(models = container.modelLister.list(id, key.ifEmpty { null }), loaded = true)
+                ModelListState(models = container.modelLister.list(id, key.ifEmpty { null }, endpoint.ifEmpty { null }), loaded = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ProviderError) {
@@ -579,6 +594,7 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
                 hasKey = container.keys.has(AppContainer.keyName(id)),
                 configured = container.isConfigured(id),
                 model = container.settings.model(id),
+                endpoint = container.settings.endpoint(id),
             )
         },
         confirmMedium = container.settings.confirmMediumActions,

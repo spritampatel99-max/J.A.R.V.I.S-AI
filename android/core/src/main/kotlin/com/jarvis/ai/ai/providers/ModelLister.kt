@@ -27,12 +27,14 @@ data class RemoteModel(
 class ModelLister(private val http: JsonHttp) {
 
     /**
-     * @param apiKey needed by every provider except OpenRouter, whose public list works without one.
+     * @param apiKey needed by every provider except OpenRouter, whose public list works without one, and the
+     *   "own endpoint" provider, which may need none.
+     * @param endpoint only for [ProviderId.FREELLM]: the address the person typed (see [CustomEndpoint]).
      * @throws ProviderError for every failure (bad key, network, unexpected response).
      */
-    suspend fun list(provider: ProviderId, apiKey: String?): List<RemoteModel> {
+    suspend fun list(provider: ProviderId, apiKey: String?, endpoint: String? = null): List<RemoteModel> {
         val key = apiKey?.takeIf { it.isNotBlank() }
-        if (key == null && provider != ProviderId.OPENROUTER) {
+        if (key == null && provider != ProviderId.OPENROUTER && provider != ProviderId.FREELLM) {
             throw ProviderError.MissingConfig("${provider.displayName} API key is not set")
         }
         return when (provider) {
@@ -42,6 +44,12 @@ class ModelLister(private val http: JsonHttp) {
             ProviderId.OPENROUTER -> openAiStyle("https://openrouter.ai/api/v1/models", if (key == null) emptyMap() else bearer(key))
             ProviderId.ANTHROPIC -> anthropic(key.orEmpty())
             ProviderId.MISTRAL -> openAiStyle("https://api.mistral.ai/v1/models", bearer(key))
+            ProviderId.FREELLM -> {
+                val parsed = CustomEndpoint.parse(endpoint)
+                if (parsed is CustomEndpoint.Parsed.Bad) throw ProviderError.MissingConfig(parsed.reason)
+                val base = (parsed as CustomEndpoint.Parsed.Ok).base
+                openAiStyle("$base/models", if (key == null) emptyMap() else bearer(key))
+            }
         }
     }
 

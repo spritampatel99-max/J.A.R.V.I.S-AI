@@ -76,7 +76,7 @@ object SecurityReview {
             f += Finding(
                 "unused_permissions", Severity.ATTENTION, "Permissions nothing uses",
                 "Granted but not used by any feature right now: ${unused.joinToString(", ") { it.substringAfterLast('.') }}.",
-                "Turn them off in Android settings > Apps > J.A.R.V.I.S. > Permissions.",
+                "Turn them off in Android settings > Apps > JARVIS 3.0 > Permissions.",
             )
         }
 

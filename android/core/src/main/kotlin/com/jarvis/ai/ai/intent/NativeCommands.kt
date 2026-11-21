@@ -44,7 +44,7 @@ object NativeCommands {
         // A message's words belong to the person: they are matched before the generic clean-up, which would trim a
         // trailing "now" or "please" and the punctuation off the end of what they want to say.
         val lead = leadClean(text)
-        if (lead.isNotEmpty() && lead.length <= MAX_LENGTH) messaging(lead)?.let { return toMatch(listOf(it)) }
+        if (lead.isNotEmpty() && lead.length <= MAX_LENGTH) (messaging(lead) ?: email(lead))?.let { return toMatch(listOf(it)) }
 
         val whole = clean(text)
         if (whole.isEmpty() || whole.length > MAX_LENGTH) return null
@@ -66,7 +66,7 @@ object NativeCommands {
     }
 
     private fun single(text: String, clock: Clock): One? =
-        flashlight(text) ?: youtube(text) ?: timer(text) ?: media(text) ?: alarm(text, clock) ?: website(text) ?: deviceInfo(text) ?: time(text) ?: weather(text) ?: calls(text) ?: phone(text) ?: offline(text) ?: openApp(text)
+        flashlight(text) ?: youtube(text) ?: camera(text) ?: timer(text) ?: media(text) ?: alarm(text, clock) ?: website(text) ?: deviceInfo(text) ?: time(text) ?: weather(text) ?: calls(text) ?: phone(text) ?: offline(text) ?: openApp(text)
 
     // ---- weather ---------------------------------------------------------------------------------------------------
     //
@@ -525,6 +525,77 @@ object NativeCommands {
         val to = bare?.let { recipient(it) }?.takeIf { ' ' !in it || it.all { c -> c.isDigit() || c == ' ' || c == '+' || c == '-' || c == '(' || c == ')' } } ?: return null
         val kind = if (Regex(WA, RegexOption.IGNORE_CASE).containsMatchIn(text)) "WhatsApp" else "text"
         return One.Ask("What should the message to $to say? Say it in one go, for example: $kind $to saying I'll be there in ten minutes.")
+    }
+
+    // ---- email -----------------------------------------------------------------------------------------------------
+    //
+    // "email sam@example.com saying I'll be late" becomes a compose_email step. Like a message, an email is a high-risk tool: the
+    // app shows the exact address and words and waits for a tap, and the email app then opens with the draft for the person to
+    // send. The address has to be typed out: the app cannot look up a contact's email address and does not guess one, so a
+    // name is answered with a question.
+
+    private const val EMAIL_ADDR = """[^\s@<>,;:"()\[\]\\]{1,64}@[^\s@<>,;:"()\[\]\\]{1,190}"""
+    private const val EMAIL_WORD = """e-?mail"""
+    private const val EMAIL_LEAD = """(?:(?:send|write|compose|draft|type) (?:an? |my |a new )?)?"""
+    private val EMAIL_WITH_WORDS = listOf(
+        Regex("""^$EMAIL_LEAD$EMAIL_WORD(?: to)? ($EMAIL_ADDR)$SAYING(.{1,3000})$""", RegexOption.IGNORE_CASE),
+        Regex("""^send ($EMAIL_ADDR) an? $EMAIL_WORD$SAYING(.{1,3000})$""", RegexOption.IGNORE_CASE),
+    )
+    private val EMAIL_ADDRESS_ONLY = Regex("""^(?:(?:send|write|compose|draft|type) (?:an? |my |a new )?)?$EMAIL_WORD(?: to)? ($EMAIL_ADDR)$""", RegexOption.IGNORE_CASE)
+    private val EMAIL_NAME_ONLY = listOf(
+        Regex("""^(?:send|write|compose|draft|type) (?:an? |my |a new )?$EMAIL_WORD to ([^@]{1,60}?)(?:$SAYING.{1,3000})?$""", RegexOption.IGNORE_CASE),
+        Regex("""^$EMAIL_WORD ([^@]{1,60}?)$SAYING.{1,3000}$""", RegexOption.IGNORE_CASE),
+    )
+    private val EMAIL_BARE = Regex("""^(?:send|write|compose|draft|type) (?:an? |my |a new )?$EMAIL_WORD$""", RegexOption.IGNORE_CASE)
+    private const val EMAIL_ASK = "Who is the email to, and what should it say? I need the full address, for example: email name@example.com saying I'll be late."
+
+    private fun email(text: String): One? {
+        for (p in EMAIL_WITH_WORDS) {
+            val m = p.matchEntire(text) ?: continue
+            val body = m.groupValues[2].trim().trim('"', '“', '”').trim()
+            if (body.isEmpty()) continue
+            val to = m.groupValues[1].trim()
+            return One.Step(
+                "compose_email",
+                "Email $to",
+                buildJsonObject {
+                    put("to", to)
+                    put("body", body)
+                },
+            )
+        }
+        EMAIL_ADDRESS_ONLY.matchEntire(text)?.let { m ->
+            val to = m.groupValues[1].trim()
+            return One.Step("compose_email", "Email $to", buildJsonObject { put("to", to) })
+        }
+        for (p in EMAIL_NAME_ONLY) {
+            val name = p.matchEntire(text)?.groupValues?.get(1)?.trim()?.trim(',', '.') ?: continue
+            val words = name.split(' ')
+            if (words.size <= 4 && words.first().lowercase(Locale.ROOT) !in NOT_A_NAME && NAME_LIKE.matches(name)) {
+                return One.Ask("I can't look up ${name.take(40)}'s email address, so I need the full address. For example: email name@example.com saying I'll be late.")
+            }
+        }
+        if (EMAIL_BARE.matches(text)) return One.Ask(EMAIL_ASK)
+        return null
+    }
+
+    // ---- camera ----------------------------------------------------------------------------------------------------
+    //
+    // "take a photo" opens the camera app; the person presses the shutter. Nothing is captured by the app itself.
+
+    private val CAMERA_PHOTO = Regex(
+        """^(?:(?:open|start|launch|fire up)(?: up)? (?:the |my )?camera(?: app)?(?: (?:in|for) (?:photo|picture)s?(?: mode)?)?|(?:take|click|snap|capture) (?:a |another |one )?(?:photo|picture|pic)(?: for me)?)$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val CAMERA_VIDEO = Regex(
+        """^(?:(?:record|shoot|take|capture) (?:a |another )?video(?: for me)?|(?:open|start|launch)(?: up)? (?:the |my )?(?:video (?:camera|recorder)|camera (?:in|for) video(?: mode)?))$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private fun camera(text: String): One? = when {
+        CAMERA_VIDEO.matches(text) -> One.Step("open_camera", "Open the camera for a video", buildJsonObject { put("mode", "video") })
+        CAMERA_PHOTO.matches(text) -> One.Step("open_camera", "Open the camera for a photo", buildJsonObject { put("mode", "photo") })
+        else -> null
     }
 
     // ---- timers ----------------------------------------------------------------------------------------------------

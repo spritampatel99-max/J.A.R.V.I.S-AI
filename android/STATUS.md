@@ -1,11 +1,11 @@
-# Status of this zip (2026-11-21)
+# Status of this zip (2026-11-22)
 
 Read this before building. It says what is finished, what was only written, and what was not done. If any other document disagrees with this one, check the code; this file was written last.
 
 ## Checked here
-- `:core` (the logic: tools, safety rules, planner, router, voice countdown, screen guard, offline library reader, message / timer / media tools) compiles and passes **798 tests**, run on a PC-style JVM in the workspace (`kotlinc` + JUnit, not Gradle).
-- Safety rules were also checked by deliberately breaking them (mutation checks). This round: 17 deliberate breaks of the new message, timer, media and routing code; 16 were caught by a failing test. The one that survived changes nothing observable (an equivalent mutant). Earlier rounds left two surviving mutants in the automation runner's backup safety layers; they are described in `docs/testing/BUILD_AND_TEST_REPORT.md`.
-- Adversarial inputs for the new tools are tested: message bodies that look like commands, quotes, Hindi text, line breaks, over-long text, carrier codes in the recipient field.
+- `:core` (the logic: tools, safety rules, planner, router, voice countdown, screen guard, offline library reader, message / timer / media tools) compiles and passes **837 tests**, run on a PC-style JVM in the workspace (`kotlinc` + JUnit, not Gradle).
+- Safety rules were also checked by deliberately breaking them (mutation checks). Last round: 17 deliberate breaks of the new message, timer, media and routing code; 16 were caught by a failing test, and the survivor changes nothing observable (an equivalent mutant). This round: 18 deliberate breaks of the new email, camera, own-endpoint and command code; all 18 were caught. Earlier rounds left two surviving mutants in the automation runner's backup safety layers; they are described in `docs/testing/BUILD_AND_TEST_REPORT.md`.
+- Adversarial inputs for the new tools are tested: message bodies that look like commands, quotes, Hindi text, line breaks, over-long text, carrier codes in the recipient field, email addresses with lists / display names / line breaks / `Bcc` tricks, and own-endpoint addresses with http, passwords, tokens or line breaks.
 
 ## Written but NOT compiled or run (`:app`, the Android part)
 The workspace cannot reach Google's Android build servers, so nothing in `app/` has been built, in this round or the previous two. Expect to fix some compile errors on the first build, as happened before. The never-compiled parts are:
@@ -15,12 +15,20 @@ The workspace cannot reach Google's Android build servers, so nothing in `app/` 
 - Texting and WhatsApp (open the app with the text ready; **you** press Send), timers (Clock app), media keys and volume.
 - Phone control: accessibility service (read screen, scroll, back/home/recents/lock/screenshot) and notification reader.
 - Offline library: download or import a Kiwix `.zim` Wikipedia file (Simple English about 1 GB, Top articles about 2.1 GB). Nothing downloads until you tap.
+- **Added after you pasted the "JARVIS 3.0" summary:** the 7th provider "FreeLLM / own endpoint" (you type an https address; Cloud tab field), `compose_email` and `open_camera` (Android classes `AndroidEmailPort`, `AndroidCameraLauncher`), and the "JARVIS 3.0" name in everything the app shows. See `docs/JARVIS_3_SUMMARY_MATCH.md` for the line-by-line comparison.
 - The AI-mode router wired into the app (Prefs > AI mode: Local only, Local first, Cloud assisted, Manual) and the Mistral provider.
 - The LiteRT-LM engine (`app/src/litert/`), which is **off by default**. See below.
 - Libraries added: `porcupine-android 4.0.2`, `zstd-jni 1.5.7-12 (@aar)`, `org.tukaani:xz 1.11`. `litertlm 0.18.0` is declared but only used when you opt in.
 
 ## The on-device AI engine: opt-in, unverified
 The default build contains **no** engine, so an installed Gemma model still cannot answer chat, and Prefs says so. I wrote a LiteRT-LM engine from Google's published Android guide. I could not compile it, and the library's artifact is built with Kotlin 2.4 metadata while this project pins Kotlin 2.1.20. To try it: set `enableLiteRt=true`, raise Kotlin, build, and expect small API-name fixes in `LiteRtLmEngine.kt`. Steps and risks: `docs/ai/LOCAL_MODELS.md`. Do not count "works offline" for AI chat until a model answers in airplane mode on your phone.
+
+## Differences from the pasted "JARVIS 3.0" summary (deliberate)
+- **FreeLLM** has no built-in address. The `freellm.com` endpoint and "no key, 87+ models" claim could not be verified, so the provider takes an address you type.
+- **No per-app tool minting** (`DynamicToolRegistry`): apps are found by name at call time instead, so an installed app's name can never become part of the planner's tool list.
+- **No WhatsApp auto-send** through the accessibility service: your own master prompt says not to use Accessibility as an automation bypass.
+- **Alarms and timers** are handed to the Clock app instead of being set with `AlarmManager`; there is **no media "seek"**; and "hey Jarvis" works only because it contains the word "Jarvis" (no separate keywords).
+- The summary's model names (gemini-1.5-flash and so on) are retired; the app loads each provider's live list instead.
 
 ## Not built
 - Tapping or typing inside other apps, and pressing Send for you (deliberately not requested from Android; the accessibility service can read and press system buttons only).
@@ -45,7 +53,7 @@ The previous round (hands-free, calls, phone control, offline library) is commit
 
 ## First run on the phone
 1. Build `:app` in Android Studio. Send the build log back if it fails.
-2. For phone control: Settings > Accessibility > J.A.R.V.I.S. If the switch is greyed out: Settings > Apps > J.A.R.V.I.S. > three dots > "Allow restricted settings", then try again. Same for Notification access.
+2. For phone control: Settings > Accessibility > JARVIS 3.0. If the switch is greyed out: Settings > Apps > JARVIS 3.0 > three dots > "Allow restricted settings", then try again. Same for Notification access.
 3. Hands-free: Prefs > Hands-free, paste the Picovoice AccessKey, switch on while the app is open. After a reboot, open the app once. Always-listening uses battery.
 4. Offline library: Prefs > Offline library > Download (use Wi-Fi). Then say "search offline for black hole".
 5. Messages: say "text Mom hello". The messaging app opens with the text ready; press Send yourself. WhatsApp opens a chat directly only for a number starting with `+`.

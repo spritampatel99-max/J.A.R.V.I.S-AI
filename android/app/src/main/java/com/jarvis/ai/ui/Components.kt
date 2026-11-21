@@ -149,7 +149,7 @@ fun AuroraBackdrop(modifier: Modifier = Modifier, content: @Composable BoxScope.
 // ---- The orb ----------------------------------------------------------------------------------------------------
 
 /**
- * J.A.R.V.I.S.'s signature: a glowing core inside two counter-rotating rings. It idles slowly and spins up while
+ * JARVIS 3.0's signature: a glowing core inside two counter-rotating rings. It idles slowly and spins up while
  * [active] (the assistant is working). Purely decorative: it carries no information that is not also in text.
  */
 @Composable

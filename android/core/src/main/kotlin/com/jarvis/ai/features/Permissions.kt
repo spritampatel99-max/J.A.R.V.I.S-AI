@@ -24,7 +24,7 @@ data class PermissionInfo(
 )
 
 object PermissionCatalog {
-    private const val APP_SETTINGS = "Settings > Apps > J.A.R.V.I.S.-AI > Permissions (the exact menu names vary by manufacturer)."
+    private const val APP_SETTINGS = "Settings > Apps > JARVIS 3.0 > Permissions (the exact menu names vary by manufacturer)."
 
     val all: List<PermissionInfo> = listOf(
         PermissionInfo(
@@ -67,7 +67,7 @@ object PermissionCatalog {
             PermissionId.NOTIFICATION_LISTENER, "Notification access", PermissionKind.SPECIAL_ACCESS,
             "Reading out and dismissing the notifications that are showing now. Notifications from banking and payment apps and password managers are left out.",
             "The title and text of notifications that other apps post. Message notifications can contain private conversations.",
-            "Settings > Notifications > Device & app notifications > J.A.R.V.I.S.-AI (the location varies by manufacturer).",
+            "Settings > Notifications > Device & app notifications > JARVIS 3.0 (the location varies by manufacturer).",
         ),
         PermissionInfo(
             PermissionId.READ_CONTACTS, "Contacts", PermissionKind.RUNTIME,
@@ -90,12 +90,12 @@ object PermissionCatalog {
         PermissionInfo(
             PermissionId.ACCESSIBILITY, "Accessibility (screen access)", PermissionKind.SPECIAL_ACCESS,
             "Reading the text on the screen when you ask, scrolling, and pressing Back, Home, Recents, lock and screenshot.",
-            "The text of whatever app is in front while it is asked to read. It does not tap or type inside other apps, and it never reads J.A.R.V.I.S. itself, payment apps or password managers.",
-            "Settings > Accessibility > J.A.R.V.I.S. (the location varies by manufacturer).",
+            "The text of whatever app is in front while it is asked to read. It does not tap or type inside other apps, and it never reads JARVIS 3.0 itself, payment apps or password managers.",
+            "Settings > Accessibility > JARVIS 3.0 (the location varies by manufacturer).",
         ),
         PermissionInfo(
             PermissionId.OVERLAY, "Display over other apps", PermissionKind.SPECIAL_ACCESS,
-            "A small status card while hands-free works, and permission for the app to open another app when you ask by voice while J.A.R.V.I.S. is not on screen.",
+            "A small status card while hands-free works, and permission for the app to open another app when you ask by voice while JARVIS 3.0 is not on screen.",
             "Nothing. It lets the app draw over other apps; it cannot read what they show.",
             "Settings > Apps > Special app access > Display over other apps (the location varies by manufacturer).",
         ),

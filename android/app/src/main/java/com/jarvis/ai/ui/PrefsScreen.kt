@@ -226,7 +226,7 @@ fun PrefsScreen(vm: AgentViewModel, appVersion: String, onOpen: (SubPage) -> Uni
         // ---- About ---------------------------------------------------------------------------------
         SectionTitle(Glyph.INFO, "About")
         GlassCard {
-            Text("J.A.R.V.I.S. for Android $appVersion", style = MaterialTheme.typography.titleSmall, color = JarvisColors.Ink)
+            Text("JARVIS 3.0 for Android $appVersion", style = MaterialTheme.typography.titleSmall, color = JarvisColors.Ink)
             Text(
                 "No account. The app sends data only to a cloud AI provider you added a key for, and downloads a model only when you tap Download. " +
                     "Speech recognition is done by Android; depending on your phone it may use its provider's servers.",

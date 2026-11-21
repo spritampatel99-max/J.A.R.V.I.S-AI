@@ -319,7 +319,7 @@ private fun saveAgent(container: AppContainer, s: WizardState, editing: AgentCon
 private fun DescribeStep(s: WizardState) {
     GlassCard {
         Text("Describe the agent you want", style = MaterialTheme.typography.titleSmall, color = JarvisColors.Ink)
-        MutedText("Say who it is for and what it should help with. J.A.R.V.I.S. suggests features from your words. This does not use the internet or an AI model.")
+        MutedText("Say who it is for and what it should help with. JARVIS 3.0 suggests features from your words. This does not use the internet or an AI model.")
         FormField("What kind of agent would you like to create?", s.request, { s.request = it }, singleLine = false, minLines = 3, maxLength = AgentValidator.MAX_PURPOSE)
         MutedText("Or start from an example:")
         for (example in EXAMPLES) GlassChip(example.take(48) + "...", onClick = { s.request = example })

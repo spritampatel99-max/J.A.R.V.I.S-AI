@@ -51,3 +51,14 @@
 - 798 offline tests pass. 16 of 17 new mutation checks are caught; the survivor is equivalent (no observable change).
 - Reviewed from `JARVIS-Project.zip`: the parts that could be built honestly were rebuilt; the rest was left out on purpose (list in `STATUS.md`).
 - Docs brought in line with the code: README, `VOICE_AND_CALLS.md`, `STATUS.md`, `ROADMAP.md`, `ACCESS.md`, `LOCAL_MODELS.md`, `RELEASE_CHECKLIST.md`.
+
+## Round 2026-11-21 to 11-22: matching the pasted "JARVIS 3.0" summary (core tested, `:app` not compiled)
+
+- New (core): a 7th cloud provider, "FreeLLM / own endpoint": an OpenAI-compatible service at an https address the person types (`CustomEndpoint` refuses http, passwords, tokens in the address, `#` parts and whitespace). No address is built in; the key is optional. Model listing works from that address.
+- New (core): `compose_email` (high risk, one plain address, always a tap, opens the email app, never sends) and `open_camera` (photo or video mode, opens the camera app, cannot capture). Commands: "email a@b.com saying …", "write an email to a@b.com", "open the camera", "take a photo", "record a video". A name instead of an address gets a question, never a guess.
+- Changed (core): "open the camera" now uses `open_camera` instead of the app-name lookup.
+- New (app, uncompiled): `AndroidEmailPort`, `AndroidCameraLauncher`, the Cloud-tab address field for the own-endpoint provider, Tools-screen examples.
+- Changed: the name people see is now "JARVIS 3.0" (app name, screens, notifications, permission instructions, planner self-description, README and setup docs). Package names, the repository name, the wake word and historical documents are unchanged.
+- New doc: `docs/JARVIS_3_SUMMARY_MATCH.md`, the pasted summary compared line by line, with the deliberate differences.
+- The own-endpoint provider never sends the JSON-mode field (an unknown gateway may reject it); the planner already reads JSON out of plain text. Two tests cover this.
+- 837 offline tests pass; 18 of 18 mutation checks run before that change were caught (the JSON-mode line itself was not mutation-checked).

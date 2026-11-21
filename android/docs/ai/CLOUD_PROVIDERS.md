@@ -1,6 +1,6 @@
 # Cloud providers
 
-All six are optional. With no key entered the app has no AI provider, and says so rather than pretending
+All seven are optional. With no key entered the app has no AI provider, and says so rather than pretending
 (`No AI provider is configured. Add an API key in the Cloud tab.`). Built-in commands (flashlight, alarm, YouTube, open a website, battery and storage) do not need a provider: see "Built-in commands" below. Every request goes over https only:
 `JsonHttp` refuses any other address and the OkHttp client is restricted to modern TLS with redirects off.
 
@@ -11,6 +11,7 @@ All six are optional. With no key entered the app has no AI provider, and says s
 | OpenRouter | `https://openrouter.ai/api/v1/chat/completions` | `Authorization: Bearer`, plus an `X-Title` header | Same format; the model field may be a comma-separated list, tried in order | Carried over from the desktop project; **not re-checked** |
 | OpenAI | `https://api.openai.com/v1/chat/completions` | `Authorization: Bearer` | Sends `max_completion_tokens` (the official OpenAPI spec marks `max_tokens` as deprecated and unsupported by its reasoning models) and **no temperature** (some models accept only the default) | OpenAI's published OpenAPI spec |
 | Mistral | `POST https://api.mistral.ai/v1/chat/completions` | `Authorization: Bearer` | OpenAI chat format with `max_tokens` and `temperature` (same adapter as Groq). | **Not re-checked** against Mistral's current docs. Use **Load models** and **Test**: they show at once whether the key and model work |
+| FreeLLM / own endpoint | `POST <your https address>/chat/completions` | `Authorization: Bearer` only if you saved a key | OpenAI chat format (same adapter as Groq). **No address is built in**: no FreeLLM service address could be verified, so you type the https address of a service you chose (a FreeLLM-style gateway, for example). | The address is checked (`CustomEndpoint`): https only, no user name or password in it, no `?` or `#` part. Everything you chat goes to that address, so only enter a service you trust. No JSON-mode field is sent, because an unknown gateway may reject it. Use **Load models** and **Test** to see at once whether it works |
 | Claude | `POST https://api.anthropic.com/v1/messages` | `Authorization: Bearer`; header `anthropic-version: 2026-10-21` | `model`, `max_tokens`, `messages`, `system` as a string. **`temperature`, `top_p` and `top_k` are never sent**: the docs say that version rejects them with HTTP 400 | Anthropic API reference, checked 2026-11-07 |
 
 ## Models
@@ -27,6 +28,7 @@ Groq key without access to `llama-3.3-70b-versatile`), so no command could run. 
 | Claude | `claude-haiku-5-5` | Anthropic's API reference. |
 | OpenAI | none | No current model name was verified; the provider stays unconfigured until you pick one. |
 | Mistral | none | Same reason as OpenAI: press **Load models** with your key and pick one. |
+| FreeLLM / own endpoint | none | Type the address first, then press **Load models** (a key is optional) and pick one. |
 
 A saved value equal to one of the retired defaults is dropped once at start-up (`SettingsStore`), so an old install moves to the
 new default without the user doing anything. A model name the user typed or picked themselves is never touched.
@@ -35,7 +37,7 @@ new default without the user doing anything. A model name the user typed or pick
 (`GET /models`, no tokens spent, and it also shows at once whether the key is accepted), and tapping a model fills the field.
 Groq and OpenRouter add the model to their ordered list; the others replace it. **Test** sends one tiny request with the saved key and
 model and shows the provider's own error if it fails. Endpoints used for the lists: Gemini `v1beta/models`, Groq and OpenAI
-`/v1/models`, Mistral `/v1/models`, OpenRouter `/api/v1/models` (public, no key), Claude `/v1/models`. Non-chat models (embeddings, image, audio) are filtered
+`/v1/models`, Mistral `/v1/models`, your own endpoint `<address>/models`, OpenRouter `/api/v1/models` (public, no key), Claude `/v1/models`. Non-chat models (embeddings, image, audio) are filtered
 out, and free OpenRouter models are listed first.
 
 ## Built-in commands (no AI needed)

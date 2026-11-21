@@ -24,6 +24,10 @@ import kotlinx.serialization.json.putJsonObject
  *  - [sendTemperature]: some OpenAI models only accept their default temperature, so the
  *    OpenAI instance does not send one.
  *
+ * [endpointSource] is for the "own endpoint" provider, whose address is typed by the person: it is read on every
+ * request and returns the full chat address, or null when the typed address is not usable (see [CustomEndpoint]).
+ * [requireKey] is false for that provider because some gateways need no key; a key that was saved is still sent.
+ *
  * A bad key (401/403) or a connectivity problem stops the pool immediately, because the
  * remaining models would fail the same way.
  */
@@ -36,24 +40,31 @@ class OpenAiCompatibleProvider(
     private val supportsJsonMode: Boolean = true,
     private val maxTokensField: String = "max_tokens",
     private val sendTemperature: Boolean = true,
+    private val endpointSource: (() -> String?)? = null,
+    private val requireKey: Boolean = true,
 ) : LlmProvider {
+
+    private fun chatUrl(): String? = if (endpointSource != null) endpointSource.invoke() else endpoint
 
     override fun isConfigured(): Boolean {
         val s = settings()
-        return !s.apiKey.isNullOrBlank() && s.model.isNotBlank()
+        val keyOk = !requireKey || !s.apiKey.isNullOrBlank()
+        return keyOk && s.model.isNotBlank() && chatUrl() != null
     }
 
     override suspend fun complete(request: LlmRequest): String {
         val s = settings()
+        val url = chatUrl()
+            ?: throw ProviderError.MissingConfig("${id.displayName} address is not set, or it is not a valid https address")
         val key = s.apiKey?.takeIf { it.isNotBlank() }
-            ?: throw ProviderError.MissingConfig("${id.displayName} API key is not set")
+        if (key == null && requireKey) throw ProviderError.MissingConfig("${id.displayName} API key is not set")
         val models = s.model.split(',').map { it.trim() }.filter { it.isNotEmpty() }
         if (models.isEmpty()) throw ProviderError.MissingConfig("${id.displayName} model is not set")
 
         var lastError: ProviderError? = null
         for (model in models) {
             try {
-                return completeWith(model, key, request)
+                return completeWith(model, key, url, request)
             } catch (e: ProviderError) {
                 val authProblem = e is ProviderError.Http && (e.code == 401 || e.code == 403)
                 val connectivityProblem = e is ProviderError.Network || e is ProviderError.Timeout
@@ -64,7 +75,7 @@ class OpenAiCompatibleProvider(
         throw lastError ?: ProviderError.InvalidResponse("${id.displayName} returned no response")
     }
 
-    private suspend fun completeWith(model: String, key: String, request: LlmRequest): String {
+    private suspend fun completeWith(model: String, key: String?, url: String, request: LlmRequest): String {
         val body = buildJsonObject {
             put("model", model)
             putJsonArray("messages") {
@@ -89,9 +100,9 @@ class OpenAiCompatibleProvider(
         }
         val headers = LinkedHashMap<String, String>()
         headers.putAll(extraHeaders)
-        headers["Authorization"] = "Bearer $key"
+        if (key != null) headers["Authorization"] = "Bearer $key"
 
-        val json = http.postJson(endpoint, headers, body)
+        val json = http.postJson(url, headers, body)
         return extractText(json)
     }
 

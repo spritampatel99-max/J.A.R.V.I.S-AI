@@ -96,7 +96,7 @@ class ModelDownloadService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setContentTitle("J.A.R.V.I.S. download")
+            .setContentTitle("JARVIS 3.0 download")
             .setContentText(text)
             .setProgress(100, percent ?: 0, percent == null)
             .setOngoing(true)

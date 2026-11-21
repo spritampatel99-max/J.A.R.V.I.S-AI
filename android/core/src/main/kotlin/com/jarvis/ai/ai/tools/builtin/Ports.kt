@@ -77,4 +77,6 @@ class DevicePorts(
     val messaging: MessagingPort? = null,
     val timers: TimerLauncher? = null,
     val media: MediaKeys? = null,
+    val email: EmailPort? = null,
+    val camera: CameraLauncher? = null,
 )

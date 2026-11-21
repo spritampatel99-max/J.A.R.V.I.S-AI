@@ -113,7 +113,7 @@ fun AccessList() {
         GlassCard {
             Text("$allowed of ${requestable.size} allowed", style = MaterialTheme.typography.titleMedium)
             Text(
-                "J.A.R.V.I.S. asks Android for real access here, and shows what Android actually says. " +
+                "JARVIS 3.0 asks Android for real access here, and shows what Android actually says. " +
                     "Android has no single switch that grants everything, so \"Allow all\" goes through the items one by one. " +
                     "You can decline any of them, and everything you allow can be turned off again in Settings.",
                 style = MaterialTheme.typography.bodySmall,

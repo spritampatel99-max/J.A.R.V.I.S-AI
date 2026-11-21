@@ -27,7 +27,7 @@ object AgentPrompt {
      * @param memoryBlock text from [com.jarvis.ai.memory.MemoryStore.forModel], already marked as untrusted data, or empty.
      */
     fun build(config: AgentConfig, memoryBlock: String, preview: Boolean, enabledToolNames: Set<String>): String = buildString {
-        appendLine("You are \"${clean(config.name)}\", a custom assistant made by the owner of this phone inside J.A.R.V.I.S.")
+        appendLine("You are \"${clean(config.name)}\", a custom assistant made by the owner of this phone inside JARVIS 3.0.")
         appendLine("Purpose: ${clean(config.purpose)}")
         if (config.description.isNotBlank()) appendLine("About: ${clean(config.description)}")
         appendLine("Category: ${config.category.label}.")

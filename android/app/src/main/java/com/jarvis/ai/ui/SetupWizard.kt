@@ -152,7 +152,7 @@ private fun WelcomeStep(version: String) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         PulsingRing(MaterialTheme.colorScheme.primary)
-        Text("J.A.R.V.I.S.-AI", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+        Text("JARVIS 3.0", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
         Text("Your Personal AI Ecosystem", style = MaterialTheme.typography.titleMedium)
         Text(
             "An intelligent assistant built around your phone.",

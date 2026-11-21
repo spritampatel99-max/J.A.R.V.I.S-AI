@@ -148,9 +148,9 @@ class ModelListerTest {
     }
 
     @Test
-    fun everyProviderButOpenAiAndMistralHasANonBlankDefault() {
+    fun everyProviderButOpenAiMistralAndTheOwnEndpointHasANonBlankDefault() {
         for (id in ProviderId.entries) {
-            if (id == ProviderId.OPENAI || id == ProviderId.MISTRAL) assertEquals("", ProviderDefaults.modelFor(id)) else assertTrue(ProviderDefaults.modelFor(id).isNotBlank())
+            if (id == ProviderId.OPENAI || id == ProviderId.MISTRAL || id == ProviderId.FREELLM) assertEquals("", ProviderDefaults.modelFor(id)) else assertTrue(ProviderDefaults.modelFor(id).isNotBlank())
         }
     }
 

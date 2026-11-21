@@ -143,7 +143,7 @@ fun HandsFreeScreen(container: AppContainer) {
         GlassCard {
             MutedText(
                 "Allow \"Display over other apps\" so a small card shows what Jarvis hears and answers while another app is open, " +
-                    "and so \"open WhatsApp\" works when J.A.R.V.I.S. is not on screen. Without it, opening apps by voice works only while J.A.R.V.I.S. is open.",
+                    "and so \"open WhatsApp\" works when JARVIS 3.0 is not on screen. Without it, opening apps by voice works only while JARVIS 3.0 is open.",
             )
             GlowButton(if (overlayAllowed) "Manage in Settings" else "Allow", subtle = overlayAllowed, onClick = {
                 val page = AccessChecks.settingsIntent(context, AccessKey.OVERLAY) ?: AccessChecks.appSettingsIntent(context)
@@ -159,7 +159,7 @@ fun HandsFreeScreen(container: AppContainer) {
         GlassCard {
             MutedText("It listens for the word \"Jarvis\" only. \"Hello Jarvis\" and \"hey Jarvis\" work because they contain it. Other greetings on their own (for example \"hyee\") are not detected.")
             MutedText("Keeping the microphone open uses battery. Turn it off when you do not need it. A notification stays on screen while it is on, with a Stop button.")
-            MutedText("Android does not start it again by itself after a restart or if the system closes the app. Open J.A.R.V.I.S. and switch it on again.")
+            MutedText("Android does not start it again by itself after a restart or if the system closes the app. Open JARVIS 3.0 and switch it on again.")
             MutedText(
                 "Calls by voice: Jarvis reads back who it will call, then waits 3 seconds. Say \"stop\" or tap Cancel to stop it; otherwise it calls. " +
                     "This applies only to a call you spoke, matched by the app's own command patterns. Anything an AI planned, and anything typed, still needs a tap.",

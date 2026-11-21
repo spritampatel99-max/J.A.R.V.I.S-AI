@@ -11,7 +11,7 @@ import com.jarvis.ai.ai.tools.Verification
 import com.jarvis.ai.core.security.Risk
 
 /**
- * Tools that look at the phone beyond J.A.R.V.I.S.: the screen in front, system navigation, and notifications. They need the
+ * Tools that look at the phone beyond JARVIS 3.0: the screen in front, system navigation, and notifications. They need the
  * person to have switched on the matching Android access (Accessibility, Notification access). What they read from other apps is
  * outside content, so it is marked untrusted: it can never approve anything, and any later step of the same request that
  * changes something asks for a tap.
@@ -40,11 +40,11 @@ object ScreenTools {
     }
 }
 
-private const val SCREEN_OFF = "Screen access is off. Turn on J.A.R.V.I.S. in Settings > Accessibility (Prefs > Access has a shortcut), then ask again."
-private const val NOTIFICATIONS_OFF = "Notification access is off. Allow J.A.R.V.I.S. in Settings > Notification access (Prefs > Access has a shortcut), then ask again."
+private const val SCREEN_OFF = "Screen access is off. Turn on JARVIS 3.0 in Settings > Accessibility (Prefs > Access has a shortcut), then ask again."
+private const val NOTIFICATIONS_OFF = "Notification access is off. Allow JARVIS 3.0 in Settings > Notification access (Prefs > Access has a shortcut), then ask again."
 
 private fun offLimits(app: String) =
-    ToolError.Unsupported("I do not read or control $app. Payment apps, password managers, system permission screens and J.A.R.V.I.S. itself are off limits.")
+    ToolError.Unsupported("I do not read or control $app. Payment apps, password managers, system permission screens and JARVIS 3.0 itself are off limits.")
 
 class ReadScreenTool(private val screen: ScreenControl) : Tool {
     override val spec = ToolSpec(

@@ -157,7 +157,7 @@ class HandsFreeService : Service() {
                 when {
                     k != null -> "Going ahead in ${k.secondsLeft}…  Say \"stop\" or tap Cancel." to true
                     // Anything the person did not say as a built-in call still needs a tap, and only the app can show that card.
-                    p != null -> "Needs your OK: ${p.summary.take(120)}. Open J.A.R.V.I.S. to answer, or cancel here." to true
+                    p != null -> "Needs your OK: ${p.summary.take(120)}. Open JARVIS 3.0 to answer, or cancel here." to true
                     v.listening -> (v.partial.ifBlank { "Listening…" }) to false
                     c.running -> (c.currentStep ?: "Thinking…") to false
                     else -> null
@@ -333,7 +333,7 @@ class HandsFreeService : Service() {
 
     private fun createChannel() {
         val channel = NotificationChannel(CHANNEL_ID, "Hands-free listening", NotificationManager.IMPORTANCE_LOW)
-        channel.description = "Shown while J.A.R.V.I.S. is listening for the word \"Jarvis\""
+        channel.description = "Shown while JARVIS 3.0 is listening for the word \"Jarvis\""
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
@@ -352,7 +352,7 @@ class HandsFreeService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setContentTitle("J.A.R.V.I.S. is listening")
+            .setContentTitle("JARVIS 3.0 is listening")
             .setContentText("Say \"Jarvis\", then your request. Only the word \"Jarvis\" is detected until you say it.")
             .setOngoing(true)
             .setOnlyAlertOnce(true)
