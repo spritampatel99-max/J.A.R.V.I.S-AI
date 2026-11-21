@@ -41,7 +41,7 @@ The default build contains **no** engine, so an installed Gemma model still cann
 Four review passes were done over the new code: tests and mutation checks, adversarial inputs, a read through the diff for safety rules (confirmation, untrusted content, secrets), and a check that the docs match the code. These were done by me, not by an independent reviewer: the separate reviewer agent failed four times with rate-limit errors. That means the code has had no independent review and no compiler pass on the Android side. Treat "audited" as "self-reviewed".
 
 ## Git
-The previous round (hands-free, calls, phone control, offline library) is commit `89339a4`. This round (messages, timers, media, Mistral, router wiring, LiteRT opt-in, these docs) is in the commit made after this file.
+The previous round (hands-free, calls, phone control, offline library) is commit `89339a4`. This round (messages, timers, media, Mistral, router wiring, LiteRT opt-in, these docs) is commit `9b4c83a`, pushed to the branch `android-standalone-foundation`.
 
 ## First run on the phone
 1. Build `:app` in Android Studio. Send the build log back if it fails.
