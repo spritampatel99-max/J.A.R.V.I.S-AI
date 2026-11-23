@@ -64,6 +64,8 @@ data class StepOutcome(
     val data: Map<String, String> = emptyMap(),
     /** The tool's own text, unwrapped, when the tool's result is the answer itself. Only set for successes. */
     val answer: String? = null,
+    /** The tool said its result is the person's private content (messages, files). Such text is never sent to an outside voice service. */
+    val private: Boolean = false,
 )
 
 data class ExecutionReport(
@@ -73,6 +75,9 @@ data class ExecutionReport(
 ) {
     val succeededCount: Int get() = outcomes.count { it.status == StepStatus.SUCCEEDED }
     val allSucceeded: Boolean get() = outcomes.isNotEmpty() && outcomes.all { it.status == StepStatus.SUCCEEDED }
+
+    /** True when any step produced private content, so the reply must stay on the phone. */
+    val containsPrivate: Boolean get() = outcomes.any { it.private }
 
     /**
      * Plain-text report built only from recorded outcomes. No model writes this, so it
@@ -239,6 +244,7 @@ class Executor(
                         StepOutcome(
                             step, StepStatus.SUCCEEDED, shown, result.verification, attempts, result.data,
                             answer = if (result.answer) result.message else null,
+                            private = result.private,
                         ),
                         untrusted = result.untrusted,
                     )

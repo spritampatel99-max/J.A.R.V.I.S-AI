@@ -31,10 +31,22 @@ data class UiPrefs(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     /** Use the phone's wallpaper colours (Material You) for the accent colours instead of the JARVIS spectrum. */
     val dynamicColor: Boolean = false,
+    /** Speak replies in the person's ElevenLabs voice. Needs their own key and a chosen voice; private content never uses it. */
+    val elevenEnabled: Boolean = false,
+    val elevenVoiceId: String? = null,
+    val elevenVoiceName: String? = null,
+    /** While a Bluetooth audio device is connected, read new notifications aloud on the phone's own voice. */
+    val announceNotifications: Boolean = false,
+    /** When announcing, also say what the notification says. Off, only who it is from is said. */
+    val announceReadText: Boolean = true,
+    /** Read the words of notifications even while the phone is locked and the lock screen would hide them. Off: only the app is named then. */
+    val announceLockedText: Boolean = false,
 ) {
     fun sanitised() = copy(
         flare = flare.coerceIn(0.1f, 1f),
         speechRate = speechRate.coerceIn(0.75f, 1.5f),
         voiceName = voiceName?.takeIf { it.isNotBlank() },
+        elevenVoiceId = elevenVoiceId?.takeIf { com.jarvis.ai.voice.ElevenLabsApi.VOICE_ID.matches(it) },
+        elevenVoiceName = elevenVoiceName?.takeIf { it.isNotBlank() }?.take(40),
     )
 }

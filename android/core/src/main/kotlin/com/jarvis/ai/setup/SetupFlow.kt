@@ -11,6 +11,7 @@ enum class SetupStep(val title: String, val optional: Boolean) {
     DEVICE("Device analysis", false),
     MODELS("Local AI model", false),
     PROVIDERS("Cloud AI providers", true),
+    VOICE("Voice", true),
     FEATURES("Features", false),
     STORAGE("Storage review", false),
     PERMISSIONS("Permissions", true),

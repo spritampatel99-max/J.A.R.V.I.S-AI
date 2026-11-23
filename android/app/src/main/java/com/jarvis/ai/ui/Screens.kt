@@ -53,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jarvis.ai.AppContainer
 import com.jarvis.ai.ai.providers.ProviderId
 import com.jarvis.ai.ai.providers.RemoteModel
+import com.jarvis.ai.data.ThemeMode
 
 // ---- The app shell -------------------------------------------------------------------------------------------
 
@@ -69,6 +70,8 @@ fun JarvisApp(vm: AgentViewModel, container: AppContainer, onRunSetupAgain: () -
     val pending by vm.pendingConfirmation.collectAsStateWithLifecycle()
     val countdown by vm.countdown.collectAsStateWithLifecycle()
     val imeOpen = keyboardOpen()
+    val themePrefs by vm.uiPrefs.collectAsStateWithLifecycle()
+    val dark = isJarvisDark(themePrefs.themeMode)
 
     fun open(target: AppTab) {
         sub = null
@@ -82,7 +85,15 @@ fun JarvisApp(vm: AgentViewModel, container: AppContainer, onRunSetupAgain: () -
     Box(Modifier.fillMaxSize().imePadding()) {
         Column(Modifier.fillMaxSize()) {
             val current = sub
-            if (current == null) AppHeader(onProfile = { open(AppTab.PREFS) }) else SubHeader(current.title, onBack = { sub = null })
+            if (current == null) {
+                AppHeader(
+                    onProfile = { open(AppTab.PREFS) },
+                    dark = dark,
+                    onToggleTheme = { vm.updateUi { it.copy(themeMode = if (dark) ThemeMode.LIGHT else ThemeMode.DARK) } },
+                )
+            } else {
+                SubHeader(current.title, onBack = { sub = null })
+            }
 
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 AnimatedContent(
@@ -99,6 +110,7 @@ fun JarvisApp(vm: AgentViewModel, container: AppContainer, onRunSetupAgain: () -
                         subPage == SubPage.CLOUD -> ProvidersScreen(vm, showTitle = false)
                         subPage == SubPage.ACCESS -> AccessScreen()
                         subPage == SubPage.HANDS_FREE -> HandsFreeScreen(container)
+                        subPage == SubPage.BLUETOOTH -> BluetoothScreen(container)
                         subPage == SubPage.SCREEN_CONTROL -> ScreenAccessScreen(container)
                         subPage == SubPage.OFFLINE_LIBRARY -> OfflineLibraryScreen(container)
                         subPage == SubPage.AGENTS -> AgentsScreen(container)

@@ -74,6 +74,12 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_ON_DEVICE_ONLY, next.onDeviceSpeechOnly)
             .putString(KEY_THEME, next.themeMode.name)
             .putBoolean(KEY_DYNAMIC, next.dynamicColor)
+            .putBoolean(KEY_ELEVEN_ON, next.elevenEnabled)
+            .putBoolean(KEY_ANNOUNCE, next.announceNotifications)
+            .putBoolean(KEY_ANNOUNCE_TEXT, next.announceReadText)
+            .putBoolean(KEY_ANNOUNCE_LOCKED, next.announceLockedText)
+            .apply { if (next.elevenVoiceId == null) remove(KEY_ELEVEN_VOICE) else putString(KEY_ELEVEN_VOICE, next.elevenVoiceId) }
+            .apply { if (next.elevenVoiceName == null) remove(KEY_ELEVEN_VOICE_NAME) else putString(KEY_ELEVEN_VOICE_NAME, next.elevenVoiceName) }
             .apply { if (next.voiceName == null) remove(KEY_VOICE) else putString(KEY_VOICE, next.voiceName) }
             .apply()
         uiFlow.value = next
@@ -89,6 +95,12 @@ class SettingsStore(context: Context) {
         onDeviceSpeechOnly = prefs.getBoolean(KEY_ON_DEVICE_ONLY, false),
         themeMode = ThemeMode.entries.firstOrNull { it.name == prefs.getString(KEY_THEME, null) } ?: ThemeMode.SYSTEM,
         dynamicColor = prefs.getBoolean(KEY_DYNAMIC, false),
+        elevenEnabled = prefs.getBoolean(KEY_ELEVEN_ON, false),
+        elevenVoiceId = prefs.getString(KEY_ELEVEN_VOICE, null),
+        elevenVoiceName = prefs.getString(KEY_ELEVEN_VOICE_NAME, null),
+        announceNotifications = prefs.getBoolean(KEY_ANNOUNCE, false),
+        announceReadText = prefs.getBoolean(KEY_ANNOUNCE_TEXT, true),
+        announceLockedText = prefs.getBoolean(KEY_ANNOUNCE_LOCKED, false),
     ).sanitised()
 
     /**
@@ -224,6 +236,15 @@ class SettingsStore(context: Context) {
         get() = WakeEngine.entries.firstOrNull { it.name == prefs.getString(KEY_WAKE_ENGINE, null) } ?: WakeEngine.VOSK
         set(value) = prefs.edit().putString(KEY_WAKE_ENGINE, value.name).apply()
 
+    /**
+     * Names of the Bluetooth audio devices JARVIS reacts to. Empty means any Bluetooth audio device. Names only, kept on this phone.
+     */
+    var bluetoothDevices: Set<String>
+        get() = prefs.getStringSet(KEY_BT_DEVICES, emptySet())?.toSet().orEmpty()
+        set(value) {
+            prefs.edit().putStringSet(KEY_BT_DEVICES, value.map { it.trim().take(60) }.filter { it.isNotEmpty() }.toSet()).apply()
+        }
+
     /** The folder the person chose for auto-saving conversations (an Android document-tree address), or null when auto-save is off. */
     var archiveFolder: String?
         get() = prefs.getString(KEY_ARCHIVE, null)?.takeIf { it.isNotBlank() }
@@ -253,6 +274,13 @@ class SettingsStore(context: Context) {
         const val KEY_ARCHIVE = "chat_archive_folder"
         const val KEY_LAST_WAKE = "schedule_last_wake_ms"
         const val KEY_ON_DEVICE_ONLY = "voice_on_device_only"
+        const val KEY_ELEVEN_ON = "eleven_enabled"
+        const val KEY_ELEVEN_VOICE = "eleven_voice_id"
+        const val KEY_ELEVEN_VOICE_NAME = "eleven_voice_name"
+        const val KEY_ANNOUNCE = "bt_announce_notifications"
+        const val KEY_ANNOUNCE_TEXT = "bt_announce_read_text"
+        const val KEY_ANNOUNCE_LOCKED = "bt_announce_locked_text"
+        const val KEY_BT_DEVICES = "bt_device_allowlist"
         const val KEY_TAP_TYPE = "screen_tap_and_type_on"
         const val KEY_WA_SEND = "whatsapp_press_send_on"
         const val KEY_NIGHTLY = "nightly_review_on"

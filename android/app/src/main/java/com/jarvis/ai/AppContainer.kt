@@ -120,11 +120,21 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     val settings = SettingsStore(appContext)
 
     private val redactor = SecretRedactor {
-        ProviderId.entries.mapNotNull { keys.get(keyName(it)) } + listOfNotNull(keys.get(HF_TOKEN_KEY))
+        ProviderId.entries.mapNotNull { keys.get(keyName(it)) } + listOfNotNull(keys.get(HF_TOKEN_KEY), keys.get(ELEVEN_KEY))
     }
 
     private val transport = OkHttpTransport(HttpClients.cloud(), redactor)
     private val cloudHttp = JsonHttp(transport, redactor)
+
+    // ---- ElevenLabs voice (optional, the person's own key) ---------------------------------------------
+    /** Turns short, non-private replies into speech with the person's ElevenLabs key. The key is read from the secure store on every call. */
+    val elevenClient = com.jarvis.ai.voice.ElevenLabsClient(
+        http = transport,
+        audio = com.jarvis.ai.android.voice.OkHttpAudioFetcher(HttpClients.cloud()),
+        key = { keys.get(ELEVEN_KEY) },
+        redactor = redactor,
+    )
+    val elevenPlayer = com.jarvis.ai.android.voice.ElevenPlayer(appContext)
 
     // ---- setup wizard (Phase 3) ----------------------------------------------------------------
     val deviceAnalyzer = AndroidDeviceAnalyzer(appContext)
@@ -321,7 +331,13 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     /**
      * Speech in and out. Created on first use, which is always on the main thread (the UI), as its recogniser requires.
      */
-    val voice: VoiceController by lazy { VoiceController(appContext) { settings.ui.value } }
+    val voice: VoiceController by lazy {
+        VoiceController(
+            appContext,
+            { settings.ui.value },
+            com.jarvis.ai.android.voice.ElevenSpeaker(elevenClient, { keys.get(ELEVEN_KEY) != null }, appContext, elevenPlayer),
+        )
+    }
 
     // ---- memory, planner, automations, agents (Phases 7-9) ---------------------------------------------
     // Each keeps its data in one small private file on this phone. Nothing here is sent anywhere by itself.
@@ -338,6 +354,9 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
      * list are never read, and system settings and permission dialogs are never acted on.
      */
     private val screenGuard = ScreenGuard(appContext.packageName) { settings.screenBlocklist }
+
+    /** Decides what is read aloud when a notification arrives while Bluetooth audio is connected. Uses the same guard, so banking and password apps stay silent. */
+    val announcer = com.jarvis.ai.voice.NotificationAnnouncer(screenGuard) { System.currentTimeMillis() }
     private val screenControl = GuardedScreenControl(AndroidRawScreen(), screenGuard, actionsOn = { settings.tapAndTypeOn })
     private val guardedNotifications = GuardedNotifications(AndroidNotificationPort(), screenGuard)
 
@@ -484,5 +503,8 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
 
         /** Hugging Face access token for gated models. Stored encrypted like the AI keys; never logged. */
         const val HF_TOKEN_KEY = "hf_access_token"
+
+        /** The person's ElevenLabs key. Stored encrypted like the AI keys; sent only in the `xi-api-key` header; never logged. */
+        const val ELEVEN_KEY = "elevenlabs_api_key"
     }
 }

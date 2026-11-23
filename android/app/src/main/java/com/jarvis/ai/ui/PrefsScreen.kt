@@ -47,6 +47,7 @@ enum class SubPage(val title: String) {
     CLOUD("Cloud AI"),
     ACCESS("Access"),
     HANDS_FREE("Hands-free"),
+    BLUETOOTH("Bluetooth"),
     SCREEN_CONTROL("Phone control"),
     OFFLINE_LIBRARY("Offline library"),
     AGENTS("Agents"),
@@ -113,6 +114,8 @@ fun PrefsScreen(vm: AgentViewModel, appVersion: String, onOpen: (SubPage) -> Uni
             }
             HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Hands-free", "Say \"Jarvis\" to wake it. No tapping the mic.", Glyph.MIC) { onOpen(SubPage.HANDS_FREE) }
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
+            NavRow("Bluetooth", "Read new notifications aloud through your headset or speaker.", Glyph.WAVE) { onOpen(SubPage.BLUETOOTH) }
             HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Phone control", "Read the screen, scroll, go back or home, read and clear notifications.", Glyph.DEVICE) { onOpen(SubPage.SCREEN_CONTROL) }
             HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))

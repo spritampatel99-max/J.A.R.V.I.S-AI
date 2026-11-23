@@ -118,6 +118,12 @@ enum class AccessKey(
             "If Android greys the switch out (apps installed outside the Play Store), open Settings > Apps > JARVIS 3.0, tap the three dots and choose \"Allow restricted settings\", then try again.",
         "Settings > Accessibility > JARVIS 3.0 > switch off.",
     ),
+    BLUETOOTH(
+        "Nearby devices (Bluetooth)", AccessKind.RUNTIME, Manifest.permission.BLUETOOTH_CONNECT, true,
+        "Lets JARVIS 3.0 notice when your Bluetooth headset or speaker connects, so it can say what is waiting, offer to start listening, and read new notifications aloud through it.",
+        "The name of a Bluetooth device when it connects. It does not read what is sent over Bluetooth and does not scan for or pair devices.",
+        "Settings > Apps > JARVIS 3.0 > Permissions > Nearby devices.",
+    ),
     NOTIFICATION_ACCESS(
         "Read notifications", AccessKind.SPECIAL, null, true,
         "Lets you say \"read my notifications\" or \"clear my notifications\".",
@@ -135,7 +141,7 @@ object AccessChecks {
         AccessKey.NOTIFICATIONS ->
             if (NotificationManagerCompat.from(context).areNotificationsEnabled()) AccessState.ALLOWED else AccessState.NOT_ALLOWED
 
-        AccessKey.MICROPHONE, AccessKey.CONTACTS, AccessKey.PHONE_CALLS, AccessKey.ANSWER_CALLS ->
+        AccessKey.MICROPHONE, AccessKey.CONTACTS, AccessKey.PHONE_CALLS, AccessKey.ANSWER_CALLS, AccessKey.BLUETOOTH ->
             if (granted(context, key.manifestPermission.orEmpty())) AccessState.ALLOWED else AccessState.NOT_ALLOWED
 
         AccessKey.BATTERY -> {

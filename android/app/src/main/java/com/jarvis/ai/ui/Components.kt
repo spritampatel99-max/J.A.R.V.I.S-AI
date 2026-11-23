@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.toggleable
@@ -464,7 +465,7 @@ fun GlyphButton(
 
 /** The top bar: the brand mark with its spectrum ring, the product name, and a profile ring that opens Prefs. */
 @Composable
-fun AppHeader(onProfile: () -> Unit, modifier: Modifier = Modifier) {
+fun AppHeader(onProfile: () -> Unit, dark: Boolean, onToggleTheme: () -> Unit, modifier: Modifier = Modifier) {
     Row(
         modifier
             .fillMaxWidth()
@@ -489,6 +490,18 @@ fun AppHeader(onProfile: () -> Unit, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.labelSmall.copy(brush = JarvisColors.spectrumHorizontal()),
             )
         }
+        Box(
+            Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(JarvisColors.Edge.copy(alpha = 0.10f))
+                .clickable(role = Role.Button, onClick = onToggleTheme)
+                .semantics { contentDescription = if (dark) "Switch to the light theme" else "Switch to the dark theme" },
+            contentAlignment = Alignment.Center,
+        ) {
+            GlyphIcon(Glyph.THEME, JarvisColors.Cyan, size = 18.dp)
+        }
+        Spacer(Modifier.width(8.dp))
         Box(
             Modifier
                 .size(36.dp)

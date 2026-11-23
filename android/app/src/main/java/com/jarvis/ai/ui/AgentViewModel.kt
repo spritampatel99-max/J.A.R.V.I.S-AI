@@ -102,6 +102,14 @@ data class ProviderTestState(
 /** A spoken call that is being read back: [secondsLeft] counts down 3, 2, 1 and the call is placed at zero unless it is cancelled. */
 data class CountdownUi(val requestId: String, val secondsLeft: Int)
 
+/** What the Voice step and the Prefs screen show about ElevenLabs. Never holds the key. */
+data class ElevenUi(
+    val hasKey: Boolean = false,
+    val voices: List<com.jarvis.ai.voice.ElevenVoice> = emptyList(),
+    val busy: Boolean = false,
+    val message: String? = null,
+)
+
 data class SettingsState(
     val providers: List<ProviderRow> = emptyList(),
     val confirmMedium: Boolean = false,
@@ -326,6 +334,77 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
 
     fun voiceChoices(): List<VoiceChoice> = container.voice.voices()
 
+    // ---- ElevenLabs voice (optional; the person's own key) -------------------------------------------------
+
+    private val elevenFlow = MutableStateFlow(ElevenUi(hasKey = container.keys.get(AppContainer.ELEVEN_KEY) != null))
+    val eleven: StateFlow<ElevenUi> = elevenFlow.asStateFlow()
+
+    fun saveElevenKey(key: String) {
+        val stored = container.keys.put(AppContainer.ELEVEN_KEY, key)
+        elevenFlow.update {
+            it.copy(
+                hasKey = container.keys.get(AppContainer.ELEVEN_KEY) != null,
+                message = if (stored) null else "Could not store the key securely on this device.",
+                voices = emptyList(),
+            )
+        }
+    }
+
+    /** Removes the key, switches ElevenLabs off and forgets the chosen voice. The phone's own voice takes over at once. */
+    fun removeElevenKey() {
+        container.keys.remove(AppContainer.ELEVEN_KEY)
+        container.settings.updateUi { it.copy(elevenEnabled = false, elevenVoiceId = null, elevenVoiceName = null) }
+        elevenFlow.value = ElevenUi()
+    }
+
+    /** Asks ElevenLabs which voices this account can use. Sends only the key, as a header. */
+    fun loadElevenVoices() {
+        if (elevenFlow.value.busy) return
+        elevenFlow.update { it.copy(busy = true, message = null) }
+        scope.launch {
+            when (val result = container.elevenClient.voices()) {
+                is com.jarvis.ai.voice.ElevenOutcome.Ok -> elevenFlow.update { it.copy(busy = false, voices = result.value, message = null) }
+                is com.jarvis.ai.voice.ElevenOutcome.Failed -> elevenFlow.update { it.copy(busy = false, message = result.message) }
+            }
+        }
+    }
+
+    fun chooseElevenVoice(voice: com.jarvis.ai.voice.ElevenVoice) {
+        container.settings.updateUi { it.copy(elevenVoiceId = voice.id, elevenVoiceName = voice.name) }
+    }
+
+    fun setElevenEnabled(on: Boolean) {
+        val ready = container.keys.get(AppContainer.ELEVEN_KEY) != null && container.settings.ui.value.elevenVoiceId != null
+        if (on && !ready) {
+            elevenFlow.update { it.copy(message = "Add your key and choose a voice first.") }
+            return
+        }
+        container.settings.updateUi { it.copy(elevenEnabled = on) }
+    }
+
+    /** Says one short fixed sentence in the chosen voice, so the person can hear it. That sentence is sent to ElevenLabs. */
+    fun testElevenVoice() {
+        val voiceId = container.settings.ui.value.elevenVoiceId
+        if (voiceId == null) {
+            elevenFlow.update { it.copy(message = "Choose a voice first.") }
+            return
+        }
+        if (elevenFlow.value.busy) return
+        elevenFlow.update { it.copy(busy = true, message = null) }
+        container.voice.stopSpeaking()
+        scope.launch {
+            when (val result = container.elevenClient.speak(voiceId, "Hello, I am Jarvis. This is how I will sound.")) {
+                is com.jarvis.ai.voice.ElevenOutcome.Ok -> {
+                    elevenFlow.update { it.copy(busy = false) }
+                    container.elevenPlayer.play(result.value) { played ->
+                        if (!played) elevenFlow.update { it.copy(message = "The voice arrived but could not be played on this phone.") }
+                    }
+                }
+                is com.jarvis.ai.voice.ElevenOutcome.Failed -> elevenFlow.update { it.copy(busy = false, message = result.message) }
+            }
+        }
+    }
+
     fun previewVoice() {
         container.voice.speak("This is how I will sound.")
     }
@@ -433,7 +512,7 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
         // The report is built from recorded outcomes only; no model summarises it.
         // A call that was just placed is not read out: the phone's call screen is taking over and the line may be ringing.
         val placedCall = report.outcomes.any { it.status == StepStatus.SUCCEEDED && it.step.tool in CALL_TOOLS }
-        append(Sender.ASSISTANT, report.summary(), provider, source, speak = !placedCall)
+        append(Sender.ASSISTANT, report.summary(), provider, source, speak = !placedCall, private = report.containsPrivate)
     }
 
     // ---- spoken call countdown ----------------------------------------------------------------------------
@@ -449,7 +528,7 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
             // Read it first and wait for the speech to end: the recogniser would otherwise hear Jarvis say "stop" and cancel itself.
             withTimeoutOrNull(READ_BACK_LIMIT_MS) {
                 suspendCancellableCoroutine<Unit> { continuation ->
-                    voice.speak(VoiceDirectPolicy.readBack(request)) { if (continuation.isActive) continuation.resume(Unit) }
+                    voice.speakPrivately(VoiceDirectPolicy.readBack(request)) { if (continuation.isActive) continuation.resume(Unit) }
                     continuation.invokeOnCancellation { voice.stopSpeaking() }
                 }
             }
@@ -636,7 +715,7 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
         notice = message,
     )
 
-    private fun append(sender: Sender, text: String, provider: ProviderId? = null, source: String? = null, viaVoice: Boolean = false, speak: Boolean = true) {
+    private fun append(sender: Sender, text: String, provider: ProviderId? = null, source: String? = null, viaVoice: Boolean = false, speak: Boolean = true, private: Boolean = false) {
         val spoken = viaVoice || (requestViaVoice && sender != Sender.USER)
         val tookMs = if (sender != Sender.USER && requestStartedAtMs > 0L) System.currentTimeMillis() - requestStartedAtMs else null
         val item = ChatItem(nextId++, sender, text, provider, source, viaVoice = spoken, tookMs = tookMs)
@@ -654,7 +733,8 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
         )
         container.archiver.onHistoryChanged()
         if (speak && sender != Sender.USER && requestViaVoice && container.settings.ui.value.speakReplies) {
-            container.voice.speak(text)
+            // What came from the person's own messages, notifications or screen is spoken only by the phone's voice (see SpeechRoute).
+            container.voice.speak(text, private = private)
         }
     }
 

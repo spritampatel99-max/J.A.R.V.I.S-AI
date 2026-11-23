@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jarvis.ai.data.ThemeMode
 import com.jarvis.ai.models.ModelChoice
 import com.jarvis.ai.setup.SetupStep
 
@@ -46,10 +47,19 @@ import com.jarvis.ai.setup.SetupStep
 fun SetupWizard(setupVm: SetupViewModel, agentVm: AgentViewModel) {
     val ui by setupVm.ui.collectAsStateWithLifecycle()
     val step = ui.step
+    val prefs by agentVm.uiPrefs.collectAsStateWithLifecycle()
+    val dark = isJarvisDark(prefs.themeMode)
 
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
-        topBar = { SetupHeader(ui) },
+        topBar = {
+            SetupHeader(
+                ui,
+                dark = dark,
+                // The switch always goes to the other look, whatever "follow phone" currently shows.
+                onToggleTheme = { agentVm.updateUi { it.copy(themeMode = if (dark) ThemeMode.LIGHT else ThemeMode.DARK) } },
+            )
+        },
         bottomBar = { SetupFooter(ui, setupVm) },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -69,6 +79,7 @@ fun SetupWizard(setupVm: SetupViewModel, agentVm: AgentViewModel) {
                     SetupStep.DEVICE -> DeviceStep(ui, onRescan = setupVm::scan)
                     SetupStep.MODELS -> ModelsStep(ui, setupVm)
                     SetupStep.PROVIDERS -> ProvidersStep(agentVm)
+                    SetupStep.VOICE -> VoiceStep(agentVm)
                     SetupStep.FEATURES -> FeaturesStep(ui, setupVm)
                     SetupStep.STORAGE -> StorageStep(ui)
                     SetupStep.PERMISSIONS -> PermissionsStep(ui)
@@ -80,16 +91,20 @@ fun SetupWizard(setupVm: SetupViewModel, agentVm: AgentViewModel) {
 }
 
 @Composable
-private fun SetupHeader(ui: SetupUiState) {
+private fun SetupHeader(ui: SetupUiState, dark: Boolean, onToggleTheme: () -> Unit) {
     val total = SetupStep.entries.size
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
         // The bar draws behind the status bar (edge-to-edge), so it pads itself by the status bar's height.
         Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
-            Text(
-                "Step ${ui.step.ordinal + 1} of $total · ${ui.step.title}",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Step ${ui.step.ordinal + 1} of $total · ${ui.step.title}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onToggleTheme) { Text(if (dark) "Light theme" else "Dark theme") }
+            }
             Spacer(Modifier.height(6.dp))
             // Progress is the number of steps actually completed or skipped, never a timer.
             LinearProgressIndicator(progress = { ui.completedCount.toFloat() / total }, modifier = Modifier.fillMaxWidth())
@@ -221,6 +236,11 @@ private fun PrivacyStep(acknowledged: Boolean, onAcknowledged: (Boolean) -> Unit
                 "go to that provider, so its own privacy policy applies. With no key, nothing is sent.",
         )
         PrivacyBlock(
+            "Sent only if you add an ElevenLabs key",
+            "ElevenLabs is optional. If you add your own key and switch it on, short replies are sent to ElevenLabs to be spoken in its voice. " +
+                "Your messages, notifications and screen content are never sent for this; the phone's own voice reads those.",
+        )
+        PrivacyBlock(
             "Model downloads",
             "Checking a model's exact size or downloading it contacts huggingface.co, which can see your network address. " +
                 "This happens only when you press the button or confirm the download.",
@@ -290,6 +310,15 @@ private fun SummaryStep(ui: SetupUiState, agentVm: AgentViewModel) {
                 else -> "You chose ${choice.models.joinToString(" and ") { com.jarvis.ai.models.ModelCatalog.spec(it).displayName }}. " +
                     "Setup downloads nothing: open the Models tab and tap Download when you are ready. " +
                     "Chatting with an installed model needs the on-device engine, which is not built yet."
+            },
+        )
+        val voicePrefs by agentVm.uiPrefs.collectAsStateWithLifecycle()
+        SummaryRow(
+            "Voice",
+            if (voicePrefs.elevenEnabled && voicePrefs.elevenVoiceName != null) {
+                "ElevenLabs voice \"${voicePrefs.elevenVoiceName}\" for short, non-private replies; the phone's voice for everything private and when offline."
+            } else {
+                "The phone's own voice. ElevenLabs is not switched on."
             },
         )
         SummaryRow("Offline AI", "Not ready. It is marked ready only after a model has been downloaded, verified and test-loaded.")

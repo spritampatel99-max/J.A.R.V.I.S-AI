@@ -29,6 +29,7 @@ class SetupFlowTest {
         s = SetupFlow.withModelChoice(s, ModelChoice.SKIP)
         s = ok(SetupFlow.complete(s, SetupStep.MODELS))
         s = ok(SetupFlow.skip(s, SetupStep.PROVIDERS))
+        s = ok(SetupFlow.skip(s, SetupStep.VOICE))
         s = SetupFlow.withFeatures(s, setOf(FeatureId.AI_ASSISTANT), ProfilePreset.ESSENTIAL)
         s = ok(SetupFlow.complete(s, SetupStep.FEATURES))
         s = ok(SetupFlow.complete(s, SetupStep.STORAGE))
@@ -106,9 +107,21 @@ class SetupFlowTest {
     fun resumingSkipsOverSkippedSteps() {
         val s = SetupState(
             completed = setOf(SetupStep.WELCOME, SetupStep.PRIVACY, SetupStep.DEVICE, SetupStep.MODELS),
-            skipped = setOf(SetupStep.PROVIDERS),
+            skipped = setOf(SetupStep.PROVIDERS, SetupStep.VOICE),
         )
         assertEquals(SetupStep.FEATURES, SetupFlow.resumeStep(s))
+    }
+
+    @Test
+    fun theVoiceStepIsOptionalSitsAfterProvidersAndNeverBlocksSetup() {
+        assertTrue(SetupStep.VOICE.optional)
+        assertEquals(SetupStep.VOICE.ordinal, SetupStep.PROVIDERS.ordinal + 1)
+        assertEquals(SetupStep.FEATURES.ordinal, SetupStep.VOICE.ordinal + 1)
+        // Leaving it undone does not stop the next step from being completed.
+        val s = SetupState(completed = setOf(SetupStep.WELCOME, SetupStep.PRIVACY, SetupStep.DEVICE, SetupStep.MODELS), skipped = setOf(SetupStep.PROVIDERS), privacyAcknowledged = true)
+        assertTrue(SetupStep.FEATURES in ok(SetupFlow.complete(s, SetupStep.FEATURES)).completed)
+        assertEquals(SetupStep.FEATURES, ok(SetupFlow.skip(s, SetupStep.VOICE)).current)
+        assertTrue(SetupStep.VOICE in ok(SetupFlow.skip(s, SetupStep.VOICE)).skipped)
     }
 
     @Test

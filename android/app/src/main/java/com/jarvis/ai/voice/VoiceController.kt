@@ -10,8 +10,14 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import com.jarvis.ai.android.voice.ElevenSpeaker
 import com.jarvis.ai.data.UiPrefs
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,7 +47,7 @@ data class VoiceChoice(val name: String, val label: String)
  *
  * Every method must be called on the main thread.
  */
-class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
+class VoiceController(context: Context, private val prefs: () -> UiPrefs, private val eleven: ElevenSpeaker? = null) {
 
     private val appContext = context.applicationContext
     private val flow = MutableStateFlow(VoiceUi(recognizerAvailable = SpeechRecognizer.isRecognitionAvailable(appContext)))
@@ -56,6 +62,12 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
     private val whenSpoken = HashMap<String, () -> Unit>()
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+
+    private val elevenScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var elevenJob: Job? = null
+
+    /** Called when an ElevenLabs reply is stopped before it ends, so whoever waits for the speech to finish is never left waiting. */
+    private var elevenDone: (() -> Unit)? = null
 
     /** A reply asked for before the speech engine finished starting; it is spoken as soon as the engine is ready. */
     private var pendingSpeech: Pair<String, (() -> Unit)?>? = null
@@ -214,7 +226,7 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
      * [onDone] runs on the main thread once the speech has ended, been stopped, or failed, and also at once when there is
      * nothing to say, so a caller that waits for it is never left waiting.
      */
-    fun speak(reply: String, onDone: (() -> Unit)? = null) {
+    fun speak(reply: String, onDone: (() -> Unit)? = null, private: Boolean = false) {
         val text = SpeechText.forSpeaking(reply)
         if (text == null) {
             onDone?.let { main.post(it) }
@@ -222,12 +234,88 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
         }
         // Marked as speaking at once, so anything watching the voice state does not see a quiet gap before the engine starts.
         flow.update { it.copy(speaking = true) }
+        // A new reply replaces one that is still being fetched or played.
+        stopEleven()
+        val settings = prefs()
+        val route = SpeechRoute.choose(
+            text = text,
+            private = private,
+            enabled = settings.elevenEnabled,
+            hasKey = eleven?.hasKey() == true,
+            voiceId = settings.elevenVoiceId,
+            online = eleven?.online() == true,
+        )
+        if (route == SpeechRoute.ELEVENLABS && eleven != null && settings.elevenVoiceId != null) {
+            speakWithEleven(eleven, settings.elevenVoiceId, text, onDone)
+        } else {
+            speakOnPhone(text, onDone)
+        }
+    }
+
+    /**
+     * Reads text that is the person's own private content (a message, a notification, what is on the screen). It is only ever spoken by the
+     * phone's own voice and never sent to ElevenLabs.
+     */
+    fun speakPrivately(reply: String, onDone: (() -> Unit)? = null) = speak(reply, onDone, private = true)
+
+    private fun speakOnPhone(text: String, onDone: (() -> Unit)?) {
         ensureTts()
         if (!ttsReady) {
             pendingSpeech = text to onDone
             return
         }
         speakNow(text, onDone)
+    }
+
+    private fun speakWithEleven(backend: ElevenSpeaker, voiceId: String, text: String, onDone: (() -> Unit)?) {
+        val id = "jarvis-${utteranceCounter++}"
+        currentUtterance = id
+        elevenDone = onDone
+        elevenJob = elevenScope.launch {
+            when (val result = backend.client.speak(voiceId, text)) {
+                is ElevenOutcome.Ok -> {
+                    if (currentUtterance != id) return@launch
+                    backend.player.play(result.value) { played ->
+                        if (currentUtterance != id) return@play
+                        if (played) {
+                            finishEleven(id)
+                        } else {
+                            // The audio could not be played: say it on the phone's own voice instead of staying silent.
+                            elevenDone = null
+                            flow.update { it.copy(message = "I could not play the ElevenLabs voice, so I used the phone's voice.") }
+                            speakOnPhone(text, onDone)
+                        }
+                    }
+                }
+                is ElevenOutcome.Failed -> {
+                    if (currentUtterance != id) return@launch
+                    elevenDone = null
+                    // Never silent because of a network or account problem: the phone's voice speaks, and the reason is shown.
+                    flow.update { it.copy(message = result.message + " I used the phone's voice instead.") }
+                    speakOnPhone(text, onDone)
+                }
+            }
+        }
+    }
+
+    private fun finishEleven(id: String) {
+        val callback = elevenDone
+        elevenDone = null
+        if (currentUtterance == id) {
+            currentUtterance = null
+            flow.update { it.copy(speaking = false) }
+        }
+        callback?.invoke()
+    }
+
+    /** Stops an ElevenLabs reply that is being fetched or played, and tells whoever was waiting for it. */
+    private fun stopEleven() {
+        elevenJob?.cancel()
+        elevenJob = null
+        eleven?.player?.stop()
+        val callback = elevenDone
+        elevenDone = null
+        callback?.let { main.post(it) }
     }
 
     private fun speakNow(text: String, onDone: (() -> Unit)?) {
@@ -257,6 +345,7 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
     }
 
     fun stopSpeaking() {
+        stopEleven()
         pendingSpeech?.second?.let { main.post(it) }
         pendingSpeech = null
         currentUtterance = null
@@ -276,6 +365,7 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
     }
 
     fun shutdown() {
+        stopEleven()
         destroyRecognizer()
         tts?.stop()
         tts?.shutdown()

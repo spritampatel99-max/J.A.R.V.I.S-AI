@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -29,7 +30,7 @@ enum class Glyph {
     MIC, CALL, SEARCH, TUNE, LOCK, SHIELD, PERSON,
     CHEVRON_RIGHT, CHEVRON_DOWN, ARROW_LEFT, ARROW_UP, CLOSE, CHECK, CHECK_CIRCLE,
     CLOCK, GLOBE, CALENDAR, HUB, TRASH, STORAGE, BELL, DEVICE, BOLT, WAVE,
-    VOLUME, VOLUME_OFF, STOP, WARNING, INFO, SPARK, CHIP, CLOUD, FLASHLIGHT, SEND_PLANE, PHOTO,
+    VOLUME, VOLUME_OFF, STOP, WARNING, INFO, SPARK, CHIP, CLOUD, FLASHLIGHT, SEND_PLANE, PHOTO, THEME,
 }
 
 @Composable
@@ -187,6 +188,11 @@ fun DrawScope.drawGlyph(glyph: Glyph, color: Color, strokeWidth: Float = 1.8f) {
         Glyph.PHOTO -> {
             box(3.5f, 4.5f, 17f, 15f, 2.5f); ring(9f, 10f, 1.8f)
             path({ moveTo(3.5f * s, 17f * s); lineTo(9f * s, 13f * s); lineTo(13f * s, 16f * s); lineTo(16f * s, 13.5f * s); lineTo(20.5f * s, 17.5f * s) })
+        }
+        // A circle with one half filled: the usual sign for switching between the light and the dark look.
+        Glyph.THEME -> {
+            ring(12f, 12f, 8.5f)
+            path({ moveTo(12f * s, 3.5f * s); arcTo(Rect(Offset(3.5f * s, 3.5f * s), Size(17f * s, 17f * s)), -90f, 180f, false); close() }, fill = true)
         }
     }
 }
