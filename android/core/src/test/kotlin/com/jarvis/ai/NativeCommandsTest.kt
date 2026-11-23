@@ -13,6 +13,16 @@ import com.jarvis.ai.ai.tools.builtin.LaunchResult
 import com.jarvis.ai.ai.tools.builtin.TorchController
 import com.jarvis.ai.ai.tools.builtin.TorchResult
 import com.jarvis.ai.ai.tools.builtin.UrlOpener
+import com.jarvis.ai.ai.tools.screen.FrontApp
+import com.jarvis.ai.ai.tools.screen.GuardedScreenControl
+import com.jarvis.ai.ai.tools.screen.PhoneAction
+import com.jarvis.ai.ai.tools.screen.PlayOnYoutubeTool
+import com.jarvis.ai.ai.tools.screen.RawBox
+import com.jarvis.ai.ai.tools.screen.RawResult
+import com.jarvis.ai.ai.tools.screen.RawScreen
+import com.jarvis.ai.ai.tools.screen.RawTap
+import com.jarvis.ai.ai.tools.screen.ScreenGuard
+import com.jarvis.ai.ai.tools.screen.Snapshot
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -30,8 +40,24 @@ class NativeCommandsTest {
     private val zone = ZoneOffset.ofHoursMinutes(5, 30)
     private val clock = Clock.fixed(Instant.parse("2026-11-08T07:17:00Z"), zone)
 
+    /** A screen that is switched off; the YouTube-play tool only has to exist so its arguments can be checked. */
+    private object OffScreen : RawScreen {
+        override val connected: Boolean = false
+        override fun front(): FrontApp? = null
+        override suspend fun snapshot(allow: (String) -> Boolean): Snapshot = Snapshot.None
+        override suspend fun scroll(down: Boolean, allow: (String) -> Boolean): RawResult = RawResult.Failed("off")
+        override suspend fun perform(action: PhoneAction): RawResult = RawResult.Failed("off")
+        override suspend fun tap(label: String, allow: (String) -> Boolean): RawTap = RawTap.NotFound
+        override suspend fun type(text: String, allow: (String) -> Boolean): RawResult = RawResult.Failed("off")
+        override suspend fun box(allow: (String) -> Boolean): RawBox = RawBox.None
+    }
+
+    private val urlOpener = object : UrlOpener {
+        override fun open(url: String): LaunchResult = LaunchResult.Launched
+    }
+
     private val registry = ToolRegistry(
-        BuiltinTools.create(
+        listOf(PlayOnYoutubeTool(urlOpener, GuardedScreenControl(OffScreen, ScreenGuard("com.jarvis.ai")))) + BuiltinTools.create(
             DevicePorts(
                 torch = object : TorchController {
                     override suspend fun setTorch(on: Boolean): TorchResult = TorchResult.NoFlash

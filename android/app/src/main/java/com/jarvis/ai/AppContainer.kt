@@ -344,7 +344,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     /** What the assistant can do: the phone tools, the planner and reminder tools, the phone-control tools and the read-only internet lookups. */
     val registry = ToolRegistry(
         BuiltinTools.create(ports) +
-            ScreenTools.create(screenControl, guardedNotifications) +
+            ScreenTools.create(screenControl, guardedNotifications, apps = ports.apps, urls = ports.urls) +
             OfflineTools.create { library.encyclopedia() } +
             listOf(com.jarvis.ai.update.CheckForUpdatesTool(updateClient, appVersion)) +
             ProductivityTools.create(productivity, wake, notifier) +

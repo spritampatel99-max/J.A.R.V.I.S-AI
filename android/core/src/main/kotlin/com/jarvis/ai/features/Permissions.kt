@@ -11,7 +11,7 @@ enum class PermissionKind {
     SPECIAL_ACCESS,
 }
 
-enum class PermissionId { INTERNET, ACCESS_NETWORK_STATE, SET_ALARM, RECORD_AUDIO, POST_NOTIFICATIONS, FOREGROUND_SERVICE_MICROPHONE, NOTIFICATION_LISTENER, READ_CONTACTS, CALL_PHONE, USAGE_ACCESS, EXACT_ALARMS, OVERLAY, ACCESSIBILITY }
+enum class PermissionId { INTERNET, ACCESS_NETWORK_STATE, SET_ALARM, RECORD_AUDIO, POST_NOTIFICATIONS, FOREGROUND_SERVICE_MICROPHONE, NOTIFICATION_LISTENER, READ_CONTACTS, CALL_PHONE, USAGE_ACCESS, EXACT_ALARMS, OVERLAY, ACCESSIBILITY, BLUETOOTH_CONNECT }
 
 /** The five things Part 25 says to explain for every permission. */
 data class PermissionInfo(
@@ -65,7 +65,7 @@ object PermissionCatalog {
         ),
         PermissionInfo(
             PermissionId.NOTIFICATION_LISTENER, "Notification access", PermissionKind.SPECIAL_ACCESS,
-            "Reading out and dismissing the notifications that are showing now. Notifications from banking and payment apps and password managers are left out.",
+            "Reading out and dismissing the notifications that are showing now, and reading new ones aloud while a Bluetooth device is connected if you switch that on. Notifications from banking and payment apps and password managers are left out.",
             "The title and text of notifications that other apps post. Message notifications can contain private conversations.",
             "Settings > Notifications > Device & app notifications > JARVIS 3.0 (the location varies by manufacturer).",
         ),
@@ -83,15 +83,21 @@ object PermissionCatalog {
         ),
         PermissionInfo(
             PermissionId.USAGE_ACCESS, "Usage access", PermissionKind.SPECIAL_ACCESS,
-            "Showing which apps used mobile data.",
+            "Showing how much mobile data the phone and each app used.",
             "Per-app usage statistics. Without it only whole-phone totals are possible.",
             "Settings > Apps > Special app access > Usage access (the location varies by manufacturer).",
         ),
         PermissionInfo(
             PermissionId.ACCESSIBILITY, "Accessibility (screen access)", PermissionKind.SPECIAL_ACCESS,
-            "Reading the text on the screen when you ask, scrolling, and pressing Back, Home, Recents, lock and screenshot.",
-            "The text of whatever app is in front while it is asked to read. It does not tap or type inside other apps, and it never reads JARVIS 3.0 itself, payment apps or password managers.",
+            "Reading the text on the screen when you ask (for example counting unread WhatsApp chats), scrolling, and pressing Back, Home, Recents, lock and screenshot. Tapping and typing in other apps is a separate switch that is off until you turn it on.",
+            "The text of whatever app is in front while it is asked to read. It never reads JARVIS 3.0 itself, payment apps or password managers.",
             "Settings > Accessibility > JARVIS 3.0 (the location varies by manufacturer).",
+        ),
+        PermissionInfo(
+            PermissionId.BLUETOOTH_CONNECT, "Nearby devices (Bluetooth)", PermissionKind.RUNTIME,
+            "Knowing when one of your Bluetooth devices connects, so Jarvis can say so, read notifications aloud and offer to start listening.",
+            "The name of a Bluetooth device when it connects or disconnects. Nothing is sent to it and nothing is read from it.",
+            APP_SETTINGS,
         ),
         PermissionInfo(
             PermissionId.OVERLAY, "Display over other apps", PermissionKind.SPECIAL_ACCESS,

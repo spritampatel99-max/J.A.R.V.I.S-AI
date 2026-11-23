@@ -7,7 +7,7 @@ enum class FeatureId {
     DEVICE_CONTROL, APPLICATION_LAUNCHER, PHONE_ASSISTANT, WHATSAPP_ASSISTANT, SMS_ASSISTANT,
     MOBILE_DATA_MONITOR, AUTOMATION_STUDIO, FILE_MANAGER, DOCUMENT_INTELLIGENCE, RESEARCH_WEB,
     AI_MEMORY, SMART_PLANNER, OFFLINE_KNOWLEDGE, CUSTOM_AGENT_CREATOR, SECURITY_CENTER,
-    OFFLINE_PREPARATION_CENTER, PERSONAL_ROUTINES, MULTILINGUAL_ASSISTANT, ADAPTIVE_DASHBOARD,
+    OFFLINE_PREPARATION_CENTER, PERSONAL_ROUTINES, MULTILINGUAL_ASSISTANT, ADAPTIVE_DASHBOARD, BLUETOOTH_COMPANION,
 }
 
 /** Shared building blocks. A capability needed by several features is counted once. */
@@ -64,8 +64,7 @@ object FeatureCatalog {
     val all: List<Feature> = listOf(
         Feature(
             FeatureId.AI_ASSISTANT, "AI Assistant",
-            "Chat that plans your request into steps and runs the phone tools you have enabled. Today it needs a cloud provider key; " +
-                "on-device models arrive in Phase 4.",
+            "Chat that plans your request into steps and runs the phone tools you have enabled. It needs a cloud provider key until an on-device model can answer.",
             Readiness.Available, InternetNeed.REQUIRED, OfflineSupport.NONE,
             capabilities = setOf(Capability.AI_ROUTER),
         ),
@@ -78,7 +77,7 @@ object FeatureCatalog {
         ),
         Feature(
             FeatureId.CLOUD_AI, "Cloud AI Integration",
-            "Use your own keys for Gemini, Groq, OpenRouter, OpenAI or Claude, tried in the order you choose.",
+            "Use your own keys for Gemini, Groq, OpenRouter, OpenAI, Claude or Mistral, or your own https endpoint, tried in the order you choose.",
             Readiness.Available, InternetNeed.REQUIRED, OfflineSupport.NONE,
         ),
         Feature(
@@ -92,7 +91,7 @@ object FeatureCatalog {
         ),
         Feature(
             FeatureId.HANDS_FREE, "Hands-Free Assistant",
-            "Say \"Jarvis\" to wake it without tapping the mic. A visible notification stays on while it listens. Needs a free Picovoice AccessKey, and must be switched on again after a restart.",
+            "Say \"Jarvis\" to wake it without tapping the mic. A visible notification stays on while it listens. The offline listener needs no key (a one-time ~40 MB download); Picovoice is the alternative. Android does not let a microphone service start by itself, so after a restart you switch it on again.",
             Readiness.Available, InternetNeed.OPTIONAL, OfflineSupport.PARTIAL,
             permissions = listOf(
                 req(PermissionId.RECORD_AUDIO), req(PermissionId.POST_NOTIFICATIONS),
@@ -112,7 +111,7 @@ object FeatureCatalog {
         Feature(
             FeatureId.DEVICE_CONTROL, "Device Control",
             "Flashlight, set an alarm through your Clock app, open a link, open YouTube, show device information, the time and date. With Accessibility switched on: read the screen aloud, scroll, and press Back, Home, Recents, lock or screenshot. " +
-                "It does not tap or type inside other apps. Android does not allow apps to switch Wi-Fi or Bluetooth silently, so those will only open the right settings screen.",
+                "Tapping and typing inside other apps exist but stay off until you switch them on in Prefs > Access. Android does not allow apps to switch Wi-Fi or Bluetooth silently, so those will only open the right settings screen.",
             Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
             permissions = listOf(req(PermissionId.SET_ALARM), opt(PermissionId.ACCESSIBILITY)),
             requires = setOf(FeatureId.AI_ASSISTANT),
@@ -133,22 +132,23 @@ object FeatureCatalog {
         ),
         Feature(
             FeatureId.WHATSAPP_ASSISTANT, "WhatsApp Assistant",
-            "Prepare a message and open WhatsApp with it. You send it; the app cannot confirm that it was sent.",
-            Readiness.Planned(6), InternetNeed.NONE, OfflineSupport.PARTIAL,
-            permissions = listOf(opt(PermissionId.READ_CONTACTS), opt(PermissionId.NOTIFICATION_LISTENER)),
+            "Count unread chats by opening WhatsApp and reading its chat list, read new messages from notifications, and prepare a message by voice. " +
+                "Pressing Send for you is off unless you switch it on; Android never confirms that a message was sent.",
+            Readiness.Available, InternetNeed.NONE, OfflineSupport.PARTIAL,
+            permissions = listOf(opt(PermissionId.READ_CONTACTS), opt(PermissionId.NOTIFICATION_LISTENER), opt(PermissionId.ACCESSIBILITY)),
             requires = setOf(FeatureId.AI_ASSISTANT),
         ),
         Feature(
             FeatureId.SMS_ASSISTANT, "SMS Assistant",
             "Prepare a text message and open your messaging app with it. It never sends silently.",
-            Readiness.Planned(6), InternetNeed.NONE, OfflineSupport.FULL,
+            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
             permissions = listOf(opt(PermissionId.READ_CONTACTS)),
             requires = setOf(FeatureId.AI_ASSISTANT),
         ),
         Feature(
             FeatureId.MOBILE_DATA_MONITOR, "Mobile Data Monitor",
-            "See how much mobile data the phone and individual apps have used.",
-            Readiness.Planned(6), InternetNeed.NONE, OfflineSupport.FULL,
+            "See how much mobile data the phone and individual apps have used today, this week and this month. Needs Usage access.",
+            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
             permissions = listOf(req(PermissionId.USAGE_ACCESS)),
         ),
         Feature(
@@ -162,21 +162,21 @@ object FeatureCatalog {
         ),
         Feature(
             FeatureId.FILE_MANAGER, "File Manager",
-            "Browse and organise files you pick with the Android file picker. No all-files access is requested.",
-            Readiness.Planned(6), InternetNeed.NONE, OfflineSupport.FULL,
+            "Browse a folder you pick with the Android file picker, make folders, rename, delete after a confirmation, and sort a folder's files by type after a preview. No all-files access is requested.",
+            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
             capabilities = setOf(Capability.STORAGE_ACCESS_FRAMEWORK),
         ),
         Feature(
             FeatureId.DOCUMENT_INTELLIGENCE, "Document Intelligence",
-            "Ask questions about documents you import.",
-            Readiness.Planned(7), InternetNeed.OPTIONAL, OfflineSupport.PARTIAL,
+            "Import text, Markdown, CSV, HTML, Word (.docx) or PDF files and search them on the phone. Asking an AI about a document is a separate button and sends only the matching passages to your cloud provider.",
+            Readiness.Available, InternetNeed.OPTIONAL, OfflineSupport.PARTIAL,
             requires = setOf(FeatureId.FILE_MANAGER, FeatureId.AI_ASSISTANT),
             capabilities = setOf(Capability.LOCAL_DATABASE),
         ),
         Feature(
             FeatureId.RESEARCH_WEB, "Research and Web",
-            "Look things up on the web. Web content is treated as untrusted and cannot approve any action.",
-            Readiness.Planned(6), InternetNeed.REQUIRED, OfflineSupport.NONE,
+            "Weather, Wikipedia and a web-grounded answer (through your Gemini key). Web content is treated as untrusted and cannot approve any action.",
+            Readiness.Available, InternetNeed.REQUIRED, OfflineSupport.NONE,
             requires = setOf(FeatureId.AI_ASSISTANT, FeatureId.CLOUD_AI),
         ),
         Feature(
@@ -196,9 +196,8 @@ object FeatureCatalog {
         ),
         Feature(
             FeatureId.OFFLINE_KNOWLEDGE, "Offline Knowledge",
-            "Downloadable reference packs that work without internet.",
-            Readiness.Planned(8), InternetNeed.OPTIONAL, OfflineSupport.FULL,
-            requires = setOf(FeatureId.LOCAL_AI_LAB),
+            "Download or import a Wikipedia file (Kiwix .zim) once, then look things up with no internet.",
+            Readiness.Available, InternetNeed.OPTIONAL, OfflineSupport.FULL,
             capabilities = setOf(Capability.LOCAL_DATABASE),
             extraDownload = Amount.Unknown("Chosen later in the Offline Preparation Center"),
             extraStorage = Amount.Unknown("Chosen later in the Offline Preparation Center"),
@@ -222,21 +221,30 @@ object FeatureCatalog {
         ),
         Feature(
             FeatureId.PERSONAL_ROUTINES, "Personal Routines",
-            "Morning and evening routines built from your own steps.",
-            Readiness.Planned(7), InternetNeed.NONE, OfflineSupport.FULL,
+            "Morning and evening routines built from your own steps: a reminder at the time you choose, and Jarvis reads the steps to you when you ask.",
+            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
             requires = setOf(FeatureId.AUTOMATION_STUDIO),
         ),
         Feature(
             FeatureId.MULTILINGUAL_ASSISTANT, "Multilingual Assistant",
-            "Answer in the language you choose.",
-            Readiness.Planned(6), InternetNeed.OPTIONAL, OfflineSupport.PARTIAL,
+            "Choose the language Jarvis answers in and the language it listens for (English, Hindi and other Indian languages). The phone's own speech engine must support it.",
+            Readiness.Available, InternetNeed.OPTIONAL, OfflineSupport.PARTIAL,
             requires = setOf(FeatureId.AI_ASSISTANT),
         ),
         Feature(
             FeatureId.ADAPTIVE_DASHBOARD, "Adaptive Dashboard",
-            "A home screen built from the features you actually use.",
-            Readiness.Planned(7), InternetNeed.NONE, OfflineSupport.FULL,
-            requires = setOf(FeatureId.AI_MEMORY),
+            "A home screen with shortcuts to the things you ask for most, counted on this phone only.",
+            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
+        ),
+        Feature(
+            FeatureId.BLUETOOTH_COMPANION, "Bluetooth Companion",
+            "When a Bluetooth audio device connects (earbuds, car), Jarvis can say so, read new notifications aloud, and put up a one-tap button to start hands-free listening. " +
+                "Android does not allow a microphone service to start by itself, so listening starts with that one tap.",
+            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
+            permissions = listOf(req(PermissionId.BLUETOOTH_CONNECT), opt(PermissionId.NOTIFICATION_LISTENER), opt(PermissionId.POST_NOTIFICATIONS)),
+            requires = setOf(FeatureId.VOICE_ASSISTANT),
+            capabilities = setOf(Capability.TEXT_TO_SPEECH, Capability.AUDIO_SYSTEM),
+            hardware = setOf(HardwareNeed.AUDIO_OUTPUT),
         ),
     )
 

@@ -73,6 +73,24 @@ sealed interface RawBox {
     data object None : RawBox
 }
 
+/** One piece of a list row: what is shown, what the app tells screen readers about it, and the control's short view name (may be empty). */
+data class ScreenPart(val text: String = "", val description: String = "", val id: String = "")
+
+/** One item of the list in front (a chat, a search result) with everything visible inside it, in reading order. */
+data class ScreenRow(val parts: List<ScreenPart>) {
+    /** Every non-blank text and description in the row. */
+    val texts: List<String> get() = parts.flatMap { listOf(it.text, it.description) }.map { it.trim() }.filter { it.isNotEmpty() }
+}
+
+/** The rows of the front window's main list, read in one step with the package check. */
+sealed interface RawRows {
+    data class Found(val app: FrontApp, val rows: List<ScreenRow>) : RawRows
+
+    data class Refused(val app: FrontApp) : RawRows
+
+    data object None : RawRows
+}
+
 /** The Android side. [allow] is asked with the front window's package BEFORE anything of that window is read or touched. */
 interface RawScreen {
     val connected: Boolean
@@ -93,6 +111,16 @@ interface RawScreen {
 
     /** What the front window's text box holds right now. */
     suspend fun box(allow: (String) -> Boolean): RawBox
+
+    /** The items of the biggest scrolling list in the front window. Never password or typing boxes. */
+    suspend fun rows(allow: (String) -> Boolean): RawRows = RawRows.None
+
+    /**
+     * Presses the first row of the front window's main list for which [pick] is true, in one step, so the row that was judged is the
+     * row that is pressed. Only if the front window belongs to one of [inApps]. Never by coordinates.
+     */
+    suspend fun pressRow(allow: (String) -> Boolean, inApps: Set<String>, pick: (ScreenRow) -> Boolean): RawTap =
+        RawTap.Failed("This phone's screen service cannot press list items.")
 }
 
 sealed interface ScreenRead {
@@ -103,6 +131,16 @@ sealed interface ScreenRead {
     data class OffLimits(val app: String) : ScreenRead
 
     data object Empty : ScreenRead
+}
+
+sealed interface ScreenRows {
+    data class Found(val app: FrontApp, val rows: List<ScreenRow>) : ScreenRows
+
+    data object NotEnabled : ScreenRows
+
+    data class OffLimits(val app: String) : ScreenRows
+
+    data object Empty : ScreenRows
 }
 
 sealed interface ScreenAct {
@@ -155,6 +193,18 @@ interface ScreenControl {
      * The caller decides whether sending is allowed at all (the person's own switch); this method only enforces what is on screen.
      */
     suspend fun sendComposed(expected: String, inApps: Set<String>): SendPress
+
+    /** The items of the list in front, for tools that need to see a list's structure (chat lists, search results). Reading rules apply. */
+    suspend fun rows(): ScreenRows = ScreenRows.NotEnabled
+
+    /** Waits up to [timeoutMs] for one of [apps] to be the app in front. Only says yes or no; nothing is read. */
+    suspend fun awaitFront(apps: Set<String>, timeoutMs: Long): Boolean = false
+
+    /**
+     * Presses the first list item that [pick] accepts, in an app of [inApps] only. Needs the person's tap-and-type switch, like [tap].
+     * [pick] is app code, never model text, and is applied to the same rows that are then pressed.
+     */
+    suspend fun pressRow(inApps: Set<String>, pick: (ScreenRow) -> Boolean): ScreenAct = ScreenAct.NotEnabled
 }
 
 /**
@@ -365,6 +415,43 @@ class GuardedScreenControl(
             else -> BoxAfter.UNKNOWN
         }
         return SendPress.Pressed(state)
+    }
+
+    override suspend fun rows(): ScreenRows {
+        if (!raw.connected) return ScreenRows.NotEnabled
+        return when (val result = raw.rows(guard::mayRead)) {
+            is RawRows.Found -> if (guard.mayRead(result.app.packageName)) ScreenRows.Found(result.app, result.rows) else ScreenRows.OffLimits(result.app.label)
+            is RawRows.Refused -> ScreenRows.OffLimits(result.app.label)
+            RawRows.None -> ScreenRows.Empty
+        }
+    }
+
+    override suspend fun awaitFront(apps: Set<String>, timeoutMs: Long): Boolean {
+        if (!raw.connected) return false
+        var waited = 0L
+        while (true) {
+            val front = raw.front()
+            if (front != null && front.packageName in apps) return true
+            if (waited >= timeoutMs) return false
+            pause(POLL_MS)
+            waited += POLL_MS
+        }
+    }
+
+    override suspend fun pressRow(inApps: Set<String>, pick: (ScreenRow) -> Boolean): ScreenAct {
+        if (!raw.connected) return ScreenAct.NotEnabled
+        if (!actionsOn()) return ScreenAct.Failed("Tapping and typing in other apps is switched off. Turn it on in Prefs > Access first.")
+        val front = raw.front() ?: return ScreenAct.Failed("I cannot tell which app is in front, so I did not tap.")
+        if (!guard.mayAct(front.packageName)) return ScreenAct.OffLimits(front.label)
+        if (front.packageName !in inApps) return ScreenAct.Failed("${front.label} is in front, not the app I was asked to use, so I pressed nothing.")
+        if (!limiter.tryAcquire()) return ScreenAct.Failed("That is a lot of taps in a minute, so I stopped. Ask again in a moment.")
+        return when (val result = raw.pressRow(guard::mayAct, inApps, pick)) {
+            is RawTap.Done -> ScreenAct.Done(result.app.label)
+            is RawTap.Refused -> ScreenAct.OffLimits(result.app.label)
+            RawTap.NotFound -> ScreenAct.Failed("I could not find a matching item on this screen.")
+            is RawTap.Ambiguous -> ScreenAct.Failed("More than one item matched, so I pressed none.")
+            is RawTap.Failed -> ScreenAct.Failed(result.reason)
+        }
     }
 
     private fun convert(result: RawResult): ScreenAct = when (result) {

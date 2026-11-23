@@ -29,6 +29,9 @@ class FeatureCatalogTest {
         FeatureId.AUTOMATION_STUDIO, FeatureId.AI_MEMORY, FeatureId.SMART_PLANNER, FeatureId.CUSTOM_AGENT_CREATOR,
         FeatureId.SECURITY_CENTER, FeatureId.OFFLINE_PREPARATION_CENTER,
         FeatureId.HANDS_FREE, FeatureId.APPLICATION_LAUNCHER, FeatureId.NOTIFICATION_INTELLIGENCE,
+        FeatureId.WHATSAPP_ASSISTANT, FeatureId.SMS_ASSISTANT, FeatureId.MOBILE_DATA_MONITOR, FeatureId.FILE_MANAGER,
+        FeatureId.DOCUMENT_INTELLIGENCE, FeatureId.RESEARCH_WEB, FeatureId.OFFLINE_KNOWLEDGE, FeatureId.PERSONAL_ROUTINES,
+        FeatureId.MULTILINGUAL_ASSISTANT, FeatureId.ADAPTIVE_DASHBOARD, FeatureId.BLUETOOTH_COMPANION,
     )
 
     /** Same catalogue with every feature treated as built, to exercise dependency rules that matter once the phases land. */
@@ -38,10 +41,10 @@ class FeatureCatalogTest {
     // ---- catalogue integrity -----------------------------------------------------------------
 
     @Test
-    fun allTwentyFiveFeaturesFromTheProductPromptArePresentOnce() {
-        assertEquals(25, FeatureId.entries.size)
+    fun allTwentyFiveFeaturesFromTheProductPromptArePresentOnceAndTheBluetoothCompanion() {
+        assertEquals(26, FeatureId.entries.size)
         assertEquals(FeatureId.entries.toSet(), FeatureCatalog.all.map { it.id }.toSet())
-        assertEquals(25, FeatureCatalog.all.size)
+        assertEquals(26, FeatureCatalog.all.size)
     }
 
     @Test
@@ -148,9 +151,9 @@ class FeatureCatalogTest {
 
     @Test
     fun aFeatureThatIsNotBuiltIsRejectedWithItsPhase() {
-        val r = FeatureResolver.resolve(setOf(FeatureId.WHATSAPP_ASSISTANT, FeatureId.CLOUD_AI))
+        val r = FeatureResolver.resolve(setOf(FeatureId.LOCAL_AI_LAB, FeatureId.CLOUD_AI))
         assertEquals(setOf(FeatureId.CLOUD_AI), r.explicit)
-        assertTrue("Phase 6" in r.rejected.getValue(FeatureId.WHATSAPP_ASSISTANT))
+        assertTrue("Phase 4" in r.rejected.getValue(FeatureId.LOCAL_AI_LAB))
         assertTrue(r.capabilities.isEmpty())
     }
 
@@ -198,11 +201,11 @@ class FeatureCatalogTest {
     fun aBuiltFeatureNeedingAnUnbuiltOneReportsItAsUnmet() {
         val custom: (FeatureId) -> Feature = {
             val f = FeatureCatalog.feature(it)
-            if (it == FeatureId.DEVICE_CONTROL) f.copy(requires = f.requires + FeatureId.FILE_MANAGER) else f
+            if (it == FeatureId.DEVICE_CONTROL) f.copy(requires = f.requires + FeatureId.LOCAL_AI_LAB) else f
         }
         val r = FeatureResolver.resolve(setOf(FeatureId.DEVICE_CONTROL), custom)
-        assertEquals(mapOf(FeatureId.DEVICE_CONTROL to setOf(FeatureId.FILE_MANAGER)), r.unmet)
-        assertFalse(FeatureId.FILE_MANAGER in r.active)
+        assertEquals(mapOf(FeatureId.DEVICE_CONTROL to setOf(FeatureId.LOCAL_AI_LAB)), r.unmet)
+        assertFalse(FeatureId.LOCAL_AI_LAB in r.active)
     }
 
     // ---- editing a selection -----------------------------------------------------------------
@@ -213,7 +216,7 @@ class FeatureCatalogTest {
         assertEquals(setOf(FeatureId.CLOUD_AI), ok.selection.chosen)
         assertNull(ok.refused)
 
-        val refused = FeatureSelection().select(FeatureId.WHATSAPP_ASSISTANT)
+        val refused = FeatureSelection().select(FeatureId.LOCAL_AI_LAB)
         assertTrue(refused.selection.chosen.isEmpty())
         assertTrue("not built yet" in refused.refused!!)
     }
@@ -254,7 +257,7 @@ class FeatureCatalogTest {
     @Test
     fun theLocalAiPresetNamesLocalFeaturesEvenThoughTheyAreNotBuilt() {
         val (sel, notBuilt) = FeatureSelection.fromPreset(ProfilePreset.LOCAL_AI)
-        assertTrue(FeatureId.LOCAL_AI_LAB in notBuilt && FeatureId.OFFLINE_KNOWLEDGE in notBuilt)
+        assertTrue(FeatureId.LOCAL_AI_LAB in notBuilt)
         assertFalse(FeatureId.CLOUD_AI in sel.chosen, "the local preset should not switch cloud on")
     }
 
@@ -288,7 +291,7 @@ class FeatureCatalogTest {
 
     @Test
     fun aFeatureThatIsNotBuiltOnlyEverSaysSo() {
-        assertEquals(setOf(FeatureStatus.NOT_BUILT_YET), status(FeatureId.WHATSAPP_ASSISTANT, built = false))
+        assertEquals(setOf(FeatureStatus.NOT_BUILT_YET), status(FeatureId.LOCAL_AI_LAB, built = false))
     }
 
     @Test

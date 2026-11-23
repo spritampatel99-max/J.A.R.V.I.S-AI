@@ -7,7 +7,9 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.jarvis.ai.ai.tools.screen.FrontApp
 import com.jarvis.ai.ai.tools.screen.RawBox
 import com.jarvis.ai.ai.tools.screen.RawResult
+import com.jarvis.ai.ai.tools.screen.RawRows
 import com.jarvis.ai.ai.tools.screen.RawTap
+import com.jarvis.ai.ai.tools.screen.ScreenRow
 
 /**
  * The phone-control service the person switches on in Settings > Accessibility. It can: read the text of the window in front,
@@ -148,6 +150,54 @@ class JarvisAccessibilityService : AccessibilityService() {
                 return RawBox.Text(app, if (box.isShowingHintText) "" else box.text?.toString().orEmpty())
             } finally {
                 NodeReader.recycle(box)
+            }
+        } finally {
+            NodeReader.recycle(root)
+        }
+    }
+
+    /** The items of the front window's main list, if [allow] accepts the window's package. */
+    fun rows(allow: (String) -> Boolean): RawRows {
+        val root = rootInActiveWindow ?: return RawRows.None
+        try {
+            val pkg = root.packageName?.toString().orEmpty()
+            if (pkg.isBlank()) return RawRows.None
+            val app = FrontApp(pkg, labelOf(pkg))
+            if (!allow(pkg)) return RawRows.Refused(app)
+            val found = NodeReader.rowsWithNodes(root)
+            try {
+                return if (found.isEmpty()) RawRows.None else RawRows.Found(app, found.map { it.first })
+            } finally {
+                found.forEach { NodeReader.recycle(it.second) }
+            }
+        } finally {
+            NodeReader.recycle(root)
+        }
+    }
+
+    /**
+     * Presses the first list item that [pick] accepts, in one step on the same window object, if [allow] accepts its package and it is
+     * one of [inApps]. The press is Android's own "click" action; no coordinates are used.
+     */
+    fun pressRow(allow: (String) -> Boolean, inApps: Set<String>, pick: (ScreenRow) -> Boolean): RawTap {
+        val root = rootInActiveWindow ?: return RawTap.Failed("No window could be read.")
+        try {
+            val pkg = root.packageName?.toString().orEmpty()
+            if (pkg.isBlank()) return RawTap.Failed("No window could be read.")
+            val app = FrontApp(pkg, labelOf(pkg))
+            if (!allow(pkg)) return RawTap.Refused(app)
+            if (pkg !in inApps) return RawTap.Failed("${app.label} is in front, not the app I was asked to use.")
+            val found = NodeReader.rowsWithNodes(root)
+            try {
+                val hit = found.firstOrNull { pick(it.first) } ?: return RawTap.NotFound
+                val target = NodeReader.clickTarget(hit.second)
+                try {
+                    return if (target.performAction(AccessibilityNodeInfo.ACTION_CLICK)) RawTap.Done(app) else RawTap.Failed("${app.label} did not accept the press.")
+                } finally {
+                    NodeReader.recycle(target)
+                }
+            } finally {
+                found.forEach { NodeReader.recycle(it.second) }
             }
         } finally {
             NodeReader.recycle(root)

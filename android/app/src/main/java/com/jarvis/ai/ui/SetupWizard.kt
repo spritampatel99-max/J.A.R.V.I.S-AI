@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -81,7 +83,8 @@ fun SetupWizard(setupVm: SetupViewModel, agentVm: AgentViewModel) {
 private fun SetupHeader(ui: SetupUiState) {
     val total = SetupStep.entries.size
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+        // The bar draws behind the status bar (edge-to-edge), so it pads itself by the status bar's height.
+        Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
             Text(
                 "Step ${ui.step.ordinal + 1} of $total · ${ui.step.title}",
                 style = MaterialTheme.typography.titleSmall,
@@ -117,7 +120,7 @@ private fun SetupFooter(ui: SetupUiState, vm: SetupViewModel) {
     }
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
         Row(
-            Modifier.fillMaxWidth().padding(12.dp),
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

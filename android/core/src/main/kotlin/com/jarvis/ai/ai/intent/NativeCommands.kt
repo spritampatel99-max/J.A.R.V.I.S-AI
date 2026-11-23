@@ -44,7 +44,7 @@ object NativeCommands {
         // A message's words belong to the person: they are matched before the generic clean-up, which would trim a
         // trailing "now" or "please" and the punctuation off the end of what they want to say.
         val lead = leadClean(text)
-        if (lead.isNotEmpty() && lead.length <= MAX_LENGTH) (whatsappRead(lead) ?: messaging(lead) ?: email(lead) ?: typeText(lead))?.let { return toMatch(listOf(it)) }
+        if (lead.isNotEmpty() && lead.length <= MAX_LENGTH) (whatsappCount(lead) ?: whatsappRead(lead) ?: messaging(lead) ?: email(lead) ?: typeText(lead))?.let { return toMatch(listOf(it)) }
 
         val whole = clean(text)
         if (whole.isEmpty() || whole.length > MAX_LENGTH) return null
@@ -203,12 +203,31 @@ object NativeCommands {
     private val YT_SEARCH = listOf(
         Regex("""^(?:search|find|look up|look for) (?:for )?(.{1,200}?) (?:on|in) youtube$""", RegexOption.IGNORE_CASE),
         Regex("""^(?:search|find|look up|look for) youtube for (.{1,200})$""", RegexOption.IGNORE_CASE),
-        Regex("""^(?:play|watch) (.{1,200}?) (?:on|in) youtube$""", RegexOption.IGNORE_CASE),
         Regex("""^(?:open|launch) youtube (?:and )?(?:search|find|look up|look for) (?:for )?(.{1,200})$""", RegexOption.IGNORE_CASE),
+    )
+
+    // "play Tum Hi Ho on YouTube", "open YouTube and play Tum Hi Ho (and tap on the song)", and the same in Hinglish.
+    private const val YT_TAIL = """(?: and (?:then )?(?:tap|click|press|select|choose)(?: on)? (?:the |that |it |first |top )*(?:song|video|result|one)?)?"""
+    private const val YT_PAR = """(?:youtube|यूट्यूब) (?:par|pe|me|mein|पर|पे|में)"""
+    private const val YT_DO = """(?:chalao|chala do|chalaiye|play karo|play kar do|bajao|baja do|laga do|lagao|चलाओ|चला दो|बजाओ|बजा दो|लगाओ|लगा दो)"""
+    private val YT_PLAY = listOf(
+        Regex("""^(?:play|watch|put on) (.{1,200}?) (?:on|in|from) youtube$YT_TAIL$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:open|launch|go to|start) (?:the )?youtube(?: app)?(?: and| then)? (?:play|watch|put on) (.{1,200}?)$YT_TAIL$""", RegexOption.IGNORE_CASE),
+        Regex("""^youtube(?: me)? (?:play|watch) (.{1,200}?)$YT_TAIL$""", RegexOption.IGNORE_CASE),
+        Regex("""^$YT_PAR (.{1,200}?) $YT_DO$""", RegexOption.IGNORE_CASE),
+        Regex("""^(.{1,200}?) $YT_PAR $YT_DO$""", RegexOption.IGNORE_CASE),
     )
 
     private fun youtube(text: String): One? {
         if (YT_OPEN.matches(text)) return One.Step("open_youtube", "Open YouTube", JsonObject(emptyMap()))
+        for (pattern in YT_PLAY) {
+            val query = pattern.matchEntire(text)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+            return One.Step(
+                "play_on_youtube",
+                "Play \"${query.take(80)}\" on YouTube",
+                buildJsonObject { put("query", query) },
+            )
+        }
         for (pattern in YT_SEARCH) {
             val query = pattern.matchEntire(text)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() } ?: continue
             return One.Step(
@@ -508,6 +527,19 @@ object NativeCommands {
         Regex("""^what(?:'s| is| are)(?: my| the)? (?:new|unread)(?: messages?)?(?: on| in) $WA$""", RegexOption.IGNORE_CASE),
         Regex("""^what(?:'s| is) new (?:on|in) $WA$""", RegexOption.IGNORE_CASE),
     )
+
+    // "go to WhatsApp and tell me how many inbox chats are unread": the screen is opened and looked at, not the notification shade.
+    private val WA_NAME = Regex("""what'?s ?app|whatsap|व्हाट्सएप|व्हाट्सऐप|व्हाट्सअप""", RegexOption.IGNORE_CASE)
+    private val HOW_MANY = Regex("""\bhow many\b|\bcount\b|\bnumber of\b|\bkitne\b|\bkitni\b|कितने|कितनी""", RegexOption.IGNORE_CASE)
+    private val UNREADISH = Regex("""\bunread\b|\bunseen\b|\bnew\b|\binbox\b|\bpending\b|\bwaiting\b|\bnot read\b|अपठित""", RegexOption.IGNORE_CASE)
+    private val HAS_MESSAGE_BODY = Regex("""\b(?:saying|that says|with the message|with the text)\b|:""", RegexOption.IGNORE_CASE)
+
+    private fun whatsappCount(text: String): One? =
+        if (text.length <= 160 && WA_NAME.containsMatchIn(text) && HOW_MANY.containsMatchIn(text) && UNREADISH.containsMatchIn(text) && !HAS_MESSAGE_BODY.containsMatchIn(text)) {
+            One.Step("count_whatsapp_unread", "Open WhatsApp and count the unread chats", JsonObject(emptyMap()))
+        } else {
+            null
+        }
 
     private fun whatsappRead(text: String): One? =
         if (WHATSAPP_READ.any { it.matches(text) }) {

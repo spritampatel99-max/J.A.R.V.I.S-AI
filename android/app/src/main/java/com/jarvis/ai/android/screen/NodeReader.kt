@@ -2,6 +2,8 @@ package com.jarvis.ai.android.screen
 
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
+import com.jarvis.ai.ai.tools.screen.ScreenPart
+import com.jarvis.ai.ai.tools.screen.ScreenRow
 
 /**
  * Turns one window's accessibility tree into the lines a person would read, top to bottom.
@@ -15,6 +17,8 @@ internal object NodeReader {
     private const val MAX_DEPTH = 40
     private const val MAX_LINES = 150
     private const val MAX_LINE_CHARS = 300
+    private const val MAX_ROWS = 40
+    private const val MAX_ROW_NODES = 120
 
     fun lines(root: AccessibilityNodeInfo): List<String> {
         val out = ArrayList<String>()
@@ -179,6 +183,79 @@ internal object NodeReader {
 
         visit(root, 0)
         return best
+    }
+
+    /**
+     * The items of the window's main list, each with everything visible inside it (text, description, short view name) and the node
+     * that stands for the item. Password and typing boxes are left out. The caller recycles every node in the result.
+     */
+    fun rowsWithNodes(root: AccessibilityNodeInfo): List<Pair<ScreenRow, AccessibilityNodeInfo>> {
+        var container = biggestScrollable(root) ?: return emptyList()
+        // Some lists wrap their items in a single holder; look one or two levels down for the real items.
+        var hops = 0
+        while (container.childCount == 1 && hops < 2) {
+            val only = container.getChild(0) ?: break
+            recycle(container)
+            container = only
+            hops++
+        }
+        val out = ArrayList<Pair<ScreenRow, AccessibilityNodeInfo>>()
+        try {
+            for (i in 0 until container.childCount) {
+                if (out.size >= MAX_ROWS) break
+                val item = container.getChild(i) ?: continue
+                if (!item.isVisibleToUser) {
+                    recycle(item)
+                    continue
+                }
+                val parts = ArrayList<ScreenPart>()
+                collectParts(item, 0, intArrayOf(MAX_ROW_NODES), parts)
+                if (parts.isEmpty()) recycle(item) else out += ScreenRow(parts) to item
+            }
+        } finally {
+            recycle(container)
+        }
+        return out
+    }
+
+    private fun collectParts(node: AccessibilityNodeInfo, depth: Int, budget: IntArray, out: MutableList<ScreenPart>) {
+        if (budget[0] <= 0 || depth > MAX_DEPTH) return
+        budget[0]--
+        if (!node.isVisibleToUser || node.isPassword || node.isEditable) return
+        val text = node.text?.toString()?.trim().orEmpty().take(MAX_LINE_CHARS)
+        val description = node.contentDescription?.toString()?.trim().orEmpty().take(MAX_LINE_CHARS)
+        val id = node.viewIdResourceName?.substringAfterLast('/').orEmpty()
+        if (text.isNotEmpty() || description.isNotEmpty() || id.isNotEmpty()) out += ScreenPart(text, description, id)
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            try {
+                collectParts(child, depth + 1, budget, out)
+            } finally {
+                recycle(child)
+            }
+        }
+    }
+
+    /** What to press for a list item: the item itself if it can be pressed, else its first pressable part. The caller recycles the result. */
+    fun clickTarget(item: AccessibilityNodeInfo): AccessibilityNodeInfo {
+        if (item.isClickable) return AccessibilityNodeInfo.obtain(item)
+        val budget = intArrayOf(MAX_ROW_NODES)
+        fun find(node: AccessibilityNodeInfo, depth: Int): AccessibilityNodeInfo? {
+            if (budget[0] <= 0 || depth > MAX_DEPTH) return null
+            budget[0]--
+            if (!node.isVisibleToUser || node.isPassword || node.isEditable) return null
+            if (depth > 0 && node.isClickable) return AccessibilityNodeInfo.obtain(node)
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                try {
+                    find(child, depth + 1)?.let { return it }
+                } finally {
+                    recycle(child)
+                }
+            }
+            return null
+        }
+        return find(item, 0) ?: AccessibilityNodeInfo.obtain(item)
     }
 
     @Suppress("DEPRECATION")

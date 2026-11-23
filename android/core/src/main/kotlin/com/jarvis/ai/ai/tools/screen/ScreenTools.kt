@@ -26,6 +26,8 @@ object ScreenTools {
     const val TAP_ON_SCREEN = "tap_on_screen"
     const val TYPE_TEXT = "type_text"
     const val READ_WHATSAPP = "read_whatsapp_unread"
+    const val COUNT_WHATSAPP_UNREAD = "count_whatsapp_unread"
+    const val PLAY_ON_YOUTUBE = "play_on_youtube"
 
     /** WhatsApp and WhatsApp Business. The only apps [ReadWhatsAppTool] looks at, and the only ones a message is sent in. */
     val WHATSAPP_PACKAGES = setOf("com.whatsapp", "com.whatsapp.w4b")
@@ -34,8 +36,15 @@ object ScreenTools {
     const val MAX_NOTIFICATIONS = 8
     const val MAX_NOTIFICATION_CHARS = 160
 
-    fun create(screen: ScreenControl?, notifications: NotificationPort?): List<Tool> = buildList {
+    fun create(
+        screen: ScreenControl?,
+        notifications: NotificationPort?,
+        apps: com.jarvis.ai.ai.tools.builtin.AppLauncher? = null,
+        urls: com.jarvis.ai.ai.tools.builtin.UrlOpener? = null,
+    ): List<Tool> = buildList {
         if (screen != null) {
+            if (apps != null) add(CountWhatsAppUnreadTool(apps, screen))
+            if (urls != null) add(PlayOnYoutubeTool(urls, screen))
             add(ReadScreenTool(screen))
             add(ScreenScrollTool(screen))
             add(PhoneNavigateTool(screen))
@@ -212,7 +221,7 @@ class ReadWhatsAppTool(private val notifications: NotificationPort) : Tool {
         if (chats.isEmpty()) {
             return ToolResult.Success(
                 "I do not see any WhatsApp notifications. Messages you already opened or dismissed are not listed here. " +
-                    "Say \"open WhatsApp\" and then \"read the screen\" to hear the chat list.",
+                    "Say \"how many unread chats do I have in WhatsApp\" and I will open it and look at the chat list.",
                 Verification.CONFIRMED,
                 answer = true,
             )
