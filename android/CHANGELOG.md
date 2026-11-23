@@ -63,7 +63,11 @@
 - The own-endpoint provider never sends the JSON-mode field (an unknown gateway may reject it); the planner already reads JSON out of plain text. Two tests cover this.
 - 837 offline tests pass; 18 of 18 mutation checks run before that change were caught (the JSON-mode line itself was not mutation-checked).
 
-## 2026-11-22 / 2026-11-23 (still 0.1.0-dev; nothing here has been compiled by Gradle)
+## 2026-11-23 (CI build)
+- Added `.github/workflows/android.yml` and `docs/BUILD_ON_GITHUB.md`: GitHub builds the app, runs `:core:test`, lint and the 16 KB check, and keeps the debug APK. First real compile found one error (missing `Switch` imports in `Screens.kt`), now fixed; the debug APK builds and lint passes.
+- 16 KB check: `libvosk.so` (Vosk 0.3.47) is 4 KB-aligned in both ABIs and `libjnidispatch.so` in x86_64 only (emulator). Not fixable by us; the Vosk model opener now treats a library that will not load as "unavailable" instead of crashing the hands-free service.
+
+## 2026-11-22 / 2026-11-23 (still 0.1.0-dev)
 
 Android 14+ move (`minSdk` 34, target 35) and the owner's second list. `:core` passes 928 offline tests; every `:app` item below is written but **uncompiled and never run on a phone**.
 

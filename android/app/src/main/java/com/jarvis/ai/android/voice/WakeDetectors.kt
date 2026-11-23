@@ -147,6 +147,10 @@ class VoskModelStore(private val context: Context, private val http: OkHttpClien
         Model(modelDir.absolutePath)
     } catch (e: IOException) {
         null
+    } catch (e: LinkageError) {
+        // The native library would not load (for example a 4 KB-aligned build on a 16 KB-page phone). Treated as "not available" so the
+        // hands-free service reports it instead of crashing.
+        null
     }
 
     fun delete() {
