@@ -78,7 +78,37 @@ enum class ChatRole(val openAiName: String) {
     ASSISTANT("assistant"),
 }
 
-data class ChatMessage(val role: ChatRole, val content: String)
+/**
+ * A photo the person chose to ask about. [base64] is the already-shrunk image bytes. It only ever goes to a cloud AI the person set up
+ * (on-device models cannot look at photos), it is never written to the log or the chat history, and its size is capped.
+ */
+data class ImageAttachment(val mimeType: String, val base64: String) {
+    init {
+        require(mimeType in ALLOWED_TYPES) { "Only JPEG, PNG and WebP photos can be sent." }
+        require(base64.isNotEmpty() && base64.length <= MAX_BASE64_CHARS) { "The photo is empty or too large to send." }
+        require(base64.all { it.isLetterOrDigit() || it == '+' || it == '/' || it == '=' }) { "The photo data is not valid." }
+    }
+
+    override fun toString(): String = "ImageAttachment($mimeType, ${base64.length} chars)"
+
+    companion object {
+        val ALLOWED_TYPES = setOf("image/jpeg", "image/png", "image/webp")
+
+        /** About 3 MB of image bytes once encoded. The app shrinks photos well below this before they get here. */
+        const val MAX_BASE64_CHARS = 4_000_000
+    }
+}
+
+data class ChatMessage(val role: ChatRole, val content: String, val images: List<ImageAttachment> = emptyList()) {
+    init {
+        require(images.size <= MAX_IMAGES) { "At most $MAX_IMAGES photos per message." }
+        require(images.isEmpty() || role == ChatRole.USER) { "Only the person's own message can carry a photo." }
+    }
+
+    companion object {
+        const val MAX_IMAGES = 3
+    }
+}
 
 /** How demanding a request is. The router uses it to decide which on-device model to try first. */
 enum class TaskWeight {
@@ -97,7 +127,9 @@ data class LlmRequest(
     val temperature: Double = 0.7,
     val jsonMode: Boolean = false,
     val weight: TaskWeight = TaskWeight.LIGHT,
-)
+) {
+    val hasImages: Boolean get() = messages.any { it.images.isNotEmpty() }
+}
 
 /** Per-provider configuration. [toString] never prints the key. */
 data class ProviderSettings(

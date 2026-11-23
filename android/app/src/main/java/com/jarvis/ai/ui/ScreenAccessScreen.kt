@@ -76,12 +76,44 @@ fun ScreenAccessScreen(container: AppContainer) {
             )
             MutedText(
                 "Say \"read my screen\", \"scroll down\", \"go back\", \"go home\", \"open recent apps\", \"lock the phone\" or \"take a screenshot\". " +
-                    "It reads the text on the screen in front and presses Android's own navigation buttons. It cannot tap or type inside other apps.",
+                    "It reads the text on the screen in front and presses Android's own navigation buttons. Pressing buttons and typing in other apps is a separate switch, below, and is off until you turn it on.",
             )
             GlowButton(if (screenOn) "Manage in Settings" else "Turn on in Settings", subtle = screenOn, onClick = { open(AccessKey.ACCESSIBILITY) })
             MutedText(
                 "If Android greys the switch out because the app was installed from a file, open Settings > Apps > JARVIS 3.0, tap the three dots " +
                     "and choose \"Allow restricted settings\", then switch it on.",
+            )
+        }
+
+        var tapType by remember { mutableStateOf(container.settings.tapAndTypeOn) }
+        var waSend by remember { mutableStateOf(container.settings.whatsappSendOn) }
+        SectionTitle(Glyph.SHIELD, "Tap, type and send", if (tapType || waSend) "on" else "off")
+        GlassCard(accent = if (tapType || waSend) JarvisColors.Warning else MaterialTheme.colorScheme.outline) {
+            SettingRow(
+                "Let JARVIS press buttons and type in other apps",
+                "Say \"tap Chats\" or \"type hello\". It finds a button by its name, one press at a time, at most a dozen a minute. " +
+                    "It will not press anything called send, pay, buy, delete, confirm or allow, never touches banking, payment or password apps, " +
+                    "and needs the screen switch above to be on.",
+            ) {
+                SpectrumSwitch(tapType, onChange = { on ->
+                    tapType = on
+                    container.settings.tapAndTypeOn = on
+                })
+            }
+            SettingRow(
+                "Press Send for me in WhatsApp",
+                "After you confirm a WhatsApp message (or say it and hear the 3-second read-back), JARVIS presses Send itself, but only if " +
+                    "WhatsApp is in front and its box holds exactly the words you approved. Needs the screen switch above. " +
+                    "WhatsApp does not report delivery, so JARVIS will say \"pressed Send\", never \"delivered\".",
+            ) {
+                SpectrumSwitch(waSend, onChange = { on ->
+                    waSend = on
+                    container.settings.whatsappSendOn = on
+                })
+            }
+            MutedText(
+                "Messages that came from a screen, a notification or a web page can never trigger any of this. A press or a message happens only " +
+                    "because you asked, in your own words.",
             )
         }
 
@@ -96,7 +128,7 @@ fun ScreenAccessScreen(container: AppContainer) {
                 if (notesRunning) JarvisColors.Good else JarvisColors.Warning,
             )
             MutedText(
-                "Say \"read my notifications\" or \"clear my notifications\". Ongoing notifications such as music, ones you marked secret, " +
+                "Say \"read my notifications\", \"read my unread WhatsApp messages\" or \"clear my notifications\". Ongoing notifications such as music, ones you marked secret, " +
                     "and banking, payment and password apps are left out.",
             )
             GlowButton(if (notesOn) "Manage in Settings" else "Turn on in Settings", subtle = notesOn, onClick = { open(AccessKey.NOTIFICATION_ACCESS) })
@@ -153,7 +185,8 @@ fun ScreenAccessScreen(container: AppContainer) {
             MutedText("What it reads is shown in the chat and spoken. It is not saved in the log, and it is not sent to any AI. The chat history on this phone may still keep the reply text, so clear the history if that matters.")
             MutedText("Text on another app's screen is treated as untrusted. It can never approve anything: after reading it, any step that changes something asks for a tap.")
             MutedText("Spoken navigation and notification commands you say yourself run straight away. Anything the AI planned, and any call, still follows the confirmation rules.")
-            MutedText("Android does not let any app tap or type inside other apps without a far wider accessibility power. This app deliberately does not request it.")
+            MutedText("Pressing and typing use Android's own click and set-text actions on a control found by its name. This app does not request the wider power to tap at screen positions or swipe.")
+            MutedText("Unread WhatsApp messages are read from the notifications that are still showing. A message you already opened or dismissed is not listed; open WhatsApp and say \"read the screen\" for the chat list.")
         }
     }
 }

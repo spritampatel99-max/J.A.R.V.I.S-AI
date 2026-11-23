@@ -27,6 +27,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jarvis.ai.AppContainer
+import kotlinx.coroutines.launch
+import com.jarvis.ai.data.WakeEngine
+import com.jarvis.ai.android.voice.VoskModelState
 import com.jarvis.ai.android.device.AccessChecks
 import com.jarvis.ai.android.device.AccessKey
 import com.jarvis.ai.android.device.AccessState
@@ -51,9 +54,18 @@ fun HandsFreeScreen(container: AppContainer) {
     var note by remember { mutableStateOf<String?>(null) }
     val listening = status is HandsFreeStatus.Waiting || status is HandsFreeStatus.Busy
 
+    var engine by remember { mutableStateOf(container.settings.wakeEngine) }
+    val voskState by container.voskModel.state.collectAsStateWithLifecycle()
+    val heard by HandsFreeService.heardText.collectAsStateWithLifecycle()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+
     fun startNow() {
-        if (!container.keys.has(HandsFreeService.ACCESS_KEY_NAME)) {
+        if (engine == WakeEngine.PORCUPINE && !container.keys.has(HandsFreeService.ACCESS_KEY_NAME)) {
             note = "Enter your Picovoice AccessKey below first."
+            return
+        }
+        if (engine == WakeEngine.VOSK && !container.voskModel.isInstalled()) {
+            note = "Download the offline wake-word model below first."
             return
         }
         note = null
@@ -102,6 +114,67 @@ fun HandsFreeScreen(container: AppContainer) {
             )
         }
 
+        SectionTitle(Glyph.MIC, "Wake-word listener", engine.label)
+        GlassCard {
+            ChoiceChips(
+                options = WakeEngine.entries,
+                selected = engine,
+                label = { it.label },
+                onSelect = { chosen ->
+                    if (listening) {
+                        note = "Turn hands-free off before changing the listener."
+                    } else {
+                        engine = chosen
+                        container.settings.wakeEngine = chosen
+                    }
+                },
+            )
+            MutedText(
+                if (engine == WakeEngine.VOSK) {
+                    "Runs fully on this phone with no account and no key. It listens the whole time, so it uses more battery than Picovoice, " +
+                        "and it can sometimes mishear another word as \"Jarvis\"."
+                } else {
+                    "Picovoice Porcupine: lighter on battery and more accurate, but it needs your own free AccessKey and contacts Picovoice to check it."
+                },
+            )
+        }
+
+        if (engine == WakeEngine.VOSK) {
+            SectionTitle(Glyph.STORAGE, "Offline listener model", when (voskState) {
+                VoskModelState.Installed -> "installed"
+                is VoskModelState.Downloading -> "downloading"
+                VoskModelState.Installing -> "installing"
+                else -> "needed"
+            })
+            GlassCard {
+                MutedText(
+                    "A small English speech model (about 40 MB, Apache-2.0, from alphacephei.com). It downloads only when you tap the button, " +
+                        "over https. There is no published checksum to check it against, so it is not verified beyond being a valid model. " +
+                        "Use Wi-Fi.",
+                )
+                when (val v = voskState) {
+                    is VoskModelState.Downloading -> MutedText("Downloading: ${formatSize(v.bytesDone)}" + (v.totalBytes?.let { " of ${formatSize(it)}" } ?: ""))
+                    VoskModelState.Installing -> MutedText("Unpacking…")
+                    is VoskModelState.Failed -> Text(v.reason, style = MaterialTheme.typography.bodySmall, color = JarvisColors.Coral)
+                    else -> Unit
+                }
+                if (voskState == VoskModelState.Installed) {
+                    GlowButton("Delete model", subtle = true, onClick = {
+                        if (listening) HandsFreeService.stop(context)
+                        container.voskModel.delete()
+                    })
+                    if (listening) MutedText("Last heard: " + heard.ifBlank { "nothing yet" })
+                } else {
+                    GlowButton(
+                        "Download model",
+                        enabled = voskState !is VoskModelState.Downloading && voskState != VoskModelState.Installing,
+                        onClick = { scope.launch { container.voskModel.download() } },
+                    )
+                }
+            }
+        }
+
+        if (engine == WakeEngine.PORCUPINE) {
         SectionTitle(Glyph.LOCK, "Picovoice AccessKey", if (hasKey) "saved" else "needed")
         GlassCard {
             MutedText(
@@ -137,6 +210,7 @@ fun HandsFreeScreen(container: AppContainer) {
                     hasKey = false
                 })
             }
+        }
         }
 
         SectionTitle(Glyph.SHIELD, "Over other apps", if (overlayAllowed) "allowed" else "off")

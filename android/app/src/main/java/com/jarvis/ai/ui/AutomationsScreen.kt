@@ -23,6 +23,11 @@ import com.jarvis.ai.automation.AutoTrigger
 import com.jarvis.ai.automation.Automation
 import com.jarvis.ai.automation.AutomationResult
 import com.jarvis.ai.automation.AutomationRules
+import com.jarvis.ai.automation.ScheduleFacts
+import com.jarvis.ai.automation.ScheduleHealth
+import com.jarvis.ai.android.device.AccessChecks
+import com.jarvis.ai.android.device.AccessKey
+import com.jarvis.ai.android.device.AccessState
 import com.jarvis.ai.productivity.ProductivityTools
 import java.time.DayOfWeek
 import java.time.ZoneId
@@ -105,9 +110,23 @@ fun AutomationsScreen(container: AppContainer) {
             Text("What automations can do", style = MaterialTheme.typography.titleSmall, color = JarvisColors.Ink)
             MutedText("They run on their own, so they are limited to adding a task, adding a note or showing a notification. They cannot call, send messages, open apps or do anything that would need your approval. Android decides the exact moment, so a run can be a little late, and if the phone was off an automation runs once when it is next possible.")
         }
-        if (!container.notifier.canNotify()) {
-            GlassCard(accent = JarvisColors.Warning) {
-                Text("Notifications are off, so notification automations will fail. Turn them on in Prefs > Manage access.", color = JarvisColors.Warning)
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val findings = remember(automations) {
+            ScheduleHealth.check(
+                ScheduleFacts(
+                    nowMs = System.currentTimeMillis(),
+                    exactAlarmsAllowed = AccessChecks.state(context, AccessKey.EXACT_ALARMS) != AccessState.NOT_ALLOWED,
+                    notificationsAllowed = container.notifier.canNotify(),
+                    batteryUnrestricted = AccessChecks.state(context, AccessKey.BATTERY) != AccessState.NOT_ALLOWED,
+                    nextDueMs = listOfNotNull(container.automations.nextWakeMs(), container.productivity.nextReminderMs(System.currentTimeMillis())).minOrNull(),
+                    lastWakeMs = container.settings.lastWakeMs,
+                ),
+            )
+        }
+        for (finding in findings) {
+            GlassCard(accent = if (finding.blocking) JarvisColors.Warning else MaterialTheme.colorScheme.outline) {
+                Text(finding.title, style = MaterialTheme.typography.titleSmall, color = if (finding.blocking) JarvisColors.Warning else JarvisColors.Ink)
+                MutedText(finding.fix)
             }
         }
         if (container.automations.saveFailed) {

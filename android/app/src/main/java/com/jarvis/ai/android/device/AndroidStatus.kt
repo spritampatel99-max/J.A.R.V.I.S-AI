@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.Build
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import com.jarvis.ai.offline.Connectivity
@@ -27,9 +26,8 @@ class AndroidStatus(private val context: Context) {
 
     fun speechRecognitionAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
 
-    /** True or false from Android on Android 13+; null on older versions, where Android cannot say. */
-    fun offlineSpeechRecognition(): Boolean? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) SpeechRecognizer.isOnDeviceRecognitionAvailable(context) else null
+    /** Whether the phone has an on-device speech recogniser (always answerable on Android 14 and later). */
+    fun offlineSpeechRecognition(): Boolean? = SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
 
     fun textToSpeechAvailable(): Boolean =
         context.packageManager.queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), 0).isNotEmpty()

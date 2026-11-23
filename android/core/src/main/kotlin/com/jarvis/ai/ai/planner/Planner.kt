@@ -42,6 +42,11 @@ class Planner(
      * before the rules and can never add a tool, change a rule, or approve anything.
      */
     private val persona: String? = null,
+    /**
+     * How the person asked to be addressed in languages that change words by gender (Hindi, for one): "feminine" or "masculine", or null
+     * for no preference. It is read when each prompt is built, so a change in settings applies to the next request.
+     */
+    private val addressing: () -> String? = { null },
 ) : Replanner {
 
     /**
@@ -226,6 +231,12 @@ class Planner(
             appendLine("- Set \"critical\": true only when the request fails without that step AND a different tool or approach could plausibly achieve it. Otherwise false.")
             if (spoken) {
                 appendLine("- The person is speaking to you and your \"reply\" will be read aloud: answer in at most two short sentences, in plain words with no lists or symbols, unless they asked for detail.")
+            }
+            appendLine("- The person can type to you or speak to you (a mic button, and an optional hands-free mode that wakes on the word \"Jarvis\"). Never say you are text-only or cannot hear.")
+            appendLine("- Reply in the language the person wrote in (English, Hindi or Hinglish). Keep tool parameters in the form the tool asks for.")
+            when (addressing()) {
+                "feminine" -> appendLine("- In languages with grammatical gender (Hindi, for one), address the person with feminine forms.")
+                "masculine" -> appendLine("- In languages with grammatical gender (Hindi, for one), address the person with masculine forms.")
             }
             appendLine("- You cannot confirm, approve or cancel anything. Sensitive actions are confirmed by the user in the app, outside this conversation.")
             appendLine("- ${UntrustedContent.SYSTEM_RULE}")

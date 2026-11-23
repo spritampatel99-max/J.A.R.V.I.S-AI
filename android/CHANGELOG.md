@@ -62,3 +62,19 @@
 - New doc: `docs/JARVIS_3_SUMMARY_MATCH.md`, the pasted summary compared line by line, with the deliberate differences.
 - The own-endpoint provider never sends the JSON-mode field (an unknown gateway may reject it); the planner already reads JSON out of plain text. Two tests cover this.
 - 837 offline tests pass; 18 of 18 mutation checks run before that change were caught (the JSON-mode line itself was not mutation-checked).
+
+## 2026-11-22 / 2026-11-23 (still 0.1.0-dev; nothing here has been compiled by Gradle)
+
+Android 14+ move (`minSdk` 34, target 35) and the owner's second list. `:core` passes 928 offline tests; every `:app` item below is written but **uncompiled and never run on a phone**.
+
+- Android 14+ (the 16 items): old-version checks removed; on-device speech preference; per-app language (`localeConfig`, `LocaleManager`, English and Hindi, Hindi app name and accessibility text only: most screen text is still English); grammatical-inflection setting passed to the planner; regional units (Fahrenheit for US-style regions); user-initiated data-transfer download job with resumable, storage-checked, progress-notified model downloads; typed foreground services; exact-alarm flow and state receiver; background-launch fallback (tap-to-open notification); predictive back; edge-to-edge; dynamic colour, light theme (a first pass, visually unchecked) and a themed icon; photo picker (see below); a 16 KB page-size checker (`tools/check_16kb.py`, to be run on your built APK, not run against the real libraries here); progress notifications. Live Updates are not done.
+- "JARVIS 2.0" was still hard-coded in the header; it now reads "JARVIS 3.0". (The phone's installed build is an older APK: rebuild from this zip.)
+- Wake word without Picovoice: Vosk engine (offline, no key, English model download). Vosk 0.3.47 / JNA 5.13.0 versions are unverified.
+- Saved conversations: Logs > Save to your files writes Markdown files into a folder you pick (Android's folder picker; no storage permission).
+- Automations: a health check explains why a schedule may not fire (exact alarms, notifications, battery, no wake seen). Automations can still only add a task or note, show a notification or an overview, by design.
+- WhatsApp by voice: `read_whatsapp_unread` (notifications still showing, private and untrusted), and opt-in "Press Send for me in WhatsApp" (verified text, one Send control, read-back and countdown for spoken built-in commands only).
+- Phone control: `tap_on_screen` and `type_text` (opt-in; node actions only; risky labels refused; guard checked in core and Android; 12 actions a minute).
+- Nightly 10 pm review, 10-day / on-command release check (`check_for_updates`), proposals with Apply / Leave as it is. Apply only opens a page or settings. No self-modification, no silent install.
+- Photos: system photo picker, shrunk JPEG, sent to a cloud AI only (Anthropic, Gemini, OpenAI-style providers), refused for on-device models, never saved. The own-endpoint provider may not accept images.
+- Fix found while testing: a Devanagari "send" label was not recognised as risky because combining marks split the word.
+- Tests: 928 pass. Mutation checks: each new safety rule was deliberately broken and a test failed; two gaps found (front-app check and the Android-side guard) now covered.

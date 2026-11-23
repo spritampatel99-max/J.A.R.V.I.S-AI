@@ -5,16 +5,21 @@ import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.jarvis.ai.ai.tools.screen.FrontApp
+import com.jarvis.ai.ai.tools.screen.RawBox
+import com.jarvis.ai.ai.tools.screen.RawResult
+import com.jarvis.ai.ai.tools.screen.RawTap
 
 /**
- * The phone-control service the person switches on in Settings > Accessibility. It does three things only: read the text of
- * the window in front, scroll it, and press the system's own Back, Home, Recents, Notifications, Quick settings, Lock and
- * Screenshot controls.
+ * The phone-control service the person switches on in Settings > Accessibility. It can: read the text of the window in front,
+ * scroll it, press the system's own Back, Home, Recents, Notifications, Quick settings, Lock and Screenshot controls, press one
+ * labelled control, and put text into one message box.
  *
- * It is declared without the gesture capability, and no code here injects a tap, a swipe or typing into another app.
- * It ignores every event except to know a window changed, and it never stores or sends what it reads: the text goes straight
- * back to the caller. Whether a window may be read at all is decided by the caller's package check, which runs before the
- * window's content is touched.
+ * It is declared without the gesture capability: nothing here touches screen coordinates or injects swipes. A press is Android's
+ * own "click" action on a control found by its label, and typing is Android's own "set text" action on a text box, so neither can
+ * land anywhere that is not a real control of the window in front. It ignores every event except to know a window changed, and it
+ * never stores or sends what it reads: the text goes straight back to the caller. Whether a window may be read or acted on at all
+ * is decided by the caller's package check, which runs on the same window object before anything of it is touched. Whether the
+ * person has allowed pressing and typing, and whether a message may be sent, is decided by the caller too.
  */
 class JarvisAccessibilityService : AccessibilityService() {
 
@@ -80,6 +85,69 @@ class JarvisAccessibilityService : AccessibilityService() {
                 return if (target.performAction(action)) Scroll.Done(app) else Scroll.CouldNot(app)
             } finally {
                 NodeReader.recycle(target)
+            }
+        } finally {
+            NodeReader.recycle(root)
+        }
+    }
+
+    /** Presses the one visible control called [label] in the front window, if [allow] accepts the window's package. */
+    fun tap(label: String, allow: (String) -> Boolean): RawTap {
+        val root = rootInActiveWindow ?: return RawTap.Failed("No window could be read.")
+        try {
+            val pkg = root.packageName?.toString().orEmpty()
+            if (pkg.isBlank()) return RawTap.Failed("No window could be read.")
+            val app = FrontApp(pkg, labelOf(pkg))
+            if (!allow(pkg)) return RawTap.Refused(app)
+            val found = NodeReader.pressables(root, label)
+            try {
+                if (found.isEmpty()) return RawTap.NotFound
+                if (found.size > 1) return RawTap.Ambiguous(found.size)
+                return if (found[0].performAction(AccessibilityNodeInfo.ACTION_CLICK)) RawTap.Done(app) else RawTap.Failed("${app.label} did not accept the press.")
+            } finally {
+                found.forEach { NodeReader.recycle(it) }
+            }
+        } finally {
+            NodeReader.recycle(root)
+        }
+    }
+
+    /** Adds [text] to the message box of the front window, if [allow] accepts the window's package. Never a password box. */
+    fun type(text: String, allow: (String) -> Boolean): RawResult {
+        val root = rootInActiveWindow ?: return RawResult.Failed("No window could be read.")
+        try {
+            val pkg = root.packageName?.toString().orEmpty()
+            if (pkg.isBlank()) return RawResult.Failed("No window could be read.")
+            val app = FrontApp(pkg, labelOf(pkg))
+            if (!allow(pkg)) return RawResult.Refused(app)
+            val box = NodeReader.messageBox(root) ?: return RawResult.Failed("There is no text box on this screen to type into.")
+            try {
+                val existing = if (box.isShowingHintText) "" else box.text?.toString().orEmpty()
+                val joined = if (existing.isNotBlank() && !existing.last().isWhitespace()) "$existing $text" else existing + text
+                if (!box.isFocused) box.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                val args = android.os.Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, joined) }
+                return if (box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) RawResult.Done(app) else RawResult.Failed("${app.label} did not accept the text.")
+            } finally {
+                NodeReader.recycle(box)
+            }
+        } finally {
+            NodeReader.recycle(root)
+        }
+    }
+
+    /** What the message box of the front window holds ("" while it only shows its hint), if [allow] accepts the window's package. */
+    fun box(allow: (String) -> Boolean): RawBox {
+        val root = rootInActiveWindow ?: return RawBox.None
+        try {
+            val pkg = root.packageName?.toString().orEmpty()
+            if (pkg.isBlank()) return RawBox.None
+            val app = FrontApp(pkg, labelOf(pkg))
+            if (!allow(pkg)) return RawBox.Refused(app)
+            val box = NodeReader.messageBox(root) ?: return RawBox.NoBox
+            try {
+                return RawBox.Text(app, if (box.isShowingHintText) "" else box.text?.toString().orEmpty())
+            } finally {
+                NodeReader.recycle(box)
             }
         } finally {
             NodeReader.recycle(root)

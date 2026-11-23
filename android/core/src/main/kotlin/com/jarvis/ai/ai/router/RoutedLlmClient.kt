@@ -62,6 +62,10 @@ class RoutedLlmClient(
         for (route in plan.routes) {
             when (route) {
                 is Route.Local -> {
+                    if (request.hasImages) {
+                        notes += "${route.label}: on-device models cannot look at photos, so this needs a cloud AI"
+                        continue
+                    }
                     val local = engine ?: continue
                     val path = installed[route.model] ?: continue
                     when (val result = answerLocally(local, route.model, path, request)) {

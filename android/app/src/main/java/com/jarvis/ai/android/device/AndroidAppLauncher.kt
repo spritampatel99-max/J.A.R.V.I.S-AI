@@ -3,7 +3,6 @@ package com.jarvis.ai.android.device
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import com.jarvis.ai.ai.tools.builtin.AppLauncher
 import com.jarvis.ai.ai.tools.builtin.InstalledApp
 import com.jarvis.ai.ai.tools.builtin.LaunchResult
@@ -39,15 +38,10 @@ class AndroidAppLauncher(
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun read(): List<InstalledApp> {
         val packages = context.packageManager
         val query = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val found = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            packages.queryIntentActivities(query, PackageManager.ResolveInfoFlags.of(0L))
-        } else {
-            packages.queryIntentActivities(query, 0)
-        }
+        val found = packages.queryIntentActivities(query, PackageManager.ResolveInfoFlags.of(0L))
         return found
             .mapNotNull { info ->
                 val packageName = info.activityInfo?.packageName ?: return@mapNotNull null

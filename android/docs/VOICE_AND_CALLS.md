@@ -38,7 +38,7 @@ Rules, all covered by tests:
 6. Android does not tell the app whether a call connected. Results say "Asked Android to call …", never "called".
 7. Answering and ending a call need the "Answer phone calls" permission. If nothing is ringing, Android does not say so; the result says that.
 
-## Messages (SMS and WhatsApp): prepared, never sent
+## Messages (SMS and WhatsApp): prepared; WhatsApp can be sent hands-free if you switch it on
 
 | Say | Tool | Risk |
 |---|---|---|
@@ -46,10 +46,15 @@ Rules, all covered by tests:
 | "WhatsApp Mom I'm on my way" | `send_whatsapp` | high |
 
 - The recipient is resolved from your contacts first (same lookup and the same ask-when-ambiguous rule as calls); a typed phone number is also accepted.
-- **Always a tap.** Messages never use the voice countdown, even when spoken. The card shows the resolved name, the exact number and the exact text.
-- **The app does not send.** SMS opens your messaging app with the text filled in (`ACTION_SENDTO`); you press Send. WhatsApp opens the chat directly **only when the number starts with `+`**; otherwise it opens WhatsApp's own picker with the text ready. The result is `HANDED_OFF` and says the message "has not been sent".
+- **A tap, or (WhatsApp only, switch on) the read-back.** Texts always need a tap. A *spoken built-in* WhatsApp command with "Press Send for me in WhatsApp" on gets "Sending WhatsApp to Asha: On my way. Say stop to cancel." and a 3-second countdown; typed or AI-planned ones still need a tap. The card shows the resolved name, the exact number and the exact text.
+- **SMS is never sent by the app.** It opens your messaging app with the text filled in (`ACTION_SENDTO`); you press Send. **WhatsApp** opens the chat directly **only when the number starts with `+`**; otherwise it opens WhatsApp's own picker and you choose the chat and press Send. With the switch off the result says the message "has not been sent".
+- **Hands-free WhatsApp send (switch on, `+` number only).** After WhatsApp is in front, the accessibility service reads the message box and presses Send only if it holds exactly the approved text and exactly one control is called Send (English "Send"; other app languages may not match, in which case nothing is pressed and you press Send yourself). The result is `HANDED_OFF`: "Pressed Send ... the message box emptied, which is what happens when a message goes out. WhatsApp does not tell me about delivery." If the box still has the text it says so; it never says "delivered".
+- **Reading WhatsApp by voice:** "read my unread WhatsApp messages", "any new WhatsApp messages", "go to WhatsApp and read unread inbox" read the WhatsApp notifications that are still showing (needs Notification access). Messages you already opened, or whose notification you dismissed, are not listed; "open WhatsApp" then "read the screen" reads the chat list. The text is private and untrusted: read to you, never obeyed, never logged.
 - The text is cleaned of control characters, limited to 1000 characters, and a body that looks like a command ("call 100", "delete everything") is just text; it is never parsed as a command.
-- No accessibility auto-send is built, on purpose: tapping Send inside another app is the kind of action this project keeps behind your own finger.
+- This reverses the project's earlier "never auto-send" rule at the owner's explicit request. The guards are the switch (off by default), the confirmation or read-back, the verified text, the package guard and the rate limit; they are listed in `SECURITY.md` rule 17.
+
+## Wake word without Picovoice: Vosk (offline, no key)
+Prefs > Hands-free > Wake engine lets you choose **Vosk**. It downloads a small English model (about 40 MB, no checksum is published for it, so it is size-checked only) and listens on the phone for "jarvis" / "hey jarvis" / "ok jarvis" with no account or access key. It is less battery-friendly and less accurate than Picovoice in noise; each detection has a 3-second cool-down, and a wake only starts one spoken command. The Vosk and JNA library versions in `gradle/libs.versions.toml` could not be checked from the build workspace; if Gradle cannot resolve them, send the log.
 
 ## Email and camera (hand-off only)
 

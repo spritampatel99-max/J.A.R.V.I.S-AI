@@ -29,7 +29,7 @@ enum class Glyph {
     MIC, CALL, SEARCH, TUNE, LOCK, SHIELD, PERSON,
     CHEVRON_RIGHT, CHEVRON_DOWN, ARROW_LEFT, ARROW_UP, CLOSE, CHECK, CHECK_CIRCLE,
     CLOCK, GLOBE, CALENDAR, HUB, TRASH, STORAGE, BELL, DEVICE, BOLT, WAVE,
-    VOLUME, VOLUME_OFF, STOP, WARNING, INFO, SPARK, CHIP, CLOUD, FLASHLIGHT, SEND_PLANE,
+    VOLUME, VOLUME_OFF, STOP, WARNING, INFO, SPARK, CHIP, CLOUD, FLASHLIGHT, SEND_PLANE, PHOTO,
 }
 
 @Composable
@@ -184,5 +184,9 @@ fun DrawScope.drawGlyph(glyph: Glyph, color: Color, strokeWidth: Float = 1.8f) {
             box(9f, 9f, 6f, 12f, 2f); line(12f, 12.5f, 12f, 14.5f)
         }
         Glyph.SEND_PLANE -> path({ moveTo(3f * s, 11f * s); lineTo(21f * s, 3.5f * s); lineTo(14f * s, 21f * s); lineTo(11.5f * s, 13f * s); close() })
+        Glyph.PHOTO -> {
+            box(3.5f, 4.5f, 17f, 15f, 2.5f); ring(9f, 10f, 1.8f)
+            path({ moveTo(3.5f * s, 17f * s); lineTo(9f * s, 13f * s); lineTo(13f * s, 16f * s); lineTo(16f * s, 13.5f * s); lineTo(20.5f * s, 17.5f * s) })
+        }
     }
 }

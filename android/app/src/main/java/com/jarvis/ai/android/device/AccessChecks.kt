@@ -10,7 +10,6 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.PowerManager
 import android.os.Process
 import android.provider.Settings
@@ -113,9 +112,9 @@ enum class AccessKey(
     ACCESSIBILITY(
         "Phone control (Accessibility)", AccessKind.SPECIAL, null, true,
         "Lets you say \"read my screen\", \"scroll down\", \"go back\", \"go home\", \"lock the phone\" or \"take a screenshot\". " +
-            "It reads the text of the window in front aloud and presses Android's own navigation buttons.",
+            "It reads the text of the window in front aloud and presses Android's own navigation buttons. With the extra switches in Prefs it can also press a labelled button, type, and press Send in WhatsApp for a message you confirmed.",
         "The text of the screen in front, only when you ask. It skips password fields, text boxes you type in, banking, payment and password apps, " +
-            "and JARVIS 3.0 itself. It cannot tap or type in other apps. What it reads is shown to you and spoken, not saved and not sent to an AI. " +
+            "and JARVIS 3.0 itself. Pressing buttons, typing and pressing Send in WhatsApp work only if you switch them on in Prefs > Phone control. What it reads is shown to you and spoken, not saved and not sent to an AI. " +
             "If Android greys the switch out (apps installed outside the Play Store), open Settings > Apps > JARVIS 3.0, tap the three dots and choose \"Allow restricted settings\", then try again.",
         "Settings > Accessibility > JARVIS 3.0 > switch off.",
     ),
@@ -144,13 +143,10 @@ object AccessChecks {
             if (power.isIgnoringBatteryOptimizations(context.packageName)) AccessState.ALLOWED else AccessState.NOT_ALLOWED
         }
 
-        AccessKey.EXACT_ALARMS ->
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                AccessState.NOT_NEEDED
-            } else {
-                val alarms = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-                if (alarms.canScheduleExactAlarms()) AccessState.ALLOWED else AccessState.NOT_ALLOWED
-            }
+        AccessKey.EXACT_ALARMS -> {
+            val alarms = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            if (alarms.canScheduleExactAlarms()) AccessState.ALLOWED else AccessState.NOT_ALLOWED
+        }
 
         AccessKey.OVERLAY ->
             if (Settings.canDrawOverlays(context)) AccessState.ALLOWED else AccessState.NOT_ALLOWED
@@ -179,21 +175,15 @@ object AccessChecks {
 
     /**
      * The runtime permission to put in Android's dialog, or null when no dialog is needed or possible.
-     * Notifications only have a permission dialog on Android 13 and later.
      */
-    fun runtimePermission(key: AccessKey): String? = when {
-        key.kind != AccessKind.RUNTIME -> null
-        key == AccessKey.NOTIFICATIONS && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> null
-        else -> key.manifestPermission
-    }
+    fun runtimePermission(key: AccessKey): String? = if (key.kind != AccessKind.RUNTIME) null else key.manifestPermission
 
     /** The Settings screen for a special access, or null when this Android version has none. */
     fun settingsIntent(context: Context, key: AccessKey): Intent? {
         val packageUri = Uri.parse("package:${context.packageName}")
         return when (key) {
             AccessKey.BATTERY -> Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, packageUri)
-            AccessKey.EXACT_ALARMS ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri) else null
+            AccessKey.EXACT_ALARMS -> Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri)
             AccessKey.OVERLAY -> Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, packageUri)
             AccessKey.USAGE_ACCESS -> Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
             AccessKey.ACCESSIBILITY -> Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)

@@ -2,6 +2,7 @@ package com.jarvis.ai.ai.tools.screen
 
 import com.jarvis.ai.ai.tools.ParamSpec
 import com.jarvis.ai.ai.tools.ParamType
+import com.jarvis.ai.ai.tools.Prepared
 import com.jarvis.ai.ai.tools.Tool
 import com.jarvis.ai.ai.tools.ToolArgs
 import com.jarvis.ai.ai.tools.ToolError
@@ -22,6 +23,12 @@ object ScreenTools {
     const val PHONE_NAVIGATE = "phone_navigate"
     const val READ_NOTIFICATIONS = "read_notifications"
     const val CLEAR_NOTIFICATIONS = "clear_notifications"
+    const val TAP_ON_SCREEN = "tap_on_screen"
+    const val TYPE_TEXT = "type_text"
+    const val READ_WHATSAPP = "read_whatsapp_unread"
+
+    /** WhatsApp and WhatsApp Business. The only apps [ReadWhatsAppTool] looks at, and the only ones a message is sent in. */
+    val WHATSAPP_PACKAGES = setOf("com.whatsapp", "com.whatsapp.w4b")
 
     const val MAX_SCREEN_CHARS = 3_000
     const val MAX_NOTIFICATIONS = 8
@@ -32,10 +39,13 @@ object ScreenTools {
             add(ReadScreenTool(screen))
             add(ScreenScrollTool(screen))
             add(PhoneNavigateTool(screen))
+            add(TapOnScreenTool(screen))
+            add(TypeTextTool(screen))
         }
         if (notifications != null) {
             add(ReadNotificationsTool(notifications))
             add(ClearNotificationsTool(notifications))
+            add(ReadWhatsAppTool(notifications))
         }
     }
 }
@@ -119,6 +129,110 @@ class PhoneNavigateTool(private val screen: ScreenControl) : Tool {
             is ScreenAct.Failed -> ToolResult.Failure(ToolError.Failed(result.reason))
             is ScreenAct.Done -> ToolResult.Success("${action.done} (asked Android to; it does not report back).", Verification.HANDED_OFF)
         }
+    }
+}
+
+class TapOnScreenTool(private val screen: ScreenControl) : Tool {
+    override val spec = ToolSpec(
+        name = ScreenTools.TAP_ON_SCREEN,
+        description = "Press a button or item in the app in front by its visible name, for example \"Chats\" or \"Search\". " +
+            "It cannot press anything that sends, pays, deletes or grants (those are refused), and it only works if the person turned on tapping and typing.",
+        params = listOf(ParamSpec("label", ParamType.STRING, "The exact visible name of the button or item", maxLength = 60)),
+        risk = Risk.MEDIUM,
+        timeoutMs = 10_000L,
+        resultFormat = "HANDED_OFF: Android was asked to press it; whether the app reacted is not reported back.",
+    )
+
+    override suspend fun prepare(args: ToolArgs): Prepared {
+        val label = args.string("label").trim()
+        if (label.isEmpty()) return Prepared.Stop(ToolError.InvalidArguments("There was no button name."))
+        if (RiskyLabels.isRisky(label)) {
+            return Prepared.Stop(ToolError.Unsupported("\"${label.take(40)}\" sends, pays, deletes or grants something, so I do not press it by voice. Tap it yourself."))
+        }
+        return Prepared.Ready(args)
+    }
+
+    override fun describe(args: ToolArgs): String = "Tap \"${args.string("label").take(40)}\""
+
+    override suspend fun execute(args: ToolArgs): ToolResult = when (val result = screen.tap(args.string("label"))) {
+        ScreenAct.NotEnabled -> ToolResult.Failure(ToolError.Unavailable(SCREEN_OFF))
+        is ScreenAct.OffLimits -> ToolResult.Failure(offLimits(result.app))
+        is ScreenAct.Failed -> ToolResult.Failure(ToolError.Failed(result.reason))
+        is ScreenAct.Done -> ToolResult.Success(
+            "Asked Android to press \"${args.string("label").take(40)}\"${result.app?.let { " in $it" }.orEmpty()}. It does not report whether anything happened.",
+            Verification.HANDED_OFF,
+        )
+    }
+}
+
+class TypeTextTool(private val screen: ScreenControl) : Tool {
+    override val spec = ToolSpec(
+        name = ScreenTools.TYPE_TEXT,
+        description = "Type words into the text box in the app in front (a search box, a note). It adds to what is there, never presses Send or Enter, " +
+            "and refuses password boxes. It only works if the person turned on tapping and typing.",
+        params = listOf(ParamSpec("text", ParamType.STRING, "The words to type", maxLength = 500)),
+        risk = Risk.MEDIUM,
+        timeoutMs = 10_000L,
+        resultFormat = "HANDED_OFF: Android was asked to put the text in the box; the box is not read back.",
+    )
+
+    override fun describe(args: ToolArgs): String = "Type \"${args.string("text").take(40)}\""
+
+    override suspend fun execute(args: ToolArgs): ToolResult = when (val result = screen.type(args.string("text"))) {
+        ScreenAct.NotEnabled -> ToolResult.Failure(ToolError.Unavailable(SCREEN_OFF))
+        is ScreenAct.OffLimits -> ToolResult.Failure(offLimits(result.app))
+        is ScreenAct.Failed -> ToolResult.Failure(ToolError.Failed(result.reason))
+        is ScreenAct.Done -> ToolResult.Success(
+            "Asked Android to type that into the box${result.app?.let { " in $it" }.orEmpty()}. Nothing was sent.",
+            Verification.HANDED_OFF,
+        )
+    }
+}
+
+/**
+ * Reads the WhatsApp notifications that are still showing. That is the only inbox view an ordinary app can get: a message whose
+ * notification was dismissed, or that arrived while the chat was open, is not listed. Everything it returns is the sender's own
+ * words, so it is outside content: shown and read aloud to the person, never obeyed, never stored, never given to an AI model.
+ */
+class ReadWhatsAppTool(private val notifications: NotificationPort) : Tool {
+    override val spec = ToolSpec(
+        name = ScreenTools.READ_WHATSAPP,
+        description = "Read out the unread WhatsApp messages that are showing as notifications: who they are from and what they say.",
+        params = emptyList(),
+        risk = Risk.MEDIUM,
+        timeoutMs = 8_000L,
+        resultFormat = "CONFIRMED: the WhatsApp notifications Android currently lists, marked as outside content. Nothing is stored.",
+    )
+
+    override fun describe(args: ToolArgs): String = "Read the unread WhatsApp messages"
+
+    override suspend fun execute(args: ToolArgs): ToolResult {
+        if (!notifications.enabled) return ToolResult.Failure(ToolError.Unavailable(NOTIFICATIONS_OFF))
+        val chats = notifications.active().filter { it.packageName in ScreenTools.WHATSAPP_PACKAGES }
+        if (chats.isEmpty()) {
+            return ToolResult.Success(
+                "I do not see any WhatsApp notifications. Messages you already opened or dismissed are not listed here. " +
+                    "Say \"open WhatsApp\" and then \"read the screen\" to hear the chat list.",
+                Verification.CONFIRMED,
+                answer = true,
+            )
+        }
+        val shown = chats.take(ScreenTools.MAX_NOTIFICATIONS)
+        val lines = shown.mapIndexed { index, n ->
+            val who = n.title.ifBlank { "WhatsApp" }.take(60)
+            val said = (n.lines.ifEmpty { listOf(n.text) })
+                .filter { it.isNotBlank() }
+                .takeLast(MAX_LINES_PER_CHAT)
+                .joinToString(" / ") { it.trim().take(ScreenTools.MAX_NOTIFICATION_CHARS) }
+            "${index + 1}. $who${if (said.isNotEmpty()) ": $said" else ""}"
+        }
+        val more = if (chats.size > shown.size) "\n(${chats.size - shown.size} more not shown)" else ""
+        val head = if (chats.size == 1) "You have 1 WhatsApp notification:" else "You have ${chats.size} WhatsApp notifications:"
+        return ToolResult.Success("$head\n${lines.joinToString("\n")}$more", Verification.CONFIRMED, untrusted = true, answer = true, private = true)
+    }
+
+    private companion object {
+        const val MAX_LINES_PER_CHAT = 5
     }
 }
 

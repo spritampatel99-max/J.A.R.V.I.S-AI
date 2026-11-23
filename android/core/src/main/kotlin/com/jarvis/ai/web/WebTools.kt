@@ -22,11 +22,18 @@ object WebTools {
 
     val NAMES = setOf(GET_WEATHER, WIKI_LOOKUP, WEB_ANSWER)
 
-    fun create(weather: WeatherClient, wiki: WikipediaClient, grounded: GroundedSearch): List<Tool> =
-        listOf(GetWeatherTool(weather), WikiLookupTool(wiki), WebAnswerTool(grounded))
+    fun create(
+        weather: WeatherClient,
+        wiki: WikipediaClient,
+        temperatureUnit: () -> TemperatureUnit = { TemperatureUnit.CELSIUS },
+        grounded: GroundedSearch,
+    ): List<Tool> = listOf(GetWeatherTool(weather, temperatureUnit), WikiLookupTool(wiki), WebAnswerTool(grounded))
 }
 
-class GetWeatherTool(private val client: WeatherClient) : Tool {
+class GetWeatherTool(
+    private val client: WeatherClient,
+    private val temperatureUnit: () -> TemperatureUnit = { TemperatureUnit.CELSIUS },
+) : Tool {
     override val spec = ToolSpec(
         name = WebTools.GET_WEATHER,
         description = "Get the current weather or today's or tomorrow's forecast for a named city. Use it for any weather question. " +
@@ -45,7 +52,7 @@ class GetWeatherTool(private val client: WeatherClient) : Tool {
     override suspend fun execute(args: ToolArgs): ToolResult {
         val tomorrow = args.stringOrNull("day").equals("tomorrow", ignoreCase = true)
         return when (val outcome = client.report(args.string("city"), tomorrow)) {
-            is WeatherOutcome.Found -> ToolResult.Success(outcome.report.sentence(), Verification.CONFIRMED, answer = true)
+            is WeatherOutcome.Found -> ToolResult.Success(outcome.report.sentence(temperatureUnit()), Verification.CONFIRMED, answer = true)
             WeatherOutcome.NoSuchPlace -> ToolResult.Failure(ToolError.NeedsInput("I could not find a place called \"${safeLabel(args.string("city"))}\". Which city do you mean?"))
             is WeatherOutcome.Unavailable -> ToolResult.Failure(ToolError.Unavailable(outcome.reason))
         }

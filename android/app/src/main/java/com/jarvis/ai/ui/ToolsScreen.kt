@@ -125,8 +125,8 @@ private fun QuickTile(label: String, glyph: Glyph, modifier: Modifier, onClick: 
     Column(
         modifier
             .clip(shape)
-            .background(Color.White.copy(alpha = 0.05f))
-            .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
+            .background(JarvisColors.Edge.copy(alpha = 0.05f))
+            .border(1.dp, JarvisColors.Edge.copy(alpha = 0.12f), shape)
             .clickableTile(onClick)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),

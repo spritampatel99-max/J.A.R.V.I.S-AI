@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.jarvis.ai"
-        minSdk = 30          // Android 11
+        minSdk = 34          // Android 14: newer rules for services, alarms and launches can be relied on
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0-dev"
@@ -66,6 +66,9 @@ dependencies {
 
     // Hands-free: on-device detector for the word "Jarvis" (needs a free Picovoice AccessKey that the person enters in Prefs).
     implementation(libs.porcupine.android)
+    // Offline wake word with no account or key (the default). Vosk calls its native code through JNA, which ships as an Android library.
+    implementation(libs.vosk.android)
+    implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
     // Reading the offline library: its content blocks are zstd (current Kiwix files) or xz (older ones). zstd ships as an Android library with its native code.
     implementation("com.github.luben:zstd-jni:${libs.versions.zstdJni.get()}@aar")
     implementation(libs.xz)

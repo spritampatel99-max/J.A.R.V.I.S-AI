@@ -1,9 +1,7 @@
 package com.jarvis.ai.android.models
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
-import androidx.core.content.ContextCompat
 import com.jarvis.ai.models.Amount
 import com.jarvis.ai.models.ExpectedFile
 import com.jarvis.ai.models.InstallPhase
@@ -53,8 +51,8 @@ data class ModelState(
  * Downloads, imports and removes model files, and keeps the state the Models screen shows.
  *
  * The work runs in this object's own scope, not in a screen's, so leaving the screen does not stop a download. While a
- * download runs, [ModelDownloadService] keeps the app alive in the foreground with a notification; Android would
- * otherwise stop a large download as soon as the app is no longer on screen.
+ * download runs, [DownloadKeeper] holds a user-initiated download job (or, as a fallback, a foreground service) with a
+ * progress notification; Android would otherwise stop a large download as soon as the app is no longer on screen.
  *
  * Nothing is reported as installed until the file passed the size check and, when Hugging Face publishes one, the
  * SHA-256 check. A download is only ever started by an explicit tap; this class never starts one on its own.
@@ -110,7 +108,7 @@ class ModelManager(
         }
         if (!begin(id)) return
         change(id) { it.copy(phase = ModelPhase.CHECKING, progress = null, message = null, isError = false) }
-        startService()
+        DownloadKeeper.start(context, downloadsFromInternet = true)
 
         track(id, scope.launch {
             try {
@@ -158,7 +156,7 @@ class ModelManager(
         val spec = ModelCatalog.spec(id)
         if (!begin(id)) return
         change(id) { it.copy(phase = ModelPhase.CHECKING, progress = null, message = null, isError = false) }
-        startService()
+        DownloadKeeper.start(context, downloadsFromInternet = false)
 
         track(id, scope.launch {
             try {
@@ -257,15 +255,6 @@ class ModelManager(
         state.update { current ->
             val existing = current[id] ?: return@update current
             current + (id to transform(existing))
-        }
-    }
-
-    private fun startService() {
-        try {
-            ContextCompat.startForegroundService(context, Intent(context, ModelDownloadService::class.java))
-        } catch (e: RuntimeException) {
-            // Android refused to start the service (for example the app is not in the foreground). The download still
-            // runs while the app is open; it just is not protected from being stopped in the background.
         }
     }
 

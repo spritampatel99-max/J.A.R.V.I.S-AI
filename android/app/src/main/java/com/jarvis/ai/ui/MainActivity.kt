@@ -4,7 +4,10 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.DisposableEffect
+import android.graphics.Color
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -25,11 +28,18 @@ class MainActivity : ComponentActivity() {
 
         container = (application as JarvisApplication).container
         setContent {
-            JarvisTheme {
+            val prefs by container.settings.ui.collectAsStateWithLifecycle()
+            val dark = isJarvisDark(prefs.themeMode)
+            // The system bar icons must match the look the person chose, which can differ from the phone's own setting.
+            DisposableEffect(dark) {
+                val bars = if (dark) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                enableEdgeToEdge(statusBarStyle = bars, navigationBarStyle = bars)
+                onDispose {}
+            }
+            JarvisTheme(prefs) {
                 val vm: AgentViewModel = viewModel(factory = AgentViewModelFactory(container))
                 val setupVm: SetupViewModel = viewModel(factory = SetupViewModelFactory(container))
                 val setup by setupVm.ui.collectAsStateWithLifecycle()
-                val prefs by container.settings.ui.collectAsStateWithLifecycle()
 
                 // Motion follows both the app's own "Reduce motion" setting and Android's "remove animations" switch.
                 val systemMotion = remember { Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f }

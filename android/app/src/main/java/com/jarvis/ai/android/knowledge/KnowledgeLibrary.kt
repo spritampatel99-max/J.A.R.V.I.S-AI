@@ -1,11 +1,9 @@
 package com.jarvis.ai.android.knowledge
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
-import androidx.core.content.ContextCompat
-import com.jarvis.ai.android.models.ModelDownloadService
+import com.jarvis.ai.android.models.DownloadKeeper
 import com.jarvis.ai.knowledge.ClusterDecoder
 import com.jarvis.ai.knowledge.KnowledgePackSpec
 import com.jarvis.ai.knowledge.KnowledgePacks
@@ -107,7 +105,7 @@ class KnowledgeLibrary(
             }
             return
         }
-        begin(spec.displayName)
+        begin(spec.displayName, downloadsFromInternet = true)
         job = scope.launch {
             try {
                 val result = installer.download(spec, ExpectedFile(null, null), dir, accessToken = null) { progress -> progressed(progress) }
@@ -151,7 +149,7 @@ class KnowledgeLibrary(
             }
             return
         }
-        begin(name)
+        begin(name, downloadsFromInternet = false)
         job = scope.launch {
             try {
                 val input = try {
@@ -301,13 +299,9 @@ class KnowledgeLibrary(
         }
     }
 
-    private fun begin(name: String) {
+    private fun begin(name: String, downloadsFromInternet: Boolean) {
         mutable.update { it.copy(phase = LibraryPhase.CHECKING, busyWith = name, progress = null, message = null, isError = false) }
-        try {
-            ContextCompat.startForegroundService(context, Intent(context, ModelDownloadService::class.java))
-        } catch (e: RuntimeException) {
-            // Android refused to start the service. The work still runs while the app is open.
-        }
+        DownloadKeeper.start(context, downloadsFromInternet)
     }
 
     private fun progressed(progress: InstallProgress) {

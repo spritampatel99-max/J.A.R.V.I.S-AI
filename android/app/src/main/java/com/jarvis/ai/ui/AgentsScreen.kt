@@ -367,7 +367,7 @@ private fun FeaturesStep(s: WizardState) {
 
     GlassCard {
         GlassChip("More suggestions", onClick = { s.shown.addAll(AgentBlueprint.moreSuggestions(s.category, s.shown.toSet()).map { it.id }) })
-        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+        HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
         Text("Add your own feature", style = MaterialTheme.typography.titleSmall, color = JarvisColors.Ink)
         FormField("What else should it do?", s.customText, { s.customText = it; s.customResult = null }, maxLength = 200)
         GlowButton("Check this feature", enabled = s.customText.isNotBlank(), subtle = true, onClick = {

@@ -1,5 +1,13 @@
 package com.jarvis.ai.data
 
+enum class ThemeMode { SYSTEM, DARK, LIGHT }
+
+/** The detector that listens for the word "Jarvis" while hands-free is on. */
+enum class WakeEngine(val label: String) {
+    VOSK("Offline, no key"),
+    PORCUPINE("Picovoice (needs key)"),
+}
+
 /**
  * Look and voice preferences shown in the Prefs tab.
  *
@@ -17,6 +25,12 @@ data class UiPrefs(
     val speechRate: Float = 1.0f,
     /** Name of the chosen text-to-speech voice, or null for the phone's default. */
     val voiceName: String? = null,
+    /** When on, speech is only ever recognised by an on-device recogniser; with none installed, listening says so instead of falling back. */
+    val onDeviceSpeechOnly: Boolean = false,
+    /** Light, dark, or follow the phone. */
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** Use the phone's wallpaper colours (Material You) for the accent colours instead of the JARVIS spectrum. */
+    val dynamicColor: Boolean = false,
 ) {
     fun sanitised() = copy(
         flare = flare.coerceIn(0.1f, 1f),

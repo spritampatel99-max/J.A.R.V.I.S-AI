@@ -9,6 +9,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 /**
  * Anthropic Claude via the Messages API (`POST /v1/messages`).
@@ -63,7 +64,26 @@ class AnthropicProvider(
                 for (message in request.messages) {
                     addJsonObject {
                         put("role", message.role.openAiName)
-                        put("content", message.content)
+                        if (message.images.isEmpty()) {
+                            put("content", message.content)
+                        } else {
+                            putJsonArray("content") {
+                                for (image in message.images) {
+                                    addJsonObject {
+                                        put("type", "image")
+                                        putJsonObject("source") {
+                                            put("type", "base64")
+                                            put("media_type", image.mimeType)
+                                            put("data", image.base64)
+                                        }
+                                    }
+                                }
+                                addJsonObject {
+                                    put("type", "text")
+                                    put("text", message.content)
+                                }
+                            }
+                        }
                     }
                 }
             }

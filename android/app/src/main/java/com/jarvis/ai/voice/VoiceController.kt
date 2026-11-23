@@ -2,7 +2,6 @@ package com.jarvis.ai.voice
 
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -37,7 +36,7 @@ data class VoiceChoice(val name: String, val label: String)
  * Speech in and out, through the phone's own services.
  *
  * Listening is push-to-talk: one session per tap, ending when the person stops talking. The recogniser is Android's
- * [SpeechRecognizer]; on Android 13 and later the on-device one is used when the phone has it. Otherwise the phone's
+ * [SpeechRecognizer]; the on-device one is used when the phone has it (always answerable on Android 14 and later). Otherwise the phone's
  * default recogniser is used, which may send the sound to its provider. This class never records, stores or forwards audio.
  *
  * Every method must be called on the main thread.
@@ -69,7 +68,15 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
      * session is ended with [cancelListening].
      */
     fun startListening(onFinal: (String) -> Unit, onNothing: (() -> Unit)? = null) {
-        if (!SpeechRecognizer.isRecognitionAvailable(appContext)) {
+        val onDevice = SpeechRecognizer.isOnDeviceRecognitionAvailable(appContext)
+        if (prefs().onDeviceSpeechOnly && !onDevice) {
+            flow.update {
+                it.copy(message = "This phone has no on-device speech recogniser. Turn off \"On-device speech only\" in Prefs to use the phone's default one.")
+            }
+            onNothing?.invoke()
+            return
+        }
+        if (!onDevice && !SpeechRecognizer.isRecognitionAvailable(appContext)) {
             flow.update { it.copy(message = "This phone has no speech recogniser installed.", recognizerAvailable = false) }
             onNothing?.invoke()
             return
@@ -79,7 +86,6 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
         this.onFinal = onFinal
         this.onNothing = onNothing
 
-        val onDevice = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && SpeechRecognizer.isOnDeviceRecognitionAvailable(appContext)
         val created = if (onDevice) SpeechRecognizer.createOnDeviceSpeechRecognizer(appContext) else SpeechRecognizer.createSpeechRecognizer(appContext)
         created.setRecognitionListener(listener)
         recognizer = created
@@ -89,6 +95,8 @@ class VoiceController(context: Context, private val prefs: () -> UiPrefs) {
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, appContext.packageName)
+            // Follows the app's own language (Android's per-app language setting), so Hindi is recognised as Hindi.
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
             if (onDevice) putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
         }
         flow.update { it.copy(listening = true, level = 0f, partial = "", message = null) }

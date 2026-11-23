@@ -114,7 +114,7 @@ import java.time.LocalDate
  */
 class AppContainer(context: Context, val foreground: ForegroundTracker) {
 
-    private val appContext = context.applicationContext
+    val appContext = context.applicationContext
 
     val keys = SecureKeyStore(appContext)
     val settings = SettingsStore(appContext)
@@ -161,6 +161,9 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     } catch (e: Exception) {
         "unknown"
     }
+
+    /** Reads the public "latest release" page of the project. Looks only; the person downloads and installs. */
+    val updateClient = com.jarvis.ai.update.ReleaseClient(transport, UPDATE_REPO)
 
     fun providerSettings(id: ProviderId): ProviderSettings = ProviderSettings(
         apiKey = keys.get(keyName(id)),
@@ -283,6 +286,12 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         media = AndroidMediaKeys(appContext),
         email = AndroidEmailPort(appContext, foreground),
         camera = AndroidCameraLauncher(appContext, foreground),
+        whatsappSender = object : com.jarvis.ai.ai.tools.builtin.WhatsAppSender {
+            override val enabled: Boolean get() = settings.whatsappSendOn
+
+            // Same guarded control as every other screen tool, so the package blocklist applies; only WhatsApp windows qualify.
+            override suspend fun pressSend(expected: String) = screenControl.sendComposed(expected, ScreenTools.WHATSAPP_PACKAGES)
+        },
     )
 
     /** Work that must outlive any one screen (the assistant's requests, the hands-free service). Runs on the main thread. */
@@ -290,6 +299,21 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
 
     /** The conversation history shown in the Logs tab. Stored in a private file, redacted of keys, deletable by the person. */
     val history = ConversationStore(HistoryFileStorage(appContext), SystemTimeSource)
+
+    /** The offline speech model that the no-key wake word needs. */
+    val voskModel = com.jarvis.ai.android.voice.VoskModelStore(
+        appContext,
+        // The cloud client gives up after 45 seconds and refuses redirects; a 40 MB file needs neither limit. It still allows https only.
+        HttpClients.cloud().newBuilder()
+            .callTimeout(0, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build(),
+    )
+
+    /** Saves conversations as text files in a folder or file the person picked, so they show up in the file manager. */
+    val archiver = com.jarvis.ai.android.files.ChatArchiver(appContext, settings, history)
 
     /** The one assistant. Every screen and the hands-free service share it, so spoken and typed requests land in the same chat. */
     val assistant: AgentViewModel by lazy { AgentViewModel(this) }
@@ -314,7 +338,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
      * list are never read, and system settings and permission dialogs are never acted on.
      */
     private val screenGuard = ScreenGuard(appContext.packageName) { settings.screenBlocklist }
-    private val screenControl = GuardedScreenControl(AndroidRawScreen(), screenGuard)
+    private val screenControl = GuardedScreenControl(AndroidRawScreen(), screenGuard, actionsOn = { settings.tapAndTypeOn })
     private val guardedNotifications = GuardedNotifications(AndroidNotificationPort(), screenGuard)
 
     /** What the assistant can do: the phone tools, the planner and reminder tools, the phone-control tools and the read-only internet lookups. */
@@ -322,10 +346,18 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         BuiltinTools.create(ports) +
             ScreenTools.create(screenControl, guardedNotifications) +
             OfflineTools.create { library.encyclopedia() } +
+            listOf(com.jarvis.ai.update.CheckForUpdatesTool(updateClient, appVersion)) +
             ProductivityTools.create(productivity, wake, notifier) +
             WebTools.create(
                 weather = WeatherClient(transport),
                 wiki = WikipediaClient(transport),
+                temperatureUnit = {
+                    if (androidx.core.text.util.LocalePreferences.getTemperatureUnit() == androidx.core.text.util.LocalePreferences.TemperatureUnit.FAHRENHEIT) {
+                        com.jarvis.ai.web.TemperatureUnit.FAHRENHEIT
+                    } else {
+                        com.jarvis.ai.web.TemperatureUnit.CELSIUS
+                    }
+                },
                 grounded = GeminiGroundedSearch(transport, { providerSettings(ProviderId.GEMINI) }, { LocalDate.now().toString() }),
             ),
     )
@@ -333,7 +365,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     val agents = AgentStore(AtomicTextStorage(appContext, "agents.json"), SystemTimeSource, registry, memory)
     val agentRuntime = AgentRuntime(registry, memory, SystemTimeSource)
 
-    val planner = Planner(routedLlm, registry)
+    val planner = Planner(routedLlm, registry, addressing = { com.jarvis.ai.ui.Addressing.promptValue(appContext) })
     val gate = ConfirmationGate()
     val audit = FileAuditLog(File(appContext.filesDir, "audit.jsonl"), redactor = redactor)
 
@@ -353,7 +385,24 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     private val automationRunner = AutomationRunner(automations, registry, permissions, audit, SystemTimeSource)
 
     /** Delivers due reminders, runs due automations and asks Android for the next wake-up. */
-    val schedule = ScheduleEngine(productivity, automations, automationRunner, notifier, wake, SystemTimeSource)
+    /** The facts about whether Android will wake the app, shared by the Automations screen and the nightly review. */
+    fun scheduleFindings(): List<com.jarvis.ai.automation.HealthFinding> {
+        val now = System.currentTimeMillis()
+        return com.jarvis.ai.automation.ScheduleHealth.check(
+            com.jarvis.ai.automation.ScheduleFacts(
+                nowMs = now,
+                exactAlarmsAllowed = com.jarvis.ai.android.device.AccessChecks.state(appContext, com.jarvis.ai.android.device.AccessKey.EXACT_ALARMS) != com.jarvis.ai.android.device.AccessState.NOT_ALLOWED,
+                notificationsAllowed = notifier.canNotify(),
+                batteryUnrestricted = com.jarvis.ai.android.device.AccessChecks.state(appContext, com.jarvis.ai.android.device.AccessKey.BATTERY) != com.jarvis.ai.android.device.AccessState.NOT_ALLOWED,
+                nextDueMs = listOfNotNull(automations.nextWakeMs(), productivity.nextReminderMs(now)).minOrNull(),
+                lastWakeMs = settings.lastWakeMs,
+            ),
+        )
+    }
+
+    val nightlyReview = com.jarvis.ai.android.schedule.NightlyReviewJob(settings, audit, updateClient, notifier, appVersion, findings = ::scheduleFindings)
+
+    val schedule = ScheduleEngine(productivity, automations, automationRunner, notifier, wake, SystemTimeSource, onWake = { settings.lastWakeMs = it }, nightly = nightlyReview)
 
     /** "Run now" from the Automations screen. Runs the same restricted way, and never moves the schedule. */
     suspend fun runAutomationNow(id: String) = automationRunner.runNow(id)
@@ -427,6 +476,9 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
 
     companion object {
         private const val HEDGE_AFTER_MS = 6_000L
+
+        /** Where releases are published. The update check reads this project's public "latest release" and nothing else. */
+        const val UPDATE_REPO = "spritampatel99-max/J.A.R.V.I.S-AI"
 
         fun keyName(id: ProviderId): String = "api_key_${id.name}"
 

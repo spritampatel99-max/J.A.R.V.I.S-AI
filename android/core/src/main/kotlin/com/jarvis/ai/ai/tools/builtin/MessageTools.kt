@@ -10,11 +10,15 @@ import com.jarvis.ai.ai.tools.ToolError
 import com.jarvis.ai.ai.tools.ToolResult
 import com.jarvis.ai.ai.tools.ToolSpec
 import com.jarvis.ai.ai.tools.Verification
+import com.jarvis.ai.ai.tools.screen.BoxAfter
+import com.jarvis.ai.ai.tools.screen.SendPress
 import com.jarvis.ai.core.security.Risk
 
 /**
- * Text and WhatsApp messages. These tools never send anything: they open the messages app or WhatsApp with the text already typed
- * in, and the person reads it there and presses Send. Before that, the app shows the person the recipient, the exact number and the
+ * Text and WhatsApp messages. These tools open the messages app or WhatsApp with the text already typed in, and the person reads
+ * it there and presses Send. The one exception is WhatsApp when the person has switched on "press Send for me": then, and only
+ * after the confirmation (or the spoken read-back and countdown), the app presses Send itself, and only if the box holds exactly
+ * the approved words. Before that, the app shows the person the recipient, the exact number and the
  * message, and waits for a tap; the model can never approve it (the tools are [Risk.HIGH]) and can never supply the number, which
  * app code resolves in [Tool.prepare]. The approval is bound to the resolved number and the exact text.
  */
@@ -135,15 +139,20 @@ class SendSmsTool(private val contacts: ContactsPort?, private val messaging: Me
     }
 }
 
-class SendWhatsAppTool(private val contacts: ContactsPort?, private val messaging: MessagingPort) : Tool {
+class SendWhatsAppTool(
+    private val contacts: ContactsPort?,
+    private val messaging: MessagingPort,
+    private val sender: WhatsAppSender? = null,
+) : Tool {
     override val spec = ToolSpec(
         name = "send_whatsapp",
         description = "Write a WhatsApp message to a contact or number. It opens WhatsApp with the text typed in; " +
-            "the user presses Send there. The user is shown the exact name, number and message and must confirm first.",
+            "the user presses Send there, unless they turned on hands-free sending, in which case the app presses Send after checking the text. " +
+            "The user is shown the exact name, number and message and must confirm first.",
         params = messageParams(),
         risk = Risk.HIGH,
-        timeoutMs = 10_000L,
-        resultFormat = "States that WhatsApp was opened with the text ready. It never says the message was sent.",
+        timeoutMs = 25_000L,
+        resultFormat = "States that WhatsApp was opened with the text ready, or that Send was pressed and what the message box did. It never says the message was delivered.",
     )
 
     override suspend fun prepare(args: ToolArgs): Prepared {
@@ -159,7 +168,7 @@ class SendWhatsAppTool(private val contacts: ContactsPort?, private val messagin
         val number = args.stringOrNull("number")
         val message = args.stringOrNull("message")
         return if (number != null && message != null) {
-            "WhatsApp ${who(args)}: \"${MessageText.preview(message)}\""
+            "WhatsApp ${who(args)}: \"${MessageText.preview(message)}\"" + if (sender?.enabled == true) " (Send is pressed for you)" else ""
         } else {
             "WhatsApp \"${args.string("to").take(60)}\""
         }
@@ -178,6 +187,9 @@ class SendWhatsAppTool(private val contacts: ContactsPort?, private val messagin
         // different person abroad, so the chat is not guessed: WhatsApp opens with the text ready and the person picks the chat.
         val international = parsed.dialable.startsWith("+")
         val result = if (international) messaging.openWhatsAppChat(parsed.dialable, message) else messaging.shareToWhatsApp(message)
+        if (result == MessageHandoff.Opened && international && sender?.enabled == true) {
+            return pressSend(sender, name, message, parsed.dialable)
+        }
         return when (result) {
             MessageHandoff.Opened -> ToolResult.Success(
                 if (international) {
@@ -190,6 +202,33 @@ class SendWhatsAppTool(private val contacts: ContactsPort?, private val messagin
             )
             is MessageHandoff.NoApp -> ToolResult.Failure(ToolError.Unavailable("WhatsApp is not installed on this phone."))
             is MessageHandoff.Failed -> ToolResult.Failure(ToolError.Failed(result.reason))
+        }
+    }
+
+    /** Presses Send and reports only what was seen: the press, and what the message box did. Delivery is never claimed. */
+    private suspend fun pressSend(sender: WhatsAppSender, name: String, message: String, number: String): ToolResult {
+        val data = mapOf("number" to number)
+        val ready = "WhatsApp is open with your message to $name ready, but it has not been sent"
+        return when (val press = sender.pressSend(message)) {
+            is SendPress.Pressed -> when (press.box) {
+                BoxAfter.CLEARED -> ToolResult.Success(
+                    "Pressed Send in WhatsApp for $name, and the message box emptied, which is what happens when a message goes out. WhatsApp does not tell me about delivery, so I cannot promise it arrived.",
+                    Verification.HANDED_OFF, data,
+                )
+                BoxAfter.STILL_THERE -> ToolResult.Success(
+                    "Pressed Send in WhatsApp for $name, but the message is still in the box, so it may not have gone. Please check WhatsApp.",
+                    Verification.HANDED_OFF, data,
+                )
+                BoxAfter.UNKNOWN -> ToolResult.Success(
+                    "Pressed Send in WhatsApp for $name. I could not check the box afterwards, so please look in WhatsApp to be sure.",
+                    Verification.HANDED_OFF, data,
+                )
+            }
+            SendPress.NotEnabled -> ToolResult.Success("$ready: screen access is off. Press Send there yourself.", Verification.HANDED_OFF, data)
+            is SendPress.OffLimits -> ToolResult.Success("$ready: I am not allowed to press buttons in ${press.app}. Press Send there yourself.", Verification.HANDED_OFF, data)
+            is SendPress.WrongApp -> ToolResult.Success("$ready: ${press.app} came up instead of WhatsApp, so I pressed nothing.", Verification.HANDED_OFF, data)
+            SendPress.TextMismatch -> ToolResult.Success("$ready: the text in the box is not exactly what you approved, so I pressed nothing. Check it and press Send yourself.", Verification.HANDED_OFF, data)
+            is SendPress.Failed -> ToolResult.Success("$ready: ${press.reason} Press Send there yourself.", Verification.HANDED_OFF, data)
         }
     }
 }

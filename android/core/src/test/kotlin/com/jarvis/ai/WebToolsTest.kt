@@ -20,6 +20,7 @@ import com.jarvis.ai.web.GroundedAnswer
 import com.jarvis.ai.web.GroundedOutcome
 import com.jarvis.ai.web.WebAnswerTool
 import com.jarvis.ai.web.WebTools
+import com.jarvis.ai.web.TemperatureUnit
 import com.jarvis.ai.web.WeatherClient
 import com.jarvis.ai.web.WeatherOutcome
 import com.jarvis.ai.web.WikiLookupTool
@@ -65,6 +66,40 @@ class WebToolsTest {
                 "Today: partly cloudy, high 33°C, low 22°C, 10% chance of rain.",
             sentence,
         )
+    }
+
+    @Test
+    fun theSameWeatherCanBeShownInFahrenheitWhenThePhoneIsSetToIt() = runTest {
+        transport.reply(200, geocodeDelhi)
+        transport.reply(200, forecast)
+
+        val report = assertIs<WeatherOutcome.Found>(WeatherClient(transport).report("Delhi", tomorrow = false)).report
+
+        assertEquals(
+            "Right now in New Delhi, Delhi, India it is 82°F and mostly clear, feels like 86°F, humidity 45%, wind 8 km/h. " +
+                "Today: partly cloudy, high 91°F, low 72°F, 10% chance of rain.",
+            report.sentence(TemperatureUnit.FAHRENHEIT),
+        )
+    }
+
+    @Test
+    fun fahrenheitConversionHandlesZeroAndNegativeTemperatures() {
+        assertEquals(32, TemperatureUnit.FAHRENHEIT.show(0))
+        assertEquals(23, TemperatureUnit.FAHRENHEIT.show(-5))
+        assertEquals(27, TemperatureUnit.FAHRENHEIT.show(-3))
+        assertEquals(212, TemperatureUnit.FAHRENHEIT.show(100))
+        assertEquals(-5, TemperatureUnit.CELSIUS.show(-5))
+    }
+
+    @Test
+    fun theWeatherToolUsesTheUnitThePhoneAsksFor() = runTest {
+        transport.reply(200, geocodeDelhi)
+        transport.reply(200, forecast)
+
+        val result = GetWeatherTool(WeatherClient(transport)) { TemperatureUnit.FAHRENHEIT }.execute(ToolArgs(mapOf("city" to "Delhi", "day" to "today")))
+
+        val text = assertIs<ToolResult.Success>(result).message
+        assertTrue(text.contains("82°F") && !text.contains("°C"), text)
     }
 
     @Test

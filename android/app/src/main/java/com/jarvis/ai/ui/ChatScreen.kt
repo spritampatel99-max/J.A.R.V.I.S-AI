@@ -32,6 +32,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,6 +60,7 @@ import com.jarvis.ai.core.security.Risk
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Commands the app runs itself, with no cloud AI. Each one is understood by the built-in matcher. */
 private val SUGGESTIONS = listOf(
@@ -85,8 +88,30 @@ fun ChatScreen(vm: AgentViewModel, onOpenPrefs: () -> Unit) {
         if (state.items.isNotEmpty()) listState.animateScrollToItem(state.items.lastIndex)
     }
 
+    // The system photo picker hands over only the photos the person selects, so no photo permission is needed.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var photo by remember { mutableStateOf<com.jarvis.ai.ai.providers.ImageAttachment?>(null) }
+    var photoNote by remember { mutableStateOf<String?>(null) }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val loaded = com.jarvis.ai.android.device.PhotoLoader.load(context, uri)
+                photo = loaded
+                photoNote = if (loaded == null) "I could not read that photo." else null
+            }
+        }
+    }
+
     fun submit() {
-        if (input.isNotBlank() && !state.running) {
+        val attached = photo
+        if (attached != null && !state.running) {
+            vm.askAboutPhoto(input, attached)
+            vm.setDraft("")
+            photo = null
+        } else if (input.isNotBlank() && !state.running) {
             vm.send(input)
             vm.setDraft("")
         }
@@ -167,6 +192,18 @@ fun ChatScreen(vm: AgentViewModel, onOpenPrefs: () -> Unit) {
             }
         }
 
+        if (photo != null || photoNote != null) {
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    photoNote ?: "Photo attached. Ask your question and send: the photo goes to your cloud AI, is not saved, and no action can start from it.",
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (photoNote != null) JarvisColors.Warning else JarvisColors.Muted,
+                )
+                GlowButton("Remove", subtle = true, onClick = { photo = null; photoNote = null })
+            }
+        }
+
         // Room below the input for the floating tab bar.
         Row(
             Modifier.fillMaxWidth().padding(top = 10.dp, bottom = if (androidx.compose.foundation.layout.WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0) 8.dp else ScreenBottomPadding - 8.dp),
@@ -186,12 +223,21 @@ fun ChatScreen(vm: AgentViewModel, onOpenPrefs: () -> Unit) {
                 keyboardActions = KeyboardActions(onSend = { submit() }),
             )
             GlyphButton(
+                glyph = Glyph.PHOTO,
+                onClick = {
+                    picker.launch(
+                        androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+                description = "Attach a photo",
+            )
+            GlyphButton(
                 glyph = if (voice.listening || voice.speaking) Glyph.STOP else Glyph.MIC,
                 onClick = toggleMic,
-                tint = if (voice.listening) JarvisColors.Magenta else Color.White,
+                tint = if (voice.listening) JarvisColors.Magenta else JarvisColors.Ink,
                 description = if (voice.listening) "Stop listening" else "Speak a command",
             )
-            SendButton(canSend = input.isNotBlank(), running = state.running, onSend = ::submit, onStop = vm::cancel)
+            SendButton(canSend = input.isNotBlank() || photo != null, running = state.running, onSend = ::submit, onStop = vm::cancel)
         }
     }
 }
@@ -203,8 +249,8 @@ private fun CommandRow(text: String, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Color.White.copy(alpha = 0.05f))
-            .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
+            .background(JarvisColors.Edge.copy(alpha = 0.05f))
+            .border(1.dp, JarvisColors.Edge.copy(alpha = 0.12f), shape)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -256,7 +302,7 @@ private fun MessageBubble(item: ChatItem, animate: Boolean, time: String, modifi
     val edge = when {
         isUser -> JarvisColors.Violet.copy(alpha = 0.55f)
         isSystem -> colors.error.copy(alpha = 0.5f)
-        else -> Color.White.copy(alpha = 0.12f)
+        else -> JarvisColors.Edge.copy(alpha = 0.12f)
     }
     val who = when (item.sender) {
         Sender.USER -> "You"

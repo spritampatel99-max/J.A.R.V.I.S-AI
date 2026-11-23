@@ -22,11 +22,16 @@ class ScheduleEngine(
     private val notifier: Notifier,
     private val wake: WakeScheduler,
     private val time: TimeSource,
+    /** Told every time the app really woke to do scheduled work, so the Automations screen can tell "never woke" from "ran and failed". */
+    private val onWake: (Long) -> Unit = {},
+    /** The optional nightly review. It only reads and notifies; it is asked for a wake-up time and to run when owed. */
+    private val nightly: com.jarvis.ai.update.NightlyHook? = null,
 ) {
     private val lock = Mutex()
 
     suspend fun tick() = lock.withLock {
         val now = time.nowMs()
+        onWake(now)
         for (reminder in productivity.dueReminders(now)) {
             val late = now - reminder.atMs > LATE_AFTER_MS
             val title = if (late) "Reminder (was due ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(reminder.atMs))})" else "Reminder"
@@ -35,13 +40,22 @@ class ScheduleEngine(
             productivity.markDelivered(reminder.id, notified = shown)
         }
         runner.runDue()
+        // A failure in the review must never stop reminders or the next wake-up from being set.
+        try {
+            nightly?.runIfDue(now)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            scheduleNext()
+            throw e
+        } catch (e: Exception) {
+            // Tried again at the next wake-up.
+        }
         scheduleNext()
     }
 
     /** Asks Android for the next wake-up, or cancels the request when nothing is waiting. Call after anything that changes a time. */
     fun scheduleNext() {
         val now = time.nowMs()
-        val next = listOfNotNull(productivity.nextReminderMs(now), automations.nextWakeMs()).minOrNull()
+        val next = listOfNotNull(productivity.nextReminderMs(now), automations.nextWakeMs(), nightly?.nextMs(now)).minOrNull()
         if (next == null) wake.cancel() else wake.schedule(maxOf(next, now + MIN_LEAD_MS))
     }
 

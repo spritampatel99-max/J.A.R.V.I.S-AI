@@ -92,11 +92,7 @@ class AndroidDeviceAnalyzer(context: Context) : DeviceAnalyzer {
             bluetooth = feature(pm, PackageManager.FEATURE_BLUETOOTH),
             audioOutput = feature(pm, PackageManager.FEATURE_AUDIO_OUTPUT),
             speechRecognition = read("Could not query speech recognition") { SpeechRecognizer.isRecognitionAvailable(appContext) },
-            onDeviceSpeechRecognition = if (Build.VERSION.SDK_INT >= 33) {
-                read("Could not query on-device speech recognition") { SpeechRecognizer.isOnDeviceRecognitionAvailable(appContext) }
-            } else {
-                Reading.unavailable("Android cannot report this before version 13.")
-            },
+            onDeviceSpeechRecognition = read("Could not query on-device speech recognition") { SpeechRecognizer.isOnDeviceRecognitionAvailable(appContext) },
             textToSpeech = read("Could not query text-to-speech") {
                 @Suppress("DEPRECATION")
                 pm.queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), 0).isNotEmpty()

@@ -161,7 +161,7 @@ fun AgentChatScreen(container: AppContainer, config: AgentConfig, preview: Boole
                         line.text,
                         modifier = Modifier
                             .clip(RoundedCornerShape(18.dp))
-                            .background(if (line.fromUser) JarvisColors.Violet.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.07f))
+                            .background(if (line.fromUser) JarvisColors.Violet.copy(alpha = 0.35f) else JarvisColors.Edge.copy(alpha = 0.07f))
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                         color = if (line.isSystem) JarvisColors.Warning else JarvisColors.Ink,
                     )

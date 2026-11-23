@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.jarvis.ai.productivity.WakeResult
 import com.jarvis.ai.productivity.WakeScheduler
 
@@ -25,7 +24,7 @@ class AndroidWakeScheduler(private val context: Context) : WakeScheduler {
     )
 
     override fun schedule(atMs: Long): WakeResult = try {
-        val exact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarms.canScheduleExactAlarms()
+        val exact = alarms.canScheduleExactAlarms()
         if (exact) {
             alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atMs, pending())
         } else {

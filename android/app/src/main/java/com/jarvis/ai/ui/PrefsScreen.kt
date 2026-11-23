@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.jarvis.ai.data.ThemeMode
 import com.jarvis.ai.android.device.AccessChecks
 import com.jarvis.ai.android.device.AccessKey
 import com.jarvis.ai.android.device.AccessKind
@@ -52,6 +53,7 @@ enum class SubPage(val title: String) {
     MEMORY("Memory"),
     PLANNER("Planner"),
     AUTOMATIONS("Automations"),
+    NIGHTLY("Nightly review"),
     OFFLINE("Offline and readiness"),
     SECURITY("Security review"),
 }
@@ -86,11 +88,11 @@ fun PrefsScreen(vm: AgentViewModel, appVersion: String, onOpen: (SubPage) -> Uni
             SettingRow("Spoken replies", "Read answers aloud, but only for requests you spoke. Typed requests are answered in text.") {
                 SpectrumSwitch(prefs.speakReplies, onChange = { on -> vm.updateUi { it.copy(speakReplies = on) } })
             }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             SettingRow("Voice", prefs.voiceName ?: "Phone default") {
                 GlassChip("Change", onClick = { showVoices = true })
             }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Speaking speed", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = JarvisColors.Ink)
@@ -105,25 +107,46 @@ fun PrefsScreen(vm: AgentViewModel, appVersion: String, onOpen: (SubPage) -> Uni
                 )
             }
             GlowButton("Preview voice", onClick = vm::previewVoice, subtle = true)
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
+            SettingRow("On-device speech only", "Recognise your voice only with the phone's own offline recogniser, so the sound never goes to a provider. If the phone has none, listening says so.") {
+                SpectrumSwitch(prefs.onDeviceSpeechOnly, onChange = { on -> vm.updateUi { it.copy(onDeviceSpeechOnly = on) } })
+            }
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Hands-free", "Say \"Jarvis\" to wake it. No tapping the mic.", Glyph.MIC) { onOpen(SubPage.HANDS_FREE) }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Phone control", "Read the screen, scroll, go back or home, read and clear notifications.", Glyph.DEVICE) { onOpen(SubPage.SCREEN_CONTROL) }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Offline library", "Wikipedia saved on this phone (1-2 GB). Answers with no internet.", Glyph.STORAGE) { onOpen(SubPage.OFFLINE_LIBRARY) }
         }
 
+        // ---- Language ----------------------------------------------------------------------------
+        SectionTitle(Glyph.GLOBE, "Language", "app and voice")
+        GlassCard { LanguageControls() }
+
         // ---- Appearance --------------------------------------------------------------------------
-        SectionTitle(Glyph.TUNE, "Appearance", "dark theme")
+        SectionTitle(Glyph.TUNE, "Appearance", "theme and colour")
         GlassCard {
+            Text("Theme", style = MaterialTheme.typography.titleSmall, color = JarvisColors.Ink)
+            ChoiceChips(
+                options = ThemeMode.entries,
+                selected = prefs.themeMode,
+                label = { mode -> when (mode) { ThemeMode.SYSTEM -> "Follow phone"; ThemeMode.DARK -> "Dark"; ThemeMode.LIGHT -> "Light" } },
+                onSelect = { mode -> vm.updateUi { it.copy(themeMode = mode) } },
+            )
+            Text("The light look is a first version and has not been checked on a phone; tell me which screens are hard to read.", style = MaterialTheme.typography.bodySmall, color = JarvisColors.Muted)
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
+            SettingRow("Colours from my wallpaper", "Uses your wallpaper's colours (Material You) for accents instead of the JARVIS cyan, violet and magenta.") {
+                SpectrumSwitch(prefs.dynamicColor, onChange = { on -> vm.updateUi { it.copy(dynamicColor = on) } })
+            }
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             SettingRow("Ambient dot grid", "A faint grid of dots behind every screen.") {
                 SpectrumSwitch(prefs.ambient, onChange = { on -> vm.updateUi { it.copy(ambient = on) } })
             }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             SettingRow("Reduce motion", "Stops the orb, the drifting light and the voice wave from moving. Android's own \"remove animations\" setting does the same.") {
                 SpectrumSwitch(prefs.reduceMotion, onChange = { on -> vm.updateUi { it.copy(reduceMotion = on) } })
             }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Orb glow", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = JarvisColors.Ink)
@@ -162,19 +185,21 @@ fun PrefsScreen(vm: AgentViewModel, appVersion: String, onOpen: (SubPage) -> Uni
         SectionTitle(Glyph.SPARK, "Assistant", "yours, on this phone")
         GlassCard {
             NavRow("Agents", "Build your own assistants for a job, such as teaching, study or planning.", Glyph.PERSON) { onOpen(SubPage.AGENTS) }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Memory", "What you asked it to remember. See, edit or delete any of it.", Glyph.STORAGE) { onOpen(SubPage.MEMORY) }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Planner", "Tasks, notes and reminders.", Glyph.CALENDAR) { onOpen(SubPage.PLANNER) }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Automations", "Small jobs that run on a schedule: add a task, add a note or show a notification.", Glyph.BOLT) { onOpen(SubPage.AUTOMATIONS) }
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
+            NavRow("Nightly review", "At 10 pm, suggests fixes and new versions. You choose what to apply.", Glyph.BELL) { onOpen(SubPage.NIGHTLY) }
         }
 
         // ---- Status ------------------------------------------------------------------------------
         SectionTitle(Glyph.SHIELD, "Status", "what works right now")
         GlassCard {
             NavRow("Offline and readiness", "What works without internet, checked on this phone.", Glyph.GLOBE) { onOpen(SubPage.OFFLINE) }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Security review", "Permissions, keys, saved data and confirmations. Says what it does not check.", Glyph.LOCK) { onOpen(SubPage.SECURITY) }
         }
 
@@ -204,11 +229,11 @@ fun PrefsScreen(vm: AgentViewModel, appVersion: String, onOpen: (SubPage) -> Uni
                     "Not in this build. Installed models are stored and checked, but nothing runs them yet, so answers come from your cloud AI. See docs/ai/LOCAL_MODELS.md to switch the engine on.",
                 ) {}
             }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("On-device models", "Download or import a model that runs on this phone.", Glyph.STORAGE) { onOpen(SubPage.MODELS) }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Cloud AI", "API keys, models and the order they are tried in.", Glyph.CLOUD) { onOpen(SubPage.CLOUD) }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Run setup again", "Walk through the first-run setup. Your choices are kept.", Glyph.SPARK, onRunSetupAgain)
         }
 
@@ -286,7 +311,7 @@ fun PrefsScreen(vm: AgentViewModel, appVersion: String, onOpen: (SubPage) -> Uni
 }
 
 @Composable
-private fun SettingRow(title: String, subtitle: String, trailing: @Composable () -> Unit) {
+internal fun SettingRow(title: String, subtitle: String, trailing: @Composable () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall, color = JarvisColors.Ink)

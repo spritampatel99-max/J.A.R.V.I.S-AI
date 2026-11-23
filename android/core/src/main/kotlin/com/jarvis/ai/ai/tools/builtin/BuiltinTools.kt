@@ -33,7 +33,7 @@ object BuiltinTools {
             ports.media?.let { MediaControlTool(it) },
             ports.email?.let { ComposeEmailTool(it) },
             ports.camera?.let { OpenCameraTool(it) },
-        ) + ports.messaging?.let { listOf(SendSmsTool(ports.contacts, it), SendWhatsAppTool(ports.contacts, it)) }.orEmpty()
+        ) + ports.messaging?.let { listOf(SendSmsTool(ports.contacts, it), SendWhatsAppTool(ports.contacts, it, ports.whatsappSender)) }.orEmpty()
         val contacts = ports.contacts
         val calls = ports.calls
         if (contacts == null || calls == null) return base

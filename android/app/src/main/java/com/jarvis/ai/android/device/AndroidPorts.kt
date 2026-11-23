@@ -38,6 +38,11 @@ private const val BACKGROUND_REASON =
     "Android only lets JARVIS 3.0 open other apps while it is on screen, or when \"Display over other apps\" is allowed. " +
         "Allow it in Prefs > Access, or keep the app open and try again."
 
+private const val BACKGROUND_OFFERED_REASON =
+    "Android does not let JARVIS 3.0 open other apps from the background, so nothing was opened. " +
+        "I put a \"Tap to open\" notification on your phone; tap it to continue. " +
+        "To skip this step, allow \"Display over other apps\" in Prefs > Access."
+
 /**
  * Whether Android will let this app start another app's screen right now.
  *
@@ -58,7 +63,10 @@ internal fun startActivitySafely(
     intent: Intent,
     what: String,
 ): LaunchResult {
-    if (!BackgroundStart.allowed(context, foreground)) return LaunchResult.Failed(BACKGROUND_REASON)
+    if (!BackgroundStart.allowed(context, foreground)) {
+        // Android would drop the start silently. A notification the person taps is always allowed to open the app.
+        return if (TapToOpen.offer(context, intent, what)) LaunchResult.Failed(BACKGROUND_OFFERED_REASON) else LaunchResult.Failed(BACKGROUND_REASON)
+    }
     return try {
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         LaunchResult.Launched

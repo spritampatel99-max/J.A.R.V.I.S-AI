@@ -49,7 +49,12 @@ class GeminiProvider(
                 for (message in request.messages) {
                     addJsonObject {
                         put("role", if (message.role == ChatRole.ASSISTANT) "model" else "user")
-                        putJsonArray("parts") { addJsonObject { put("text", message.content) } }
+                        putJsonArray("parts") {
+                            for (image in message.images) {
+                                addJsonObject { putJsonObject("inlineData") { put("mimeType", image.mimeType); put("data", image.base64) } }
+                            }
+                            addJsonObject { put("text", message.content) }
+                        }
                     }
                 }
             }

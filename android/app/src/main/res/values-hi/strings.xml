@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">JARVIS 3.0</string>
+    <string name="accessibility_service_description">जब आप कहें, JARVIS 3.0 सामने की स्क्रीन का टेक्स्ट पढ़कर सुनाए, उसे स्क्रॉल करे, और Back, Home, Recents, Lock तथा Screenshot दबाए। अगर आप Prefs में चालू करें, तभी यह दूसरे ऐप में बटन दबा सकता है, टाइप कर सकता है, और आपके पुष्टि किए WhatsApp संदेश के लिए Send दबा सकता है। यह बैंकिंग, पेमेंट और पासवर्ड ऐप्स तथा पासवर्ड फ़ील्ड को छोड़ देता है, और जो कुछ यह पढ़ता है वह न सेव होता है और न किसी AI को भेजा जाता है।</string>
+</resources>

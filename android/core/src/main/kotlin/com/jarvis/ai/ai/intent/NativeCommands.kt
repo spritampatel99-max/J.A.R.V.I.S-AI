@@ -44,7 +44,7 @@ object NativeCommands {
         // A message's words belong to the person: they are matched before the generic clean-up, which would trim a
         // trailing "now" or "please" and the punctuation off the end of what they want to say.
         val lead = leadClean(text)
-        if (lead.isNotEmpty() && lead.length <= MAX_LENGTH) (messaging(lead) ?: email(lead))?.let { return toMatch(listOf(it)) }
+        if (lead.isNotEmpty() && lead.length <= MAX_LENGTH) (whatsappRead(lead) ?: messaging(lead) ?: email(lead) ?: typeText(lead))?.let { return toMatch(listOf(it)) }
 
         val whole = clean(text)
         if (whole.isEmpty() || whole.length > MAX_LENGTH) return null
@@ -386,9 +386,27 @@ object NativeCommands {
         Regex("""^what notifications do i have$""", RegexOption.IGNORE_CASE),
         Regex("""^(?:do i have|any|have i got) (?:any )?(?:new )?notifications$""", RegexOption.IGNORE_CASE),
     )
+    // "tap Chats", "press the search button", "type hello". Whole phrases only; the tools refuse send/pay/delete-style labels and are
+    // off until the person switches tapping and typing on, and they say so when they are.
+    private val TAP = Regex("""^(?:tap|click|touch|press)(?: on)?(?: the)? (.{1,40}?)(?: (?:button|tab|icon|option))?$""", RegexOption.IGNORE_CASE)
+    private val TYPE = Regex("""^type (?:in |out )?(.{1,300})$""", RegexOption.IGNORE_CASE)
+    /** The words are the person's own, so this is matched on the front-cleaned text and keeps their punctuation and ending. */
+    private fun typeText(text: String): One? {
+        val words = TYPE.matchEntire(text)?.groupValues?.get(1)?.trim()?.trim('"', '“', '”')?.trim().orEmpty()
+        return if (words.isEmpty()) null else One.Step("type_text", "Type the words", buildJsonObject { put("text", words) })
+    }
+
     private val CLEAR_NOTIFICATIONS = Regex("""^(?:clear|dismiss|remove) (?:all |my |the )*notifications$""", RegexOption.IGNORE_CASE)
 
+    private val UPDATE_PATTERNS = listOf(
+        Regex("""^(?:check|look) for (?:an? )?(?:app |jarvis )?updates?$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:is there|are there) (?:an? )?(?:new )?(?:update|version)(?: (?:for|of) jarvis)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:update|upgrade) (?:jarvis|yourself|the app)(?: now)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:am i|are you) up to date$""", RegexOption.IGNORE_CASE),
+    )
+
     private fun phone(text: String): One? {
+        if (UPDATE_PATTERNS.any { it.matches(text) }) return One.Step("check_for_updates", "Check for a newer version", JsonObject(emptyMap()))
         NAV_PATTERNS.firstOrNull { it.first.matches(text) }?.let { (_, action) ->
             return One.Step("phone_navigate", "Phone: ${action.replace('_', ' ')}", buildJsonObject { put("action", action) })
         }
@@ -399,6 +417,10 @@ object NativeCommands {
         if (READ_SCREEN_PATTERNS.any { it.matches(text) }) return One.Step("read_screen", "Read the text on the screen", JsonObject(emptyMap()))
         if (READ_NOTIFICATION_PATTERNS.any { it.matches(text) }) return One.Step("read_notifications", "Read the current notifications", JsonObject(emptyMap()))
         if (CLEAR_NOTIFICATIONS.matches(text)) return One.Step("clear_notifications", "Dismiss all notifications", JsonObject(emptyMap()))
+        TAP.matchEntire(text)?.let { m ->
+            val label = m.groupValues[1].trim().trim('"', '“', '”', '.', ',').trim()
+            if (label.isNotEmpty()) return One.Step("tap_on_screen", "Tap $label", buildJsonObject { put("label", label) })
+        }
         return null
     }
 
@@ -463,11 +485,37 @@ object NativeCommands {
     private const val NOUN_SMS = """(?:text message|text|sms|message)"""
     private const val SEND_LEAD = """(?:(?:send|write|compose|type) (?:an? |my )?)?"""
 
+    private val WHATSAPP_GO_SEND = Regex(
+        """^(?:go to|open) $WA(?: and)? (?:send|write|message|text)(?: an? message)?(?: to)? (.{1,60}?)$SAYING(.{1,1000})$""",
+        RegexOption.IGNORE_CASE,
+    )
+
     private val WHATSAPP_PATTERNS = listOf(
         Regex("""^$SEND_LEAD$WA(?: message| text)?(?: to)? (.{1,60}?)$SAYING(.{1,1000})$""", RegexOption.IGNORE_CASE),
         Regex("""^$SEND_LEAD$NOUN_SMS (?:to )?(.{1,60}?) (?:on|via|using|through|in) $WA$SAYING(.{1,1000})$""", RegexOption.IGNORE_CASE),
         Regex("""^send (.{1,60}?) an? $WA(?: message| text)?$SAYING(.{1,1000})$""", RegexOption.IGNORE_CASE),
+        WHATSAPP_GO_SEND,
     )
+    // "go to WhatsApp and read my unread messages", "any new WhatsApp messages". Whole-phrase matches only, and checked before the
+    // message-writing patterns so "read WhatsApp unread" is never taken for a message to someone called "unread".
+    private val WHATSAPP_READ = listOf(
+        Regex(
+            """^(?:(?:go to|open) $WA(?: and)? )?(?:read|read out|check|tell me|show me)(?: me)? (?:(?:my|the|all|new|unread) )*""" +
+                """(?:$WA(?: (?:unread|new))?(?: (?:messages?|chats?|inbox|notifications?))?|(?:unread|new) (?:messages?|inbox|chats?)(?: (?:on|in|from) $WA)?)$""",
+            RegexOption.IGNORE_CASE,
+        ),
+        Regex("""^(?:do i have|have i got|are there|any)(?: any)? (?:new |unread )*$WA(?: messages?| chats?)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^what(?:'s| is| are)(?: my| the)? (?:new|unread)(?: messages?)?(?: on| in) $WA$""", RegexOption.IGNORE_CASE),
+        Regex("""^what(?:'s| is) new (?:on|in) $WA$""", RegexOption.IGNORE_CASE),
+    )
+
+    private fun whatsappRead(text: String): One? =
+        if (WHATSAPP_READ.any { it.matches(text) }) {
+            One.Step("read_whatsapp_unread", "Read the unread WhatsApp messages", JsonObject(emptyMap()))
+        } else {
+            null
+        }
+
     private val SMS_PATTERNS = listOf(
         Regex("""^$SEND_LEAD$NOUN_SMS(?: to)? (.{1,60}?)$SAYING(.{1,1000})$""", RegexOption.IGNORE_CASE),
         Regex("""^send (.{1,60}?) an? $NOUN_SMS$SAYING(.{1,1000})$""", RegexOption.IGNORE_CASE),

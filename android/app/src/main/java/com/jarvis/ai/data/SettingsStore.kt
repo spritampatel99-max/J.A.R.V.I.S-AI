@@ -71,6 +71,9 @@ class SettingsStore(context: Context) {
             .putFloat(KEY_FLARE, next.flare)
             .putBoolean(KEY_SPEAK, next.speakReplies)
             .putFloat(KEY_RATE, next.speechRate)
+            .putBoolean(KEY_ON_DEVICE_ONLY, next.onDeviceSpeechOnly)
+            .putString(KEY_THEME, next.themeMode.name)
+            .putBoolean(KEY_DYNAMIC, next.dynamicColor)
             .apply { if (next.voiceName == null) remove(KEY_VOICE) else putString(KEY_VOICE, next.voiceName) }
             .apply()
         uiFlow.value = next
@@ -83,6 +86,9 @@ class SettingsStore(context: Context) {
         speakReplies = prefs.getBoolean(KEY_SPEAK, true),
         speechRate = prefs.getFloat(KEY_RATE, 1.0f),
         voiceName = prefs.getString(KEY_VOICE, null),
+        onDeviceSpeechOnly = prefs.getBoolean(KEY_ON_DEVICE_ONLY, false),
+        themeMode = ThemeMode.entries.firstOrNull { it.name == prefs.getString(KEY_THEME, null) } ?: ThemeMode.SYSTEM,
+        dynamicColor = prefs.getBoolean(KEY_DYNAMIC, false),
     ).sanitised()
 
     /**
@@ -115,6 +121,75 @@ class SettingsStore(context: Context) {
             prefs.edit().putStringSet(KEY_SCREEN_BLOCKLIST, value.toSet()).apply()
         }
 
+    /**
+     * Whether JARVIS may press buttons and type in other apps (accessibility "click" and "set text" on a control found by its
+     * name). Off until the person switches it on. Banking, payment, password apps and JARVIS itself stay off limits either way.
+     */
+    var tapAndTypeOn: Boolean
+        get() = prefs.getBoolean(KEY_TAP_TYPE, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_TAP_TYPE, value).apply()
+        }
+
+    /**
+     * Whether JARVIS presses Send itself in WhatsApp after a WhatsApp message was confirmed (by a tap, or by the spoken read-back
+     * and countdown). Off until the person switches it on. Send is only pressed if the box holds exactly the approved words.
+     */
+    var whatsappSendOn: Boolean
+        get() = prefs.getBoolean(KEY_WA_SEND, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_WA_SEND, value).apply()
+        }
+
+    /**
+     * The nightly 10 pm review: looks for a newer release (at most every 10 days), turns repeated failures and setting problems into
+     * suggestions, and notifies. It changes nothing by itself. Off until the person switches it on; switching it on starts counting from now,
+     * so the first review is tonight at 10 pm, not an immediate one.
+     */
+    var nightlyOn: Boolean
+        get() = prefs.getBoolean(KEY_NIGHTLY, false)
+        set(value) {
+            val editor = prefs.edit().putBoolean(KEY_NIGHTLY, value)
+            if (value && !prefs.getBoolean(KEY_NIGHTLY, false)) editor.putLong(KEY_NIGHTLY_LAST, System.currentTimeMillis())
+            editor.apply()
+        }
+
+    var nightlyLastRunMs: Long
+        get() = prefs.getLong(KEY_NIGHTLY_LAST, 0L)
+        set(value) {
+            prefs.edit().putLong(KEY_NIGHTLY_LAST, value).apply()
+        }
+
+    /** When the release page was last read successfully, or null if never. */
+    var updateLastCheckMs: Long?
+        get() = prefs.getLong(KEY_UPDATE_CHECK, -1L).takeIf { it >= 0 }
+        set(value) {
+            val editor = prefs.edit()
+            if (value == null) editor.remove(KEY_UPDATE_CHECK) else editor.putLong(KEY_UPDATE_CHECK, value)
+            editor.apply()
+        }
+
+    /** The newest release found, as stored by ReleaseStore. */
+    var knownRelease: String?
+        get() = prefs.getString(KEY_KNOWN_RELEASE, null)
+        set(value) {
+            prefs.edit().putString(KEY_KNOWN_RELEASE, value).apply()
+        }
+
+    /** The suggestions from the last review that the person has not answered yet, as stored by NightlyReview. */
+    var nightlyProposals: String?
+        get() = prefs.getString(KEY_PROPOSALS, null)
+        set(value) {
+            prefs.edit().putString(KEY_PROPOSALS, value).apply()
+        }
+
+    /** Suggestion ids the person answered "leave as it is" to; they are not suggested again. */
+    var leftAsIs: Set<String>
+        get() = prefs.getStringSet(KEY_LEFT_AS_IS, emptySet())?.toSet().orEmpty()
+        set(value) {
+            prefs.edit().putStringSet(KEY_LEFT_AS_IS, value.toSet()).apply()
+        }
+
     /** When on, MEDIUM-risk actions (for example setting an alarm) also ask first. HIGH always asks. */
     var confirmMediumActions: Boolean
         get() = prefs.getBoolean(KEY_CONFIRM_MEDIUM, false)
@@ -137,6 +212,25 @@ class SettingsStore(context: Context) {
         editor.putBoolean(KEY_RETIRED_DROPPED, true).apply()
     }
 
+    /** The last time the app woke to do scheduled work (reminders and automations), or null. Used only to explain missed runs. */
+    var lastWakeMs: Long?
+        get() = prefs.getLong(KEY_LAST_WAKE, -1L).takeIf { it >= 0 }
+        set(value) {
+            if (value != null) prefs.edit().putLong(KEY_LAST_WAKE, value).apply()
+        }
+
+    /** Which detector listens for "Jarvis". Vosk needs no account; Porcupine needs the person's own Picovoice AccessKey. */
+    var wakeEngine: WakeEngine
+        get() = WakeEngine.entries.firstOrNull { it.name == prefs.getString(KEY_WAKE_ENGINE, null) } ?: WakeEngine.VOSK
+        set(value) = prefs.edit().putString(KEY_WAKE_ENGINE, value.name).apply()
+
+    /** The folder the person chose for auto-saving conversations (an Android document-tree address), or null when auto-save is off. */
+    var archiveFolder: String?
+        get() = prefs.getString(KEY_ARCHIVE, null)?.takeIf { it.isNotBlank() }
+        set(value) {
+            if (value.isNullOrBlank()) prefs.edit().remove(KEY_ARCHIVE).apply() else prefs.edit().putString(KEY_ARCHIVE, value).apply()
+        }
+
     private fun modelKey(id: ProviderId) = "model_${id.name}"
 
     private fun endpointKey(id: ProviderId) = "endpoint_${id.name}"
@@ -155,6 +249,20 @@ class SettingsStore(context: Context) {
         const val KEY_SPEAK = "voice_speak_replies"
         const val KEY_RATE = "voice_rate"
         const val KEY_VOICE = "voice_name"
+        const val KEY_WAKE_ENGINE = "wake_engine"
+        const val KEY_ARCHIVE = "chat_archive_folder"
+        const val KEY_LAST_WAKE = "schedule_last_wake_ms"
+        const val KEY_ON_DEVICE_ONLY = "voice_on_device_only"
+        const val KEY_TAP_TYPE = "screen_tap_and_type_on"
+        const val KEY_WA_SEND = "whatsapp_press_send_on"
+        const val KEY_NIGHTLY = "nightly_review_on"
+        const val KEY_NIGHTLY_LAST = "nightly_review_last_ms"
+        const val KEY_UPDATE_CHECK = "update_last_check_ms"
+        const val KEY_KNOWN_RELEASE = "update_known_release"
+        const val KEY_PROPOSALS = "nightly_proposals"
+        const val KEY_LEFT_AS_IS = "nightly_left_as_is"
+        const val KEY_THEME = "ui_theme_mode"
+        const val KEY_DYNAMIC = "ui_dynamic_color"
         const val KEY_RETIRED_DROPPED = "retired_model_defaults_dropped_v1"
     }
 }

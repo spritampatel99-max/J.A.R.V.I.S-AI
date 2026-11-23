@@ -79,4 +79,15 @@ class DevicePorts(
     val media: MediaKeys? = null,
     val email: EmailPort? = null,
     val camera: CameraLauncher? = null,
+    /** Lets a WhatsApp message be sent hands-free. Absent, or [WhatsAppSender.enabled] false, the person presses Send. */
+    val whatsappSender: WhatsAppSender? = null,
 )
+
+/** Presses Send in WhatsApp for a message that was just opened with the text typed in. Off unless the person switched it on. */
+interface WhatsAppSender {
+    /** True only while the person's own "press Send for me in WhatsApp" switch is on. Read fresh for every message. */
+    val enabled: Boolean
+
+    /** Presses Send if WhatsApp is in front and its message box holds exactly [expected]. */
+    suspend fun pressSend(expected: String): com.jarvis.ai.ai.tools.screen.SendPress
+}

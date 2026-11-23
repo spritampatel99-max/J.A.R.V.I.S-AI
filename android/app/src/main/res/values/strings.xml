@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">JARVIS 3.0</string>
-    <string name="accessibility_service_description">Lets JARVIS 3.0 read aloud the text on the screen in front, scroll it, and press Back, Home, Recents, Lock and Screenshot when you ask. It cannot tap or type in other apps. It skips banking, payment and password apps and password fields, and nothing it reads is saved or sent to an AI.</string>
+    <string name="accessibility_service_description">Lets JARVIS 3.0 read aloud the text on the screen in front, scroll it, and press Back, Home, Recents, Lock and Screenshot when you ask. Only if you switch it on in Prefs, it can also press a button or type in another app and press Send in WhatsApp for a message you confirmed. It skips banking, payment and password apps and password fields, and nothing it reads is saved or sent to an AI.</string>
 </resources>

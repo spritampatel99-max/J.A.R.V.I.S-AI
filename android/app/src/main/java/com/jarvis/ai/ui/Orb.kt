@@ -102,7 +102,7 @@ fun HeroOrb(state: VoiceState, level: Float, modifier: Modifier = Modifier, diam
         glow(r * 0.78f, 0.45f * flare * energy, Color.White, palette[0], palette[1])
 
         // 2. Frosted disc and breathing core.
-        drawCircle(Color.White.copy(alpha = 0.05f), radius = r * 0.62f, center = c)
+        drawCircle(JarvisColors.Edge.copy(alpha = 0.05f), radius = r * 0.62f, center = c)
         drawCircle(Color.White.copy(alpha = 0.28f), radius = r * 0.62f, center = c, style = Stroke(width = 1.dp.toPx()))
         val core = r * 0.5f * breathe * (1f + 0.12f * level.coerceIn(0f, 1f))
         drawCircle(
@@ -175,7 +175,7 @@ fun VoiceWave(state: VoiceState, level: Float, modifier: Modifier = Modifier) {
         modifier
             .height(28.dp)
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.10f))
+            .background(JarvisColors.Edge.copy(alpha = 0.10f))
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,

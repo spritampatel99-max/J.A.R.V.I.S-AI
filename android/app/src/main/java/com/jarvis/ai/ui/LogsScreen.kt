@@ -93,6 +93,7 @@ fun LogsScreen(vm: AgentViewModel) {
                     Counter("By voice", voiceCount.toString(), Modifier.weight(1f))
                     Counter("On phone", formatSize(size), Modifier.weight(1f))
                 }
+                Box(Modifier.padding(top = 10.dp)) { SaveToFilesCard(vm.archiver) }
                 Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     GlassChip("All", onClick = { filter = HistoryFilter.ALL }, selected = filter == HistoryFilter.ALL)
                     GlassChip("Voice", onClick = { filter = HistoryFilter.VOICE }, selected = filter == HistoryFilter.VOICE, glyph = Glyph.MIC)
@@ -163,8 +164,8 @@ private fun Counter(label: String, value: String, modifier: Modifier) {
     Column(
         modifier
             .clip(MaterialTheme.shapes.medium)
-            .background(Color.White.copy(alpha = 0.05f))
-            .border(1.dp, Color.White.copy(alpha = 0.10f), MaterialTheme.shapes.medium)
+            .background(JarvisColors.Edge.copy(alpha = 0.05f))
+            .border(1.dp, JarvisColors.Edge.copy(alpha = 0.10f), MaterialTheme.shapes.medium)
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Text(value, style = MaterialTheme.typography.titleLarge, color = JarvisColors.Cyan)

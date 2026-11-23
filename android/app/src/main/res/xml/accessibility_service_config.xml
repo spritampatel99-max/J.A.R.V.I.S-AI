@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Read the text of the window in front, scroll it, and press the system's Back, Home, Recents, Notifications, Quick settings,
-  Lock and Screenshot controls. Gestures (taps, swipes, typing into other apps) are deliberately NOT requested.
+  Read the text of the window in front, scroll it, press the system's Back, Home, Recents, Notifications, Quick settings, Lock and
+  Screenshot controls, and (only when the person switched it on in Prefs) press a labelled control and type into a text box using
+  Android's own click and set-text actions. Coordinate gestures (swipes, taps at a position) are deliberately NOT requested.
+  flagReportViewIds lets a control be found by its view name as well as its label.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagDefault"
+    android:accessibilityFlags="flagDefault|flagReportViewIds"
     android:canPerformGestures="false"
     android:canRetrieveWindowContent="true"
     android:description="@string/accessibility_service_description"

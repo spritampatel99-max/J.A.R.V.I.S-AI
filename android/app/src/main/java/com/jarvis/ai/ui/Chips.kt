@@ -24,8 +24,8 @@ fun GlassChip(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, 
     Row(
         modifier
             .clip(CircleShape)
-            .background(if (selected) JarvisColors.Cyan.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.06f))
-            .border(1.dp, if (selected) JarvisColors.Cyan.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.14f), CircleShape)
+            .background(if (selected) JarvisColors.Cyan.copy(alpha = 0.14f) else JarvisColors.Edge.copy(alpha = 0.06f))
+            .border(1.dp, if (selected) JarvisColors.Cyan.copy(alpha = 0.55f) else JarvisColors.Edge.copy(alpha = 0.14f), CircleShape)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,

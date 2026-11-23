@@ -24,6 +24,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.jarvis.ai.AppContainer
 import com.jarvis.ai.JarvisApplication
+import com.jarvis.ai.data.WakeEngine
 import com.jarvis.ai.ui.MainActivity
 import com.jarvis.ai.ui.Sender
 import kotlinx.coroutines.CoroutineScope
@@ -72,7 +73,7 @@ class HandsFreeService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private lateinit var container: AppContainer
 
-    private var wake: PorcupineManager? = null
+    private var wake: WakeDetector? = null
     private var wakeRunning = false
     private var overlay: HandsFreeOverlay? = null
     private var controller: Job? = null
@@ -106,21 +107,9 @@ class HandsFreeService : Service() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             return fail("Allow the microphone first (Prefs > Access).")
         }
-        val accessKey = container.keys.get(ACCESS_KEY_NAME)
-        if (accessKey.isNullOrBlank()) return fail("Enter your Picovoice AccessKey first (Prefs > Hands-free).")
-
-        val detector = try {
-            PorcupineManager.Builder()
-                .setAccessKey(accessKey)
-                .setKeyword(Porcupine.BuiltInKeyword.JARVIS)
-                .setSensitivity(SENSITIVITY)
-                .setErrorCallback { e -> main.post { fail("The wake-word listener stopped: ${e.message.orEmpty().take(120)}") } }
-                .build(applicationContext, PorcupineManagerCallback { main.post { onWakeWord() } })
-        } catch (e: PorcupineException) {
-            // The message never contains the key. Typical causes: a wrong AccessKey, no internet to check it, or the free limit.
-            return fail("The wake-word listener could not start: ${e.message.orEmpty().take(160)}")
-        } catch (e: RuntimeException) {
-            return fail("The wake-word listener could not start (${e.javaClass.simpleName}).")
+        val detector: WakeDetector = when (container.settings.wakeEngine) {
+            WakeEngine.PORCUPINE -> buildPorcupine() ?: return START_NOT_STICKY
+            WakeEngine.VOSK -> buildVosk() ?: return START_NOT_STICKY
         }
         wake = detector
 
@@ -128,6 +117,54 @@ class HandsFreeService : Service() {
         startController()
         status.value = HandsFreeStatus.Waiting
         return START_NOT_STICKY
+    }
+
+    /** @return the detector, or null after reporting why it could not be made. */
+    private fun buildPorcupine(): WakeDetector? {
+        val accessKey = container.keys.get(ACCESS_KEY_NAME)
+        if (accessKey.isNullOrBlank()) {
+            fail("Enter your Picovoice AccessKey first (Prefs > Hands-free), or switch to the offline listener that needs no key.")
+            return null
+        }
+        return try {
+            PorcupineWake(
+                PorcupineManager.Builder()
+                    .setAccessKey(accessKey)
+                    .setKeyword(Porcupine.BuiltInKeyword.JARVIS)
+                    .setSensitivity(SENSITIVITY)
+                    .setErrorCallback { e -> main.post { fail("The wake-word listener stopped: ${e.message.orEmpty().take(120)}") } }
+                    .build(applicationContext, PorcupineManagerCallback { main.post { onWakeWord() } }),
+            )
+        } catch (e: PorcupineException) {
+            // The message never contains the key. Typical causes: a wrong AccessKey, no internet to check it, or the free limit.
+            fail("The wake-word listener could not start: ${e.message.orEmpty().take(160)}")
+            null
+        } catch (e: RuntimeException) {
+            fail("The wake-word listener could not start (${e.javaClass.simpleName}).")
+            null
+        }
+    }
+
+    private fun buildVosk(): WakeDetector? {
+        val model = container.voskModel.open()
+        if (model == null) {
+            fail("Download the offline wake-word model first (Prefs > Hands-free > Offline listener).")
+            return null
+        }
+        return try {
+            VoskWake(
+                model = model,
+                onWake = { main.post { onWakeWord() } },
+                onHeard = { text -> lastHeard.value = text },
+                onProblem = { reason -> main.post { fail(reason) } },
+            )
+        } catch (e: RuntimeException) {
+            fail("The offline wake-word listener could not start (${e.javaClass.simpleName}).")
+            null
+        } catch (e: UnsatisfiedLinkError) {
+            fail("The offline wake-word library did not load on this phone.")
+            null
+        }
     }
 
     // ---- the loop -------------------------------------------------------------------------------------------------
@@ -245,7 +282,7 @@ class HandsFreeService : Service() {
             detector.start()
             wakeRunning = true
             status.value = HandsFreeStatus.Waiting
-        } catch (e: PorcupineException) {
+        } catch (e: WakeException) {
             fail("The wake-word listener could not resume: ${e.message.orEmpty().take(120)}")
         }
     }
@@ -254,11 +291,7 @@ class HandsFreeService : Service() {
         val detector = wake ?: return
         if (!wakeRunning) return
         wakeRunning = false
-        try {
-            detector.stop()
-        } catch (e: PorcupineException) {
-            // Stopping failed; the next resume will report it if the microphone really is stuck.
-        }
+        detector.stop()
     }
 
     private fun beep() {
@@ -283,13 +316,7 @@ class HandsFreeService : Service() {
     private fun stopHandsFree(keepStatus: Boolean = false) {
         controller?.cancel()
         pauseWake()
-        wake?.let {
-            try {
-                it.delete()
-            } catch (e: PorcupineException) {
-                // Nothing more can be done.
-            }
-        }
+        wake?.release()
         wake = null
         overlay?.hide()
         overlay = null
@@ -303,13 +330,7 @@ class HandsFreeService : Service() {
         hideJob?.cancel()
         scope.cancel()
         pauseWake()
-        wake?.let {
-            try {
-                it.delete()
-            } catch (e: PorcupineException) {
-                // Nothing more can be done.
-            }
-        }
+        wake?.release()
         wake = null
         overlay?.hide()
         container.voice.cancelListening()
@@ -380,6 +401,11 @@ class HandsFreeService : Service() {
 
         private val status = MutableStateFlow<HandsFreeStatus>(HandsFreeStatus.Off)
 
+        private val lastHeard = MutableStateFlow("")
+
+        /** What the offline listener last made out (a few words), shown on the Hands-free page so the person can see whether it hears them. */
+        val heardText: StateFlow<String> = lastHeard.asStateFlow()
+
         /** Shown on the Prefs > Hands-free page. */
         val state: StateFlow<HandsFreeStatus> = status.asStateFlow()
 
@@ -388,11 +414,23 @@ class HandsFreeService : Service() {
         /** Must be called while the app is on screen: Android refuses to start a microphone service from the background. */
         fun start(context: Context) {
             status.value = HandsFreeStatus.Waiting
-            ContextCompat.startForegroundService(context, Intent(context, HandsFreeService::class.java))
+            try {
+                ContextCompat.startForegroundService(context, Intent(context, HandsFreeService::class.java))
+            } catch (e: IllegalStateException) {
+                // Android 12+ throws here when the app is not on screen (ForegroundServiceStartNotAllowedException).
+                status.value = HandsFreeStatus.Problem("Android only lets hands-free start while the app is on screen. Open the app and turn it on there.")
+            } catch (e: SecurityException) {
+                status.value = HandsFreeStatus.Problem("Android did not allow a microphone service (${e.javaClass.simpleName}). Allow the microphone first.")
+            }
         }
 
         fun stop(context: Context) {
-            context.startService(Intent(context, HandsFreeService::class.java).setAction(ACTION_STOP))
+            try {
+                context.startService(Intent(context, HandsFreeService::class.java).setAction(ACTION_STOP))
+            } catch (e: IllegalStateException) {
+                // The app is in the background and the service is not running, so there is nothing to stop.
+                status.value = HandsFreeStatus.Off
+            }
         }
     }
 }

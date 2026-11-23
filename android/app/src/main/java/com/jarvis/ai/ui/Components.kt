@@ -109,7 +109,7 @@ fun AuroraBackdrop(modifier: Modifier = Modifier, content: @Composable BoxScope.
     Box(
         modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(JarvisColors.Void, Color(0xFF090E1C), JarvisColors.VoiceDeep))),
+            .background(Brush.verticalGradient(listOf(JarvisColors.Void, JarvisColors.BackdropMid, JarvisColors.VoiceDeep))),
     ) {
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width
@@ -135,7 +135,7 @@ fun AuroraBackdrop(modifier: Modifier = Modifier, content: @Composable BoxScope.
                 while (y < size.height) {
                     var x = step / 2
                     while (x < size.width) {
-                        drawCircle(Color.White.copy(alpha = 0.04f), radius = dot, center = Offset(x, y))
+                        drawCircle(JarvisColors.Edge.copy(alpha = 0.04f), radius = dot, center = Offset(x, y))
                         x += step
                     }
                     y += step
@@ -267,13 +267,13 @@ fun GlassCard(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(Color(0xFF141A2E).copy(alpha = 0.92f), Color(0xFF0D1222).copy(alpha = 0.94f))))
+            .background(Brush.verticalGradient(listOf(JarvisColors.CardTop.copy(alpha = 0.92f), JarvisColors.CardBottom.copy(alpha = 0.94f))))
             .border(
                 1.dp,
                 Brush.linearGradient(
                     listOf(
-                        (accent ?: Color.White).copy(alpha = if (accent != null) 0.42f else 0.12f),
-                        Color.White.copy(alpha = 0.06f),
+                        (accent ?: JarvisColors.Edge).copy(alpha = if (accent != null) 0.42f else 0.12f),
+                        JarvisColors.Edge.copy(alpha = 0.06f),
                     ),
                 ),
                 shape,
@@ -309,8 +309,8 @@ fun GlowButton(
                 alpha = if (enabled) 1f else 0.4f
             }
             .clip(shape)
-            .background(if (subtle) SolidColor(Color.White.copy(alpha = 0.06f)) else JarvisColors.spectrumHorizontal())
-            .then(if (subtle) Modifier.border(1.dp, Color.White.copy(alpha = 0.14f), shape) else Modifier)
+            .background(if (subtle) SolidColor(JarvisColors.Edge.copy(alpha = 0.06f)) else JarvisColors.spectrumHorizontal())
+            .then(if (subtle) Modifier.border(1.dp, JarvisColors.Edge.copy(alpha = 0.14f), shape) else Modifier)
             .clickable(interactionSource = interaction, indication = null, enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center,
@@ -363,8 +363,8 @@ fun FloatingNav(selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Mod
                 .widthIn(max = 384.dp)
                 .fillMaxWidth()
                 .clip(CircleShape)
-                .background(Color(0xFF080D1E).copy(alpha = 0.94f))
-                .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+                .background(JarvisColors.Nav.copy(alpha = 0.94f))
+                .border(1.dp, JarvisColors.Edge.copy(alpha = 0.15f), CircleShape)
                 .padding(6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
@@ -430,7 +430,7 @@ fun SpectrumSwitch(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modi
             .size(width = 48.dp, height = 28.dp)
             .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
             .clip(CircleShape)
-            .background(if (checked) JarvisColors.spectrumHorizontal() else SolidColor(Color(0xFF1C243C)))
+            .background(if (checked) JarvisColors.spectrumHorizontal() else SolidColor(JarvisColors.SwitchOff))
             .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
             .padding(2.dp),
     ) {
@@ -444,7 +444,7 @@ fun GlyphButton(
     glyph: Glyph,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = Color.White,
+    tint: Color = JarvisColors.Ink,
     size: Dp = 48.dp,
     description: String? = null,
 ) {
@@ -452,8 +452,8 @@ fun GlyphButton(
         modifier
             .size(size)
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.10f))
-            .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
+            .background(JarvisColors.Edge.copy(alpha = 0.10f))
+            .border(1.dp, JarvisColors.Edge.copy(alpha = 0.15f), CircleShape)
             .clickable(role = Role.Button, onClick = onClick)
             .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier),
         contentAlignment = Alignment.Center,
@@ -483,7 +483,7 @@ fun AppHeader(onProfile: () -> Unit, modifier: Modifier = Modifier) {
             }
         }
         Column(Modifier.padding(start = 10.dp).weight(1f)) {
-            Text("JARVIS 2.0", style = MaterialTheme.typography.labelLarge, color = JarvisColors.Ink, fontWeight = FontWeight.Bold)
+            Text("JARVIS 3.0", style = MaterialTheme.typography.labelLarge, color = JarvisColors.Ink, fontWeight = FontWeight.Bold)
             Text(
                 "07 // PRISMATIC SPECTRAL CORE",
                 style = MaterialTheme.typography.labelSmall.copy(brush = JarvisColors.spectrumHorizontal()),

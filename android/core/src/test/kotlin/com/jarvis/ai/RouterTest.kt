@@ -199,6 +199,34 @@ class RoutedLlmClientTest {
         settings: RoutingSettings = RoutingSettings(),
     ) = RoutedLlmClient(engine, { installed }, cloud, { cloudConfigured }, { settings })
 
+    private val photoRequest = LlmRequest(
+        "system",
+        listOf(ChatMessage(ChatRole.USER, "what is this?", listOf(com.jarvis.ai.ai.providers.ImageAttachment("image/jpeg", "QUJD")))),
+    )
+
+    @Test
+    fun aPhotoNeverGoesToAnOnDeviceModelAndFallsThroughToTheCloud() = runTest {
+        val engine = FakeEngine()
+        val cloud = FakeCloud()
+        val answer = client(engine = engine, cloud = cloud).complete(photoRequest)
+        assertEquals("cloud answer", answer.text)
+        assertEquals(0, engine.loads.size, "the local model was never even loaded")
+        assertEquals(1, cloud.calls)
+        assertTrue(answer.routeNotes.any { "cannot look at photos" in it }, answer.routeNotes.toString())
+    }
+
+    @Test
+    fun aPhotoInLocalOnlyModeIsRefusedAndNothingIsSentToTheCloud() = runTest {
+        val engine = FakeEngine()
+        val cloud = FakeCloud()
+        val error = assertFailsWith<NoRouteException> {
+            client(engine = engine, cloud = cloud, settings = RoutingSettings(mode = AiMode.LOCAL_ONLY)).complete(photoRequest)
+        }
+        assertEquals(0, cloud.calls, "local only never reaches the cloud, photo or not")
+        assertEquals(0, engine.loads.size)
+        assertTrue("photos" in error.notes.joinToString())
+    }
+
     @Test
     fun aLocalModelAnswersFirstAndTheCloudIsNotTouched() = runTest {
         val cloud = FakeCloud()

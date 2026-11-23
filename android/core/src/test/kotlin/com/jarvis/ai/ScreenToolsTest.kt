@@ -20,8 +20,10 @@ import com.jarvis.ai.ai.tools.screen.NotificationInfo
 import com.jarvis.ai.ai.tools.screen.NotificationPort
 import com.jarvis.ai.ai.tools.screen.PhoneAction
 import com.jarvis.ai.ai.tools.screen.PhoneNavigateTool
+import com.jarvis.ai.ai.tools.screen.RawBox
 import com.jarvis.ai.ai.tools.screen.RawResult
 import com.jarvis.ai.ai.tools.screen.RawScreen
+import com.jarvis.ai.ai.tools.screen.RawTap
 import com.jarvis.ai.ai.tools.screen.ReadNotificationsTool
 import com.jarvis.ai.ai.tools.screen.ReadScreenTool
 import com.jarvis.ai.ai.tools.screen.ScreenAct
@@ -80,6 +82,12 @@ class ScreenToolsTest {
             performed += action
             return RawResult.Done(front)
         }
+
+        override suspend fun tap(label: String, allow: (String) -> Boolean): RawTap = RawTap.NotFound
+
+        override suspend fun type(text: String, allow: (String) -> Boolean): RawResult = RawResult.Failed("not used here")
+
+        override suspend fun box(allow: (String) -> Boolean): RawBox = RawBox.None
     }
 
     private fun guarded(raw: RawScreen, personal: Set<String> = emptySet()) =
@@ -230,7 +238,7 @@ class ScreenToolsTest {
         })
 
         assertEquals(
-            setOf("read_screen", "screen_scroll", "phone_navigate", "read_notifications", "clear_notifications"),
+            setOf("read_screen", "screen_scroll", "phone_navigate", "tap_on_screen", "type_text", "read_notifications", "clear_notifications", "read_whatsapp_unread"),
             tools.map { it.spec.name }.toSet(),
         )
         assertTrue(tools.all { it.spec.risk == Risk.MEDIUM })
@@ -239,7 +247,7 @@ class ScreenToolsTest {
     @Test
     fun noToolIsRegisteredForAnAccessThatIsMissing() {
         assertTrue(ScreenTools.create(null, null).isEmpty())
-        assertEquals(3, ScreenTools.create(guarded(FakeRaw()), null).size)
+        assertEquals(5, ScreenTools.create(guarded(FakeRaw()), null).size)
     }
 
     @Test

@@ -46,8 +46,26 @@ class JarvisNotificationListener : NotificationListenerService() {
                     text = (extras?.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: extras?.getCharSequence(Notification.EXTRA_TEXT))
                         ?.toString()?.trim().orEmpty(),
                     packageName = sbn.packageName,
+                    lines = messageLines(extras),
                 )
             }
+    }
+
+    /** The individual messages of a chat notification (oldest first), or the lines of an inbox-style one. */
+    private fun messageLines(extras: android.os.Bundle?): List<String> {
+        if (extras == null) return emptyList()
+        val styled = try {
+            extras.getParcelableArray(Notification.EXTRA_MESSAGES, android.os.Bundle::class.java)
+                ?.let { Notification.MessagingStyle.Message.getMessagesFromBundleArray(it) }
+                ?.mapNotNull { it.text?.toString()?.trim()?.takeIf { text -> text.isNotEmpty() } }
+                .orEmpty()
+        } catch (e: RuntimeException) {
+            emptyList()
+        }
+        if (styled.isNotEmpty()) return styled
+        return extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            ?.mapNotNull { it?.toString()?.trim()?.takeIf { text -> text.isNotEmpty() } }
+            .orEmpty()
     }
 
     /** How many notifications could be dismissed right now. */

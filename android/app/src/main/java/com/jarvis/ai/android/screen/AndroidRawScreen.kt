@@ -3,8 +3,10 @@ package com.jarvis.ai.android.screen
 import android.accessibilityservice.AccessibilityService
 import com.jarvis.ai.ai.tools.screen.FrontApp
 import com.jarvis.ai.ai.tools.screen.PhoneAction
+import com.jarvis.ai.ai.tools.screen.RawBox
 import com.jarvis.ai.ai.tools.screen.RawResult
 import com.jarvis.ai.ai.tools.screen.RawScreen
+import com.jarvis.ai.ai.tools.screen.RawTap
 import com.jarvis.ai.ai.tools.screen.Snapshot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -46,6 +48,21 @@ class AndroidRawScreen : RawScreen {
                 JarvisAccessibilityService.Scroll.NoWindow -> RawResult.Failed("No window could be read.")
             }
         }
+    }
+
+    override suspend fun tap(label: String, allow: (String) -> Boolean): RawTap {
+        val service = ScreenHub.accessibility ?: return RawTap.Failed("The accessibility service is not running.")
+        return withContext(Dispatchers.Default) { service.tap(label, allow) }
+    }
+
+    override suspend fun type(text: String, allow: (String) -> Boolean): RawResult {
+        val service = ScreenHub.accessibility ?: return RawResult.Failed("The accessibility service is not running.")
+        return withContext(Dispatchers.Default) { service.type(text, allow) }
+    }
+
+    override suspend fun box(allow: (String) -> Boolean): RawBox {
+        val service = ScreenHub.accessibility ?: return RawBox.None
+        return withContext(Dispatchers.Default) { service.box(allow) }
     }
 
     override suspend fun perform(action: PhoneAction): RawResult {

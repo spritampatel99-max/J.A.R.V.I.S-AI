@@ -1,0 +1,96 @@
+name: Android build
+
+# Builds the Android app on GitHub's servers. It never uses a signing key: the APK is a debug build, signed with Android's public
+# debug key, for installing on your own phone. Start it from the Actions tab ("Run workflow") or by pushing a branch named ci/...
+on:
+  push:
+    branches: [ "ci/**" ]
+    paths: [ "android/**", ".github/workflows/android.yml" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # only to publish the trimmed build log to the throw-away "ci-logs" branch
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Core unit tests
+        id: core
+        continue-on-error: true
+        run: |
+          chmod +x gradlew
+          set -o pipefail
+          ./gradlew --no-daemon --console=plain :core:test 2>&1 | tee ci-core.log
+
+      - name: Build the app (debug APK)
+        id: app
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --console=plain :app:assembleDebug 2>&1 | tee ci-app.log
+
+      - name: Lint (Android's own checks)
+        id: lint
+        if: steps.app.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --console=plain :app:lintDebug 2>&1 | tee ci-lint.log
+
+      - name: 16 KB page-size check on the APK
+        id: kb16
+        if: steps.app.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          python3 tools/check_16kb.py "$APK" 2>&1 | tee ci-16kb.log
+
+      - name: Keep the APK
+        if: steps.app.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-3-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish the build log (errors only, trimmed)
+        if: always()
+        run: |
+          rep=$(mktemp -d)
+          for f in ci-core ci-app ci-lint ci-16kb; do
+            [ -f "$f.log" ] || continue
+            { echo "== $f (last 60 lines)"; tail -n 60 "$f.log"; echo; echo "== $f problems"; grep -nE "^e: |error:|FAILED|What went wrong|Could not (resolve|find)|Execution failed|AAPT|Manifest merger|Duplicate class" "$f.log" | head -400; } | head -c 300000 > "$rep/$f.txt"
+          done
+          { echo "run=$GITHUB_RUN_ID sha=$GITHUB_SHA"; echo "core=${{ steps.core.outcome }} app=${{ steps.app.outcome }} lint=${{ steps.lint.outcome }} kb16=${{ steps.kb16.outcome }}"; } > "$rep/RESULT.txt"
+          cd "$rep"
+          git init -q
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout -q -b ci-logs
+          git add -A
+          git commit -qm "build log for $GITHUB_SHA"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-logs
+
+      - name: Fail the run if the app or the core tests failed
+        if: steps.app.outcome != 'success' || steps.core.outcome != 'success'
+        run: exit 1

@@ -31,6 +31,21 @@ internal fun urlEncode(raw: String): String = URLEncoder.encode(raw, "UTF-8").re
 // Weather (Open-Meteo: no key, no account). The sentence is written here from numbers, never copied from the service.
 // ---------------------------------------------------------------------------------------------------------------------
 
+/** How the person's phone is set to show temperatures (Android 14 "Regional preferences"). The service always reports Celsius. */
+enum class TemperatureUnit {
+    CELSIUS,
+    FAHRENHEIT,
+    ;
+
+    /** [celsius] shown in this unit, rounded to a whole number. */
+    fun show(celsius: Int): Int = when (this) {
+        CELSIUS -> celsius
+        FAHRENHEIT -> Math.round(celsius * 9.0 / 5.0 + 32.0).toInt()
+    }
+
+    val symbol: String get() = if (this == CELSIUS) "°C" else "°F"
+}
+
 data class WeatherNow(val tempC: Int, val feelsC: Int?, val humidityPercent: Int?, val windKmh: Int?, val condition: String)
 
 data class WeatherReport(
@@ -43,18 +58,19 @@ data class WeatherReport(
     val rainChancePercent: Int?,
 ) {
     /** One short paragraph that reads well on screen and aloud. */
-    fun sentence(): String = buildString {
+    fun sentence(unit: TemperatureUnit = TemperatureUnit.CELSIUS): String = buildString {
+        val u = unit.symbol
         if (!tomorrow && now != null) {
-            append("Right now in $place it is ${now.tempC}°C and ${now.condition}")
-            if (now.feelsC != null && now.feelsC != now.tempC) append(", feels like ${now.feelsC}°C")
+            append("Right now in $place it is ${unit.show(now.tempC)}$u and ${now.condition}")
+            if (now.feelsC != null && now.feelsC != now.tempC) append(", feels like ${unit.show(now.feelsC)}$u")
             val extras = listOfNotNull(
                 now.humidityPercent?.let { "humidity $it%" },
                 now.windKmh?.let { "wind $it km/h" },
             )
             if (extras.isNotEmpty()) append(", ").append(extras.joinToString(", "))
-            append(". Today: ${dayCondition}, high ${highC}°C, low ${lowC}°C")
+            append(". Today: ${dayCondition}, high ${unit.show(highC)}$u, low ${unit.show(lowC)}$u")
         } else {
-            append("${if (tomorrow) "Tomorrow" else "Today"} in $place: ${dayCondition}, high ${highC}°C, low ${lowC}°C")
+            append("${if (tomorrow) "Tomorrow" else "Today"} in $place: ${dayCondition}, high ${unit.show(highC)}$u, low ${unit.show(lowC)}$u")
         }
         if (rainChancePercent != null) append(", $rainChancePercent% chance of rain")
         append('.')

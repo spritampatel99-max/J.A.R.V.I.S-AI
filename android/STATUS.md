@@ -13,7 +13,8 @@ The workspace cannot reach Google's Android build servers, so nothing in `app/` 
 - Opening apps by voice (needs "Display over other apps" to start apps from the background).
 - Spoken calls: read back "Calling X, mobile" and dial after 3 seconds unless you say "stop". Typed or AI-planned calls need a tap.
 - Texting and WhatsApp (open the app with the text ready; **you** press Send), timers (Clock app), media keys and volume.
-- Phone control: accessibility service (read screen, scroll, back/home/recents/lock/screenshot) and notification reader.
+- Phone control: accessibility service (read screen, scroll, back/home/recents/lock/screenshot), notification reader, "read my unread WhatsApp messages" (from showing notifications), and, behind two default-off switches, press-a-labelled-button, type-into-a-box and press-Send-in-WhatsApp.
+- Nightly 10 pm review and 10-day / on-command release check (notify and hand-off only), saved conversations as files (Logs > Save to your files), Vosk offline wake word (alternative to Picovoice, needs a ~40 MB model download), Android 14+ items (see CHANGELOG).
 - Offline library: download or import a Kiwix `.zim` Wikipedia file (Simple English about 1 GB, Top articles about 2.1 GB). Nothing downloads until you tap.
 - **Added after you pasted the "JARVIS 3.0" summary:** the 7th provider "FreeLLM / own endpoint" (you type an https address; Cloud tab field), `compose_email` and `open_camera` (Android classes `AndroidEmailPort`, `AndroidCameraLauncher`), and the "JARVIS 3.0" name in everything the app shows. See `docs/JARVIS_3_SUMMARY_MATCH.md` for the line-by-line comparison.
 - The AI-mode router wired into the app (Prefs > AI mode: Local only, Local first, Cloud assisted, Manual) and the Mistral provider.
@@ -26,12 +27,14 @@ The default build contains **no** engine, so an installed Gemma model still cann
 ## Differences from the pasted "JARVIS 3.0" summary (deliberate)
 - **FreeLLM** has no built-in address. The `freellm.com` endpoint and "no key, 87+ models" claim could not be verified, so the provider takes an address you type.
 - **No per-app tool minting** (`DynamicToolRegistry`): apps are found by name at call time instead, so an installed app's name can never become part of the planner's tool list.
-- **No WhatsApp auto-send** through the accessibility service: your own master prompt says not to use Accessibility as an automation bypass.
+- **WhatsApp auto-send is opt-in** and reverses an earlier rule at the owner's explicit request: off by default, needs confirmation or the spoken read-back, and Send is pressed only if the box holds exactly the approved text.
 - **Alarms and timers** are handed to the Clock app instead of being set with `AlarmManager`; there is **no media "seek"**; and "hey Jarvis" works only because it contains the word "Jarvis" (no separate keywords).
 - The summary's model names (gemini-1.5-flash and so on) are retired; the app loads each provider's live list instead.
 
 ## Not built
-- Tapping or typing inside other apps, and pressing Send for you (deliberately not requested from Android; the accessibility service can read and press system buttons only).
+- Tapping at screen positions, swipes and gestures (not requested from Android). Button presses and typing use node actions only.
+- Self-modifying code or a silent self-update (an app cannot do this; new versions are installed by you).
+- Live Updates notifications.
 - Streaming replies / speaking the first sentence early.
 - A light theme, a floating orb over other apps.
 - A custom "hyee" wake word (needs a keyword file trained in the Picovoice console).
@@ -41,7 +44,7 @@ The default build contains **no** engine, so an installed Gemma model still cann
 ## Not taken from your JARVIS-Project zip, and why
 - Its `core` files did not compile against the current code, so they were not copied.
 - `LocalEngine` there was a template-based placeholder (not a model), `WakeWordService` simulated detection instead of listening for a word, and `SpeakerVerification` gave a false sense of security. The wake word is replaced by the real Porcupine service; the other two were left out.
-- The accessibility auto-sender (taps Send in WhatsApp for you) was left out: it breaks the rule that sending is your own tap.
+- The accessibility auto-sender from that zip was not copied. A new one was written for this project with the guards in `docs/VOICE_AND_CALLS.md` (opt-in, verified text, read-back).
 - `WhatsAppWidget` and `MiniOrbService` did not compile; the half-finished light-theme refactor, `DynamicToolRegistry`/`AppCatalog` and the FreeLLM provider were left out. His manifest had invalid permissions, exported widget receivers and no notification-listener service.
 - The ideas were kept where they could be built honestly: messaging, timers, media keys, Mistral, the AI-mode router and the engine opt-in.
 

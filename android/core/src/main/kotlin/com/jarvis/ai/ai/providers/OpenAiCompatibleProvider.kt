@@ -88,7 +88,19 @@ class OpenAiCompatibleProvider(
                 for (message in request.messages) {
                     addJsonObject {
                         put("role", message.role.openAiName)
-                        put("content", message.content)
+                        if (message.images.isEmpty()) {
+                            put("content", message.content)
+                        } else {
+                            putJsonArray("content") {
+                                addJsonObject { put("type", "text"); put("text", message.content) }
+                                for (image in message.images) {
+                                    addJsonObject {
+                                        put("type", "image_url")
+                                        putJsonObject("image_url") { put("url", "data:${image.mimeType};base64,${image.base64}") }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
