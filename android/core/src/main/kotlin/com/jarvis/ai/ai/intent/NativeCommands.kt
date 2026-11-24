@@ -77,7 +77,7 @@ object NativeCommands {
 
     private fun onPhone(text: String): One? =
         calculator(text) ?: convertUnits(text) ?: randomPick(text) ?: brightness(text) ?: soundMode(text) ?: settingsPage(text)
-            ?: dismissAlarm(text) ?: maps(text) ?: countApps(text) ?: accessCheck(text) ?: clipboard(text)
+            ?: dismissAlarm(text) ?: paymentMode(text) ?: maps(text) ?: countApps(text) ?: accessCheck(text) ?: clipboard(text)
 
     private val CALC_VERB = Regex("""^(?:calculate|compute|work out|solve|what(?:'s| is)|whats|how much is) (.{1,150})$""", RegexOption.IGNORE_CASE)
 
@@ -271,6 +271,14 @@ object NativeCommands {
 
     private fun dismissAlarm(text: String): One? =
         if (DISMISS_ALARM.matches(text)) One.Step("dismiss_alarm", "Dismiss the ringing or next alarm", JsonObject(emptyMap())) else null
+
+    private val PAYMENT_MODE = Regex(
+        """^(?:(?:turn on|start|enable|switch to|go to|activate) )?(?:payment|pay) mode(?: on)?$|^(?:i(?: am|'m) (?:going to|about to|gonna) (?:pay|make a payment|do a payment)|i want to (?:pay|make a payment)|turn off (?:jarvis )?for (?:a )?payment)$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private fun paymentMode(text: String): One? =
+        if (PAYMENT_MODE.matches(text)) One.Step("payment_mode", "Switch off screen control so a payment app can run", JsonObject(emptyMap())) else null
 
     private val DIRECTIONS = listOf(
         Regex("""^(?:navigate|drive|walk|route|guide) (?:me )?(?:to|for) (?:the )?(.{2,100})$""", RegexOption.IGNORE_CASE),

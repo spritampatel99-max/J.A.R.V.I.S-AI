@@ -94,7 +94,16 @@ interface PhoneSettingsPort {
 
     /** Puts [text] on the clipboard. @return false when Android refused. */
     fun copyToClipboard(text: String): Boolean
+
+    /**
+     * Turns off everything of JARVIS that reads or draws over other apps' screens, so a payment or banking app that refuses to run next to
+     * them can be used. Cannot be undone from here: Android only lets the person switch the accessibility service back on.
+     */
+    fun enterPaymentMode(): PaymentModeResult = PaymentModeResult(screenControlWasOn = false, screenControlAsked = false, handsFreeStopped = false)
 }
+
+/** [screenControlAsked] = Android was asked to switch the service off; it does not report back, so this is not proof it is off. */
+data class PaymentModeResult(val screenControlWasOn: Boolean, val screenControlAsked: Boolean, val handsFreeStopped: Boolean)
 
 /** One kind of access (notification access, accessibility, microphone...) and whether it is switched on right now. */
 data class AccessLine(val title: String, val on: Boolean, val unlocks: String)
@@ -245,6 +254,34 @@ class DismissAlarmTool(private val settings: PhoneSettingsPort) : Tool {
         )
         is LaunchResult.NoHandler -> ToolResult.Failure(ToolError.Unavailable("The Clock app on this phone does not accept that request. Open the Clock app to turn the alarm off."))
         is LaunchResult.Failed -> ToolResult.Failure(ToolError.Failed(result.reason))
+    }
+}
+
+class PaymentModeTool(private val settings: PhoneSettingsPort) : Tool {
+    override val spec = ToolSpec(
+        name = "payment_mode",
+        description = "Before paying in a payment or banking app: switch off JARVIS's screen control and hands-free listening so nothing of JARVIS is reading or drawing over the screen.",
+        params = emptyList(),
+        risk = Risk.LOW,
+        timeoutMs = 5_000L,
+        resultFormat = "HANDED_OFF: Android was asked to switch the screen-control service off; it does not report back.",
+    )
+
+    override fun describe(args: ToolArgs): String = "Switch off JARVIS's screen control and listening so a payment app can run"
+
+    override suspend fun execute(args: ToolArgs): ToolResult {
+        val r = settings.enterPaymentMode()
+        val screen = when {
+            r.screenControlAsked -> "I asked Android to switch off JARVIS's screen control."
+            r.screenControlWasOn -> "I could not switch off JARVIS's screen control; turn it off in Settings > Accessibility > JARVIS."
+            else -> "JARVIS's screen control was already off."
+        }
+        val listening = if (r.handsFreeStopped) " Hands-free listening is stopped." else ""
+        return ToolResult.Success(
+            "Payment mode: $screen$listening Some payment apps close or go to the home screen while any screen-reading service is on. " +
+                "I never press anything in a payment app. To bring JARVIS back: Settings > Accessibility > JARVIS, then start hands-free again.",
+            Verification.HANDED_OFF,
+        )
     }
 }
 

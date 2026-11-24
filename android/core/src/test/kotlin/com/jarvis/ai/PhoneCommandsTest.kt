@@ -446,3 +446,40 @@ class ContactNameFallbackTest {
         assertTrue(com.jarvis.ai.ai.tools.builtin.ContactLookupForTest.resolve(book, "Rohit Verma").startsWith("FOUND:"))
     }
 }
+
+class PaymentModeTest {
+    private fun tool(text: String): String? =
+        ((com.jarvis.ai.ai.intent.NativeCommands.match(text) as? com.jarvis.ai.ai.intent.NativeCommands.Match.Run)?.steps?.singleOrNull())?.tool
+
+    @kotlin.test.Test fun paymentModePhrasesMapToThePaymentModeTool() {
+        for (phrase in listOf("payment mode", "pay mode", "turn on payment mode", "i am going to pay", "i want to make a payment", "turn off jarvis for payment")) {
+            kotlin.test.assertEquals("payment_mode", tool(phrase), phrase)
+        }
+    }
+
+    @kotlin.test.Test fun ordinarySentencesAboutPayingDoNotTriggerIt() {
+        for (phrase in listOf("how do I pay my electricity bill", "pay rent reminder tomorrow", "open phonepe")) {
+            kotlin.test.assertNotEquals("payment_mode", tool(phrase), phrase)
+        }
+    }
+
+    @kotlin.test.Test fun theToolSaysWhatHappenedAndNeverClaimsMore() = kotlinx.coroutines.test.runTest {
+        suspend fun run(r: com.jarvis.ai.ai.tools.builtin.PaymentModeResult): String {
+            val port = object : com.jarvis.ai.ai.tools.builtin.PhoneSettingsPort {
+                override fun brightnessPercent() = null
+                override fun setBrightnessPercent(percent: Int) = com.jarvis.ai.ai.tools.builtin.BrightnessResult.Failed("n/a")
+                override fun setSoundMode(mode: com.jarvis.ai.ai.tools.builtin.SoundMode) = throw IllegalStateException("no")
+                override fun open(page: com.jarvis.ai.ai.tools.builtin.SettingsPage) = throw IllegalStateException("no")
+                override fun dismissAlarm() = throw IllegalStateException("no")
+                override fun copyToClipboard(text: String) = false
+                override fun enterPaymentMode() = r
+            }
+            val result = com.jarvis.ai.ai.tools.builtin.PaymentModeTool(port).execute(com.jarvis.ai.ai.tools.ToolArgs(emptyMap()))
+            return (result as com.jarvis.ai.ai.tools.ToolResult.Success).message
+        }
+        kotlin.test.assertTrue(run(com.jarvis.ai.ai.tools.builtin.PaymentModeResult(true, true, true)).contains("asked Android"))
+        kotlin.test.assertTrue(run(com.jarvis.ai.ai.tools.builtin.PaymentModeResult(true, false, false)).contains("could not switch off"))
+        kotlin.test.assertTrue(run(com.jarvis.ai.ai.tools.builtin.PaymentModeResult(false, false, true)).contains("already off"))
+        kotlin.test.assertFalse(run(com.jarvis.ai.ai.tools.builtin.PaymentModeResult(true, true, true)).contains("is off"), "must not claim it is off")
+    }
+}

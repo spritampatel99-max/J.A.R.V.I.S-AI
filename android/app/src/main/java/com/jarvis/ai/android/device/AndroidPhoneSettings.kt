@@ -13,6 +13,9 @@ import com.jarvis.ai.ai.tools.builtin.AccessLine
 import com.jarvis.ai.ai.tools.builtin.AccessReporter
 import com.jarvis.ai.ai.tools.builtin.BrightnessResult
 import com.jarvis.ai.ai.tools.builtin.LaunchResult
+import com.jarvis.ai.ai.tools.builtin.PaymentModeResult
+import com.jarvis.ai.android.screen.ScreenHub
+import com.jarvis.ai.android.voice.HandsFreeService
 import com.jarvis.ai.ai.tools.builtin.PhoneSettingsPort
 import com.jarvis.ai.ai.tools.builtin.SettingsPage
 import com.jarvis.ai.ai.tools.builtin.SoundMode
@@ -125,6 +128,26 @@ class AndroidPhoneSettings(context: Context, private val foreground: ForegroundT
             SettingsPage.DO_NOT_DISTURB_ACCESS -> Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
             SettingsPage.THIS_APP -> AccessChecks.appSettingsIntent(context)
         }
+    }
+
+    override fun enterPaymentMode(): PaymentModeResult {
+        val service = ScreenHub.accessibility
+        var asked = false
+        if (service != null) {
+            try {
+                service.switchOff()
+                asked = true
+            } catch (e: RuntimeException) {
+                // Android refused; reported honestly below.
+            }
+        }
+        val stopped = try {
+            HandsFreeService.stop(context)
+            true
+        } catch (e: RuntimeException) {
+            false
+        }
+        return PaymentModeResult(screenControlWasOn = service != null, screenControlAsked = asked, handsFreeStopped = stopped)
     }
 
     override fun dismissAlarm(): LaunchResult {

@@ -36,6 +36,7 @@ object BuiltinTools {
             ports.settings?.let { SetSoundModeTool(it) },
             ports.settings?.let { OpenSettingsTool(it) },
             ports.settings?.let { DismissAlarmTool(it) },
+            ports.settings?.let { PaymentModeTool(it) },
             ports.settings?.let { CopyToClipboardTool(it) },
             ports.apps?.let { CountAppsTool(it) },
             ports.access?.let { CheckAccessTool(it) },

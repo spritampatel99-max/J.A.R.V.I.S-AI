@@ -46,6 +46,9 @@ class JarvisAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
+    /** Switches this service off (Android 7+). Only the person can switch it back on, in Settings > Accessibility. */
+    fun switchOff() = disableSelf()
+
     /** The package of the window Android says is active, or null when none can be read right now. */
     fun frontPackage(): String? {
         val root = rootInActiveWindow ?: return null

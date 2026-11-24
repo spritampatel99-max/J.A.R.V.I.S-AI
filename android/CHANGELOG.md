@@ -104,3 +104,7 @@ Android 14+ move (`minSdk` 34, target 35) and the owner's second list. `:core` p
 - Problems 03 / 08: a failed write (any exception, not only `IOException`) marks the data as unsaved and is retried at every wake-up; a damaged or partly unreadable file is backed up (`<file>.damaged`), reported on the Automations / Planner screens, and no longer silently becomes an empty planner.
 - Mutation checks: 12 deliberate breaks of the new logic; 4 survived at first (running guard, early wake-up request, write-failure catch, and one covered twice); tests added and all are now caught.
 - Not done: WorkManager (no new dependency added; automations are short and low-risk), replanning history (Problem 09), reminder / Android alarm reconciliation beyond the existing re-request after reboot and update, a catch-up policy other than "run once", clock-change handling.
+
+## 2026-11-24 (payment apps going to the home screen)
+- Cause not confirmed on a phone. JARVIS never presses Home by itself (only the opt-in phone operator can, when told to). Payment and banking apps are known to close themselves when a screen-reading accessibility service or a draw-over-other-apps window is active; JARVIS has both.
+- New: **payment mode** ("payment mode", "I am going to pay"): asks Android to switch off JARVIS's accessibility service and stops hands-free listening. Android only lets the person switch the service back on (Settings > Accessibility > JARVIS). `:core` 1058 tests.
