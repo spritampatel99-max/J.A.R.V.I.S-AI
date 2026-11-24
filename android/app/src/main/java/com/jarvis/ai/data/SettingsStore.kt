@@ -78,6 +78,7 @@ class SettingsStore(context: Context) {
             .putBoolean(KEY_ANNOUNCE, next.announceNotifications)
             .putBoolean(KEY_ANNOUNCE_TEXT, next.announceReadText)
             .putBoolean(KEY_ANNOUNCE_LOCKED, next.announceLockedText)
+            .putBoolean(KEY_BARGE_IN, next.bargeIn)
             .apply { if (next.elevenVoiceId == null) remove(KEY_ELEVEN_VOICE) else putString(KEY_ELEVEN_VOICE, next.elevenVoiceId) }
             .apply { if (next.elevenVoiceName == null) remove(KEY_ELEVEN_VOICE_NAME) else putString(KEY_ELEVEN_VOICE_NAME, next.elevenVoiceName) }
             .apply { if (next.voiceName == null) remove(KEY_VOICE) else putString(KEY_VOICE, next.voiceName) }
@@ -101,6 +102,7 @@ class SettingsStore(context: Context) {
         announceNotifications = prefs.getBoolean(KEY_ANNOUNCE, false),
         announceReadText = prefs.getBoolean(KEY_ANNOUNCE_TEXT, true),
         announceLockedText = prefs.getBoolean(KEY_ANNOUNCE_LOCKED, false),
+        bargeIn = prefs.getBoolean(KEY_BARGE_IN, true),
     ).sanitised()
 
     /**
@@ -151,6 +153,17 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean(KEY_WA_SEND, false)
         set(value) {
             prefs.edit().putBoolean(KEY_WA_SEND, value).apply()
+        }
+
+    /**
+     * Whether JARVIS may carry out a whole task inside other apps by looking at the screen and pressing controls, one step at a time. Off until
+     * the person switches it on, because the text on the screen is sent to the AI that decides each step. It asks before anything critical
+     * and never pays; banking, payment and password apps stay off limits either way.
+     */
+    var phoneOperatorOn: Boolean
+        get() = prefs.getBoolean(KEY_PHONE_OPERATOR, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_PHONE_OPERATOR, value).apply()
         }
 
     /**
@@ -280,9 +293,11 @@ class SettingsStore(context: Context) {
         const val KEY_ANNOUNCE = "bt_announce_notifications"
         const val KEY_ANNOUNCE_TEXT = "bt_announce_read_text"
         const val KEY_ANNOUNCE_LOCKED = "bt_announce_locked_text"
+        const val KEY_BARGE_IN = "voice_barge_in"
         const val KEY_BT_DEVICES = "bt_device_allowlist"
         const val KEY_TAP_TYPE = "screen_tap_and_type_on"
         const val KEY_WA_SEND = "whatsapp_press_send_on"
+        const val KEY_PHONE_OPERATOR = "phone_operator_on"
         const val KEY_NIGHTLY = "nightly_review_on"
         const val KEY_NIGHTLY_LAST = "nightly_review_last_ms"
         const val KEY_UPDATE_CHECK = "update_last_check_ms"

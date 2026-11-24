@@ -117,6 +117,27 @@ fun ScreenAccessScreen(container: AppContainer) {
             )
         }
 
+        var operator by remember { mutableStateOf(container.settings.phoneOperatorOn) }
+        SectionTitle(Glyph.SHIELD, "Phone operator", if (operator) "on" else "off")
+        GlassCard(accent = if (operator) JarvisColors.Warning else MaterialTheme.colorScheme.outline) {
+            SettingRow(
+                "Let JARVIS do a whole task in other apps",
+                "For a request nothing else covers, such as \"open Instagram and go to my messages\", JARVIS looks at the screen and presses controls one step at a time. " +
+                    "You approve the task first, and approve again before anything critical (send, post, delete, install). It never pays or buys, " +
+                    "and never touches banking, payment or password apps, system permission screens or this app.",
+            ) {
+                SpectrumSwitch(operator, onChange = { on ->
+                    operator = on
+                    container.settings.phoneOperatorOn = on
+                })
+            }
+            MutedText(
+                "Privacy: to choose each step, the words on the screen in front are sent to the AI that answers your requests (a cloud provider, or on this phone if your AI mode is on-device only). " +
+                    "Text boxes for passwords are never read. Needs the screen switch and \"press buttons and type\" above to be on. " +
+                    "Android does not report whether an app did what was pressed, so JARVIS tells you to check.",
+            )
+        }
+
         SectionTitle(Glyph.BELL, "Read and clear notifications", if (notesRunning) "running" else if (notesOn) "starting" else "off")
         GlassCard(accent = if (notesRunning) JarvisColors.Good else MaterialTheme.colorScheme.outline) {
             StatusPill(

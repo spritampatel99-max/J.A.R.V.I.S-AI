@@ -44,6 +44,7 @@ import com.jarvis.ai.android.voice.HandsFreeStatus
 fun HandsFreeScreen(container: AppContainer) {
     val context = LocalContext.current
     val status by HandsFreeService.state.collectAsStateWithLifecycle()
+    val ui by container.settings.ui.collectAsStateWithLifecycle()
     var refresh by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refresh++ }
 
@@ -211,6 +212,22 @@ fun HandsFreeScreen(container: AppContainer) {
                 })
             }
         }
+        }
+
+        SectionTitle(Glyph.MIC, "Interrupting Jarvis", if (ui.bargeIn) "on" else "off")
+        GlassCard {
+            SettingRow(
+                "Say \"Jarvis\" to interrupt",
+                "While Jarvis is reading a reply aloud, saying \"Jarvis\" stops it and listens. Your next words can change the answer: \"shorter\", \"in Hindi\", \"no, the other one\". " +
+                    "Tapping the mic while it talks does the same, with or without this switch.",
+            ) {
+                SpectrumSwitch(ui.bargeIn, onChange = { on -> container.settings.updateUi { it.copy(bargeIn = on) } })
+            }
+            MutedText(
+                "How well this works depends on your phone: the speaker can drown out your voice, so a headset or a lower volume helps. " +
+                    "A reply that itself contains the word \"Jarvis\" cannot be interrupted by voice, so Jarvis does not trigger itself. " +
+                    "Saying \"stop\" or \"say that again\" after the wake word works without asking an AI.",
+            )
         }
 
         SectionTitle(Glyph.SHIELD, "Over other apps", if (overlayAllowed) "allowed" else "off")

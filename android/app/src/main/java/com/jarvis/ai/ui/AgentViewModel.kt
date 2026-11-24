@@ -22,6 +22,7 @@ import com.jarvis.ai.core.security.ConfirmationRequest
 import com.jarvis.ai.core.security.SecretRedactor
 import com.jarvis.ai.data.UiPrefs
 import com.jarvis.ai.history.Conversation
+import com.jarvis.ai.voice.VoiceControls
 import com.jarvis.ai.memory.MemoryCategory
 import com.jarvis.ai.memory.MemoryCommands
 import com.jarvis.ai.voice.RequestOrigin
@@ -211,9 +212,14 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
         requestStartedAtMs = System.currentTimeMillis()
         origin = if (viaVoice) RequestOrigin.ASSISTANT_PLANNED else RequestOrigin.TYPED
 
-        val history = chat.value.items
-            .filter { it.sender != Sender.SYSTEM }
-            .map { ChatMessage(if (it.sender == Sender.USER) ChatRole.USER else ChatRole.ASSISTANT, it.text) }
+        val interrupted = VoiceControls.interruptionStillRelevant(interruptedAtMs, System.currentTimeMillis())
+        interruptedAtMs = 0L
+        val items = chat.value.items.filter { it.sender != Sender.SYSTEM }
+        val history = items.mapIndexed { index, item ->
+            // The reply the person cut off is marked, so a short follow-up changes that reply instead of starting a new topic.
+            val note = if (interrupted && index == items.lastIndex && item.sender == Sender.ASSISTANT) VoiceControls.INTERRUPTED_NOTE else ""
+            ChatMessage(if (item.sender == Sender.USER) ChatRole.USER else ChatRole.ASSISTANT, item.text + note)
+        }
 
         append(Sender.USER, text, viaVoice = viaVoice)
         chat.update { it.copy(running = true, currentStep = "Thinking…") }
@@ -292,6 +298,7 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
             onNothing?.invoke()
             return
         }
+        noteInterruption()
         container.voice.startListening({ heard -> send(heard, viaVoice = true) }, onNothing)
     }
 
@@ -300,8 +307,27 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun stopSpeaking() {
+        noteInterruption()
         container.voice.stopSpeaking()
     }
+
+    /** The person cut a reply short (by tapping, or by saying "Jarvis"). The next request is told, so it can change that reply. */
+    fun interruptSpeech() {
+        noteInterruption()
+        container.voice.stopSpeaking()
+    }
+
+    /** Stops the voice and listens at once. */
+    fun interruptAndListen() {
+        interruptSpeech()
+        listen()
+    }
+
+    private fun noteInterruption() {
+        if (container.voice.state.value.speaking) interruptedAtMs = System.currentTimeMillis()
+    }
+
+    private var interruptedAtMs = 0L
 
     fun dismissVoiceMessage() {
         container.voice.clearMessage()
@@ -427,6 +453,25 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     private suspend fun handle(text: String, history: List<ChatMessage>) {
+        // "Stop talking" and "say that again" control the voice itself. They never reach an AI model and never start a tool.
+        when (VoiceControls.match(text)) {
+            VoiceControls.Control.QUIET -> {
+                container.voice.stopSpeaking()
+                append(Sender.ASSISTANT, "Okay.", source = BUILT_IN, speak = false)
+                return
+            }
+            VoiceControls.Control.REPEAT -> {
+                val last = chat.value.items.lastOrNull { it.sender == Sender.ASSISTANT }
+                if (last == null) {
+                    append(Sender.ASSISTANT, "I have not said anything yet.", source = BUILT_IN)
+                } else {
+                    // Read on the phone's own voice: this text may have been private (a notification or the screen), which never goes to ElevenLabs.
+                    container.voice.speakPrivately(last.text)
+                }
+                return
+            }
+            null -> Unit
+        }
         // Native tools first: a clear built-in command runs without any AI provider. It still goes through the same
         // executor as a model-written plan (argument checks, permission checks, confirmation, audit, honest result).
         when (val command = NativeCommands.match(text)) {

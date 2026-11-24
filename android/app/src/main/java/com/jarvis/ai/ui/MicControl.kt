@@ -15,7 +15,7 @@ import com.jarvis.ai.android.device.AccessState
 /**
  * What tapping the mic button does, shared by the Home and Chat screens.
  *
- * Listening: stop. Speaking: be quiet. Otherwise: start one listening session, asking Android for the microphone first
+ * Listening: stop. Speaking: stop the voice and listen at once (so the person can interrupt and change the answer). Otherwise: start one listening session, asking Android for the microphone first
  * when it has not been allowed. If it has been blocked for good, the person is told to use the Prefs tab. Nothing listens
  * unless this was tapped.
  */
@@ -34,7 +34,8 @@ fun rememberMicToggle(vm: AgentViewModel): () -> Unit {
     return {
         when {
             currentVoice.listening -> vm.stopListening()
-            currentVoice.speaking -> vm.stopSpeaking()
+            currentVoice.speaking ->
+                if (!currentChat.running && AccessChecks.state(context, AccessKey.MICROPHONE) == AccessState.ALLOWED) vm.interruptAndListen() else vm.stopSpeaking()
             currentChat.running -> Unit
             AccessChecks.state(context, AccessKey.MICROPHONE) == AccessState.ALLOWED -> vm.listen()
             AccessChecks.isBlocked(context, AccessKey.MICROPHONE) -> vm.microphoneOff()

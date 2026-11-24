@@ -366,6 +366,19 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     val registry = ToolRegistry(
         BuiltinTools.create(ports) +
             ScreenTools.create(screenControl, guardedNotifications, apps = ports.apps, urls = ports.urls) +
+            listOfNotNull(
+                ports.apps?.let { launcher ->
+                    com.jarvis.ai.ai.agent.OperatePhoneTool(
+                        enabled = { settings.phoneOperatorOn && settings.tapAndTypeOn },
+                        agent = com.jarvis.ai.ai.agent.PhoneAgent(
+                            screen = screenControl,
+                            apps = launcher,
+                            brain = com.jarvis.ai.ai.agent.LlmAgentBrain(routedLlm),
+                            approver = com.jarvis.ai.ai.agent.StepApprover { summary -> approveOperatorStep(summary) },
+                        ),
+                    )
+                },
+            ) +
             OfflineTools.create { library.encyclopedia() } +
             listOf(com.jarvis.ai.update.CheckForUpdatesTool(updateClient, appVersion)) +
             ProductivityTools.create(productivity, wake, notifier) +
@@ -388,6 +401,15 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
 
     val planner = Planner(routedLlm, registry, addressing = { com.jarvis.ai.ui.Addressing.promptValue(appContext) })
     val gate = ConfirmationGate()
+
+    /**
+     * One press the phone operator wants to make that is on the "ask first" list. It goes through the same native confirmation as every other
+     * sensitive action: the person sees the app, the exact control and what was typed, and only their tap approves it.
+     */
+    private suspend fun approveOperatorStep(summary: String): Boolean {
+        val fingerprint = java.security.MessageDigest.getInstance("SHA-256").digest(summary.toByteArray()).joinToString("") { "%02x".format(it) }
+        return gate.request("operate_phone_step", summary, Risk.HIGH, fingerprint) is com.jarvis.ai.core.security.ConfirmationDecision.Approved
+    }
     val audit = FileAuditLog(File(appContext.filesDir, "audit.jsonl"), redactor = redactor)
 
     /** Reads which Android permissions are granted right now. The executor and the Tools tab both use it. */

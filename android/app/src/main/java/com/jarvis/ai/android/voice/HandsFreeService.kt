@@ -175,15 +175,25 @@ class HandsFreeService : Service() {
 
         // The detector only listens while nothing else is using the microphone or the assistant.
         controller = scope.launch {
-            combine(voice.state, assistant.chatState, assistant.countdown) { v, c, k ->
-                v.listening || v.speaking || c.running || k != null
-            }.distinctUntilChanged().collectLatest { busy ->
-                if (busy) {
-                    pauseWake()
-                    status.value = HandsFreeStatus.Busy
-                } else {
-                    delay(RESUME_DELAY_MS)
-                    if (!followUpIfAsked()) resumeWake()
+            combine(voice.state, assistant.chatState, assistant.countdown, assistant.pendingConfirmation, container.settings.ui) { v, c, k, p, ui ->
+                when {
+                    v.listening || c.running || k != null -> Activity.BUSY
+                    // While a reply is read aloud the wake word stays on, so "Jarvis" can interrupt it. Not while a confirmation is waiting
+                    // (its read-back must not be cut off by a voice), and not for a reply that contains the word itself.
+                    v.speaking -> if (ui.bargeIn && p == null && !lastReplyContainsWakeWord(c)) Activity.SPEAKING else Activity.BUSY
+                    else -> Activity.IDLE
+                }
+            }.distinctUntilChanged().collectLatest { activity ->
+                when (activity) {
+                    Activity.BUSY -> {
+                        pauseWake()
+                        status.value = HandsFreeStatus.Busy
+                    }
+                    Activity.SPEAKING -> resumeWake()
+                    Activity.IDLE -> {
+                        delay(RESUME_DELAY_MS)
+                        if (!followUpIfAsked()) resumeWake()
+                    }
                 }
             }
         }
@@ -233,15 +243,31 @@ class HandsFreeService : Service() {
 
     private var lastShownReply = -1L
 
+    private enum class Activity { IDLE, SPEAKING, BUSY }
+
+    private fun lastReplyContainsWakeWord(chat: com.jarvis.ai.ui.ChatState): Boolean =
+        chat.items.lastOrNull { it.sender != Sender.USER }?.text?.contains("jarvis", ignoreCase = true) == true
+
     private fun isBusy(): Boolean {
         val v = container.voice.state.value
         val c = container.assistant.chatState.value
         return v.listening || v.speaking || c.running || container.assistant.countdown.value != null
     }
 
+    /** True while a reply is being read aloud and nothing else is going on, so the wake word may cut it short. */
+    private fun canInterruptSpeech(): Boolean {
+        val v = container.voice.state.value
+        val c = container.assistant.chatState.value
+        return container.settings.ui.value.bargeIn && v.speaking && !v.listening && !c.running &&
+            container.assistant.countdown.value == null && container.assistant.pendingConfirmation.value == null &&
+            !lastReplyContainsWakeWord(c)
+    }
+
     private fun onWakeWord() {
-        if (isBusy()) return
+        val interrupting = canInterruptSpeech()
+        if (isBusy() && !interrupting) return
         pauseWake()
+        if (interrupting) container.assistant.interruptSpeech()
         beep()
         armedForFollowUp = true
         container.assistant.listen(onNothing = {

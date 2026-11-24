@@ -185,6 +185,13 @@ interface ScreenControl {
     /** Presses the control labelled [label] in the app in front. Off unless the person switched tapping and typing on. */
     suspend fun tap(label: String): ScreenAct
 
+    /**
+     * Presses a control whose name is on the "ask first" list (send, delete, post...), but only because the person approved this exact
+     * press on the app's own confirmation. The caller must have asked; nothing here asks. Labels that move money are refused here as well,
+     * and the guard, the switch for tapping and the rate limit still apply.
+     */
+    suspend fun tapApproved(label: String): ScreenAct = ScreenAct.Failed("This phone's screen service cannot do that.")
+
     /** Types [text] into the text box in the app in front. Off unless the person switched tapping and typing on. */
     suspend fun type(text: String): ScreenAct
 
@@ -264,8 +271,19 @@ object RiskyLabels {
         "भेजें", "भेजो", "भुगतान", "खरीदें", "हटाएं", "मिटाएं", "स्वीकार",
     )
 
-    fun isRisky(label: String): Boolean =
-        label.lowercase(Locale.ROOT).split(Regex("""[^\p{L}\p{M}\p{N}]+""")).any { it in WORDS }
+    fun isRisky(label: String): Boolean = words(label).any { it in WORDS }
+
+    /** Labels that move money or buy something. These are never pressed by JARVIS 3.0, whoever asks and however it is confirmed. */
+    fun isMoney(label: String): Boolean = words(label).any { it in MONEY } || words(label).windowed(2).any { it.joinToString(" ") in MONEY_PHRASES }
+
+    private fun words(label: String): List<String> =
+        label.lowercase(Locale.ROOT).split(Regex("""[^\p{L}\p{M}\p{N}]+""")).filter { it.isNotEmpty() }
+
+    private val MONEY = setOf(
+        "pay", "payment", "payments", "buy", "purchase", "checkout", "transfer", "donate", "subscribe", "upi",
+        "भुगतान", "खरीदें",
+    )
+    private val MONEY_PHRASES = setOf("place order", "order now", "send money", "add money", "top up", "proceed to pay")
 }
 
 /** Compares what is in a message box with the words the person approved, ignoring only differences in spaces and line breaks. */
@@ -338,12 +356,19 @@ class GuardedScreenControl(
         return convert(raw.perform(action))
     }
 
-    override suspend fun tap(label: String): ScreenAct {
+    override suspend fun tap(label: String): ScreenAct = press(label, approved = false)
+
+    override suspend fun tapApproved(label: String): ScreenAct = press(label, approved = true)
+
+    private suspend fun press(label: String, approved: Boolean): ScreenAct {
         if (!raw.connected) return ScreenAct.NotEnabled
         if (!actionsOn()) return ScreenAct.Failed("Tapping and typing in other apps is switched off. Turn it on in Prefs > Access first.")
         val clean = label.trim()
         if (clean.isEmpty() || clean.length > MAX_LABEL) return ScreenAct.Failed("That is not a button name I can look for.")
-        if (RiskyLabels.isRisky(clean)) {
+        if (RiskyLabels.isMoney(clean)) {
+            return ScreenAct.Failed("\"$clean\" moves money or buys something, so I never press it. Do that step yourself.")
+        }
+        if (!approved && RiskyLabels.isRisky(clean)) {
             return ScreenAct.Failed("\"$clean\" sends, pays, deletes or grants something, so I do not press it by voice. Tap it yourself, or use the command made for it.")
         }
         val front = raw.front() ?: return ScreenAct.Failed("I cannot tell which app is in front, so I did not tap.")

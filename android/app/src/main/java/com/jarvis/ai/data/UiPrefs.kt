@@ -41,6 +41,8 @@ data class UiPrefs(
     val announceReadText: Boolean = true,
     /** Read the words of notifications even while the phone is locked and the lock screen would hide them. Off: only the app is named then. */
     val announceLockedText: Boolean = false,
+    /** While hands-free is on, the word "Jarvis" also interrupts a reply that is being read aloud, so a new request can change it. */
+    val bargeIn: Boolean = true,
 ) {
     fun sanitised() = copy(
         flare = flare.coerceIn(0.1f, 1f),
