@@ -14,6 +14,9 @@ import com.jarvis.ai.core.security.ConfirmationDecision
 import com.jarvis.ai.core.security.ConfirmationRequester
 import com.jarvis.ai.core.security.Risk
 import java.time.ZoneId
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /**
  * Runs automations through the normal [Executor], with three safeguards that do not depend on the stored data being honest:
@@ -45,31 +48,55 @@ class AutomationRunner(
 
     data class Outcome(val automationId: String, val name: String, val ok: Boolean, val summary: String)
 
-    /** Runs every automation that is due. Safe to call at any time; one that is not due is left alone. */
-    suspend fun runDue(): List<Outcome> = store.due(time.nowMs()).map { run(it) }
+    /**
+     * Runs every automation that is due, each on its own: one that fails or is cut off never stops the others. Each occurrence is claimed and saved
+     * before it runs ([AutomationStore.claim]), so the same occurrence cannot run twice, and it is never run again after being interrupted.
+     */
+    suspend fun runDue(): List<Outcome> {
+        val outcomes = ArrayList<Outcome>()
+        for (automation in store.due(time.nowMs())) {
+            if (!store.claim(automation.id, zone())) continue
+            outcomes += run(automation)
+        }
+        return outcomes
+    }
 
     /** "Run now" from the person. Runs the same restricted way and does not move the schedule. */
     suspend fun runNow(id: String): Outcome? {
         val automation = store.automations.value.firstOrNull { it.id == id } ?: return null
-        return run(automation, reschedule = false)
+        if (!store.claim(id, zone(), scheduled = false)) return Outcome(id, automation.name, false, "It is already running.")
+        return run(automation)
     }
 
-    private suspend fun run(automation: Automation, reschedule: Boolean = true): Outcome {
-        val problems = AutomationRules.validate(automation.name, automation.trigger, automation.actions, fullRegistry)
-        val outcome = if (problems.isNotEmpty()) {
-            // The stored automation no longer passes today's rules (a tool changed risk, for example): nothing runs.
-            Outcome(automation.id, automation.name, false, "Not run: ${problems.first()}")
-        } else {
-            val plan = Plan(
-                goal = automation.name,
-                steps = automation.actions.mapIndexed { i, a -> PlanStep(i + 1, a.tool, a.tool, a.parameters, critical = false) },
-            )
-            val report = executor.execute(plan)
-            val failed = report.outcomes.filter { it.status != StepStatus.SUCCEEDED }
-            val ok = failed.isEmpty() && report.outcomes.size == automation.actions.size
-            Outcome(automation.id, automation.name, ok, if (ok) "Ran ${report.outcomes.size} action(s)." else failed.firstOrNull()?.message ?: "Nothing ran.")
+    /** Runs an automation that has already been claimed, and always records how it ended. */
+    private suspend fun run(automation: Automation): Outcome {
+        val outcome = try {
+            execute(automation)
+        } catch (e: CancellationException) {
+            // The wake-up ran out of time or the app is closing. The result is written even so, as "interrupted": the actions may or may not
+            // have happened, which is different from a failure, and they are not run again.
+            withContext(NonCancellable) { store.finishRun(automation.id, ok = false, summary = AutomationStore.INTERRUPTED_NOTE, interrupted = true) }
+            throw e
+        } catch (e: Exception) {
+            Outcome(automation.id, automation.name, false, "Failed unexpectedly (${e.javaClass.simpleName}).")
         }
-        store.recordRun(automation.id, outcome.ok, outcome.summary, zone(), reschedule)
+        store.finishRun(automation.id, outcome.ok, outcome.summary)
         return outcome
+    }
+
+    private suspend fun execute(automation: Automation): Outcome {
+        val problems = AutomationRules.validate(automation.name, automation.trigger, automation.actions, fullRegistry)
+        if (problems.isNotEmpty()) {
+            // The stored automation no longer passes today's rules (a tool changed risk, for example): nothing runs.
+            return Outcome(automation.id, automation.name, false, "Not run: ${problems.first()}")
+        }
+        val plan = Plan(
+            goal = automation.name,
+            steps = automation.actions.mapIndexed { i, a -> PlanStep(i + 1, a.tool, a.tool, a.parameters, critical = false) },
+        )
+        val report = executor.execute(plan)
+        val failed = report.outcomes.filter { it.status != StepStatus.SUCCEEDED }
+        val ok = failed.isEmpty() && report.outcomes.size == automation.actions.size
+        return Outcome(automation.id, automation.name, ok, if (ok) "Ran ${report.outcomes.size} action(s)." else failed.firstOrNull()?.message ?: "Nothing ran.")
     }
 }

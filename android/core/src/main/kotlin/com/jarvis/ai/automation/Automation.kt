@@ -40,17 +40,30 @@ sealed interface AutoTrigger {
             " at %02d:%02d".format(hour, minute)
     }
 
-    /** Android cannot reliably wake an app more often than every 15 minutes, so that is the floor. */
-    data class Every(val minutes: Int) : AutoTrigger {
+    /**
+     * Android cannot reliably wake an app more often than every 15 minutes, so that is the floor. [mode] says what the interval is counted from;
+     * the store applies it (see [RepeatMode]). [nextAfter] alone counts from the moment given, which is what "after completion" means.
+     */
+    data class Every(val minutes: Int, val mode: RepeatMode = RepeatMode.FIXED_INTERVAL) : AutoTrigger {
         override fun nextAfter(from: ZonedDateTime): ZonedDateTime = from.plusMinutes(minutes.toLong())
         override fun describe() = if (minutes % 60 == 0) "Every ${minutes / 60} hour${if (minutes == 60) "" else "s"}" else "Every $minutes minutes"
     }
 }
 
+/** What an "every N minutes" automation counts its interval from. A late run never moves a fixed schedule; a run that missed several slots runs once. */
+enum class RepeatMode {
+    /** Slots stay on the original grid (09:00, 09:30, 10:00 ...) even when one run starts late. */
+    FIXED_INTERVAL,
+
+    /** The next run is N minutes after the previous run actually started. */
+    AFTER_COMPLETION,
+}
+
 /** One step of an automation: a tool from the allow-list and its arguments. */
 data class AutoAction(val tool: String, val parameters: JsonObject)
 
-data class RunRecord(val atMs: Long, val ok: Boolean, val summary: String)
+/** [interrupted] means the app stopped while it ran, so nobody knows whether the actions happened; it is not the same as a failure. */
+data class RunRecord(val atMs: Long, val ok: Boolean, val summary: String, val interrupted: Boolean = false)
 
 data class Automation(
     val id: String,
@@ -61,6 +74,8 @@ data class Automation(
     val createdMs: Long,
     val nextRunMs: Long?,
     val history: List<RunRecord> = emptyList(),
+    /** Set (and saved) before the actions start and cleared when the result is recorded. Found set after a restart, it means the run was cut off. */
+    val runningSinceMs: Long? = null,
 ) {
     val lastRun: RunRecord? get() = history.lastOrNull()
 }

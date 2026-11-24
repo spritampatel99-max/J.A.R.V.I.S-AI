@@ -135,6 +135,13 @@ fun AutomationsScreen(container: AppContainer) {
             }
         }
 
+        container.automations.loadProblem?.let { problem ->
+            GlassCard(accent = JarvisColors.Warning) { Text(problem, color = JarvisColors.Warning) }
+        }
+        container.schedule.lastProblem?.let { problem ->
+            GlassCard(accent = JarvisColors.Warning) { Text("The last scheduled run hit a problem: $problem The next wake-up was still requested.", color = JarvisColors.Warning) }
+        }
+
         if (!creating) {
             GlowButton("New automation", onClick = { creating = true }, modifier = Modifier.fillMaxWidth(), enabled = automations.size < AutomationRules.MAX_AUTOMATIONS)
         } else {
@@ -213,7 +220,10 @@ fun AutomationsScreen(container: AppContainer) {
                 )
                 a.lastRun?.let { run ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusPill(if (run.ok) "Last run ok" else "Last run failed", if (run.ok) JarvisColors.Good else JarvisColors.Coral)
+                        StatusPill(
+                            if (run.ok) "Last run ok" else if (run.interrupted) "Last run interrupted" else "Last run failed",
+                            if (run.ok) JarvisColors.Good else JarvisColors.Coral,
+                        )
                         MutedText("${formatWhen(run.atMs, zone)} - ${run.summary}", Modifier.weight(1f))
                     }
                 }
@@ -230,7 +240,7 @@ fun AutomationsScreen(container: AppContainer) {
                 if (a.history.size > 1) {
                     MutedText("Earlier runs")
                     for (run in a.history.dropLast(1).takeLast(3).reversed()) {
-                        MutedText("${formatWhen(run.atMs, zone)}: ${if (run.ok) "ok" else "failed"} - ${run.summary}")
+                        MutedText("${formatWhen(run.atMs, zone)}: ${if (run.ok) "ok" else if (run.interrupted) "interrupted" else "failed"} - ${run.summary}")
                     }
                 }
             }

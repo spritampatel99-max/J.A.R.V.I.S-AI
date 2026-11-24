@@ -59,7 +59,7 @@ import com.jarvis.ai.android.screen.AndroidNotificationPort
 import com.jarvis.ai.android.screen.AndroidRawScreen
 import com.jarvis.ai.android.schedule.AndroidNotifier
 import com.jarvis.ai.android.schedule.AndroidWakeScheduler
-import com.jarvis.ai.android.schedule.ScheduleEngine
+import com.jarvis.ai.automation.ScheduleEngine
 import com.jarvis.ai.automation.AutomationRunner
 import com.jarvis.ai.automation.AutomationStore
 import com.jarvis.ai.core.common.SystemTimeSource

@@ -26,7 +26,11 @@ class WakeReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.Default).launch {
             try {
+                // Android gives a receiver about ten seconds. The work here is small, but if it is ever cut off nothing is lost: the next wake-up is
+                // already requested, and an automation cut off mid-run is recorded as "interrupted" and not run again (see AutomationRunner).
                 withTimeoutOrNull(8_000L) { engine.tick() }
+            } catch (e: Exception) {
+                // A failure must not crash the app from a background broadcast; the engine already recorded what went wrong.
             } finally {
                 pending.finish()
             }

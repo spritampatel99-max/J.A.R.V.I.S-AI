@@ -94,3 +94,13 @@ Android 14+ move (`minSdk` 34, target 35) and the owner's second list. `:core` p
 - Fixed: five features (Mobile Data Monitor, File Manager, Document Intelligence, Personal Routines, Adaptive Dashboard) were marked available with no code behind them; they are planned again. The Multilingual description now says English and Hindi.
 - Mutation checks: two guards were not watched by any test (scrolling in a banking app; an approved press on a money button). Tests added; both mutations are now caught.
 - Docs: `STATUS.md` rewritten (it still described the 2026-11-22 zip); `docs/PHONE_OPERATOR.md` added.
+
+## 2026-11-24 (automation reliability audit; core tested, `:app` part compiled in CI only after this entry)
+
+`:core` passes 1055 offline tests. Done from the pasted automation audit:
+- Problem 01: `ScheduleEngine` (moved to `:core` so it can be tested) isolates every stage and every reminder, asks Android for the next wake-up before the long work and again in a `finally`, and never throws when Android refuses the request. `lastProblem` and a warning card on the Automations screen show what failed.
+- Problem 05 / 07: an occurrence is claimed and saved as "running" before it runs, and the schedule moves past it at the same moment, so a re-delivered alarm or a restart cannot run it twice. A run found "running" after a restart is recorded as **interrupted** (shown as such) and is **not** run again. A run cut off by the 8-second limit is recorded the same way.
+- Problem 04: "every N minutes" now has two modes (`FIXED_INTERVAL`, the new default, and `AFTER_COMPLETION`). A late run stays on its grid; slots missed while the phone was off are skipped and the automation runs once. There is no screen control for the mode yet.
+- Problems 03 / 08: a failed write (any exception, not only `IOException`) marks the data as unsaved and is retried at every wake-up; a damaged or partly unreadable file is backed up (`<file>.damaged`), reported on the Automations / Planner screens, and no longer silently becomes an empty planner.
+- Mutation checks: 12 deliberate breaks of the new logic; 4 survived at first (running guard, early wake-up request, write-failure catch, and one covered twice); tests added and all are now caught.
+- Not done: WorkManager (no new dependency added; automations are short and low-risk), replanning history (Problem 09), reminder / Android alarm reconciliation beyond the existing re-request after reboot and update, a catch-up policy other than "run once", clock-change handling.

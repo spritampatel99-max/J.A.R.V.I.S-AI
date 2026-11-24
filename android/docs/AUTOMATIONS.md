@@ -42,3 +42,11 @@ Pausing an automation clears its next run. "Run now" runs it immediately through
 - Editing an existing automation (delete and recreate it).
 - Triggers for location, Wi-Fi, charging, an app opening or a received message. Android only allows some of these to background apps, and none were built.
 - Next-run recomputation when the time zone changes.
+
+
+## Reliability rules (2026-11-24)
+- Each wake-up: reminders, then the next wake-up is requested, then automations, then the nightly review, then the next wake-up is requested again. A failing stage never stops the next one.
+- A run is claimed and saved before it starts. After a restart, a run found unfinished is shown as **interrupted** and is not repeated, because it may already have added the task or shown the notification.
+- "Every N minutes" is on a fixed grid by default (09:00, 09:30, 10:00 ...). Missed slots are skipped; one run happens when the phone is back.
+- If the phone cannot write its storage, the screen says the data is in memory only and each wake-up tries again. A damaged file is kept as `<name>.damaged`.
+- Not covered: WorkManager, clock changes, and automations longer than a few seconds.

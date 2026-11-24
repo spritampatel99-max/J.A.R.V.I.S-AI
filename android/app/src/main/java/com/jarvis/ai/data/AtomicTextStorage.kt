@@ -33,6 +33,15 @@ class AtomicTextStorage(directory: File, fileName: String) : TextStorage {
         }
     }
 
+    /** Keeps a copy of a file that could not be understood next to it (`<name>.damaged`), replacing any earlier copy. Failure to keep it is ignored. */
+    override fun backupCorrupt(text: String) {
+        try {
+            File(file.baseFile.parentFile, file.baseFile.name + ".damaged").writeText(text, Charsets.UTF_8)
+        } catch (e: IOException) {
+            // Best effort only.
+        }
+    }
+
     /** Removes the file. Used for the scratch files of the offline self-test. */
     fun delete() {
         file.delete()

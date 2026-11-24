@@ -18,6 +18,12 @@ interface TextStorage {
 
     @Throws(IOException::class)
     fun write(text: String)
+
+    /**
+     * Keeps a copy of text that could not be understood, before a later save replaces it, so a damaged file is never silently destroyed.
+     * Best effort: the default keeps nothing, and a failure to keep it is not an error.
+     */
+    fun backupCorrupt(text: String) {}
 }
 
 // Small readers for hand-written JSON, so stores need no serialization compiler plugin. A value of the wrong type reads as

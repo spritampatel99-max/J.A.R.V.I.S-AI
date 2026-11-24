@@ -3,7 +3,7 @@
 Read this before building. It says what is finished, what was only compiled, and what was not done. If another document disagrees with this one, check the code; this file was written last.
 
 ## Checked here
-- `:core` (the logic: tools, safety rules, planner, router, screen guard, phone operator, voice controls, offline library reader and the rest) compiles and passes **1029 tests**, run on a PC-style JVM in the workspace (`kotlinc` + JUnit, not Gradle).
+- `:core` (the logic: tools, safety rules, planner, router, screen guard, phone operator, voice controls, offline library reader and the rest) compiles and passes **1055 tests**, run on a PC-style JVM in the workspace (`kotlinc` + JUnit, not Gradle).
 - Safety rules were also checked by deliberately breaking them (mutation checks). This round: the money-button refusal, the risky-label refusal, the operator's "never" class, the interruption time window, and the scroll / tap guards. Two breaks survived at first (scrolling in a banking app, and an approved press on a money button); tests were added and both are now caught. Mutation checks cover only the rules named here, not the whole project.
 
 ## Compiled on GitHub, but NEVER run on a phone (`:app`, the Android part)
@@ -18,6 +18,9 @@ This workspace cannot reach Google's Android build servers, so the app is built 
 - **New built-in commands (no AI needed):** set brightness, silent / vibrate / normal mode (silent needs Do Not Disturb access), open any of 30 Settings pages, cancel / dismiss an alarm, copy to clipboard, count installed apps, open Maps / directions, check which permissions are on, calculator, unit converter, random pick. Brightness and sound mode report the real before / after value from Android.
 - **Contacts:** a name that is not found now offers the closest similar names instead of failing.
 - **Phone operator** ("do it for me in any app"): off until you switch it on in Prefs > Access > Phone operator (also needs Accessibility and "press buttons and type"). See `docs/PHONE_OPERATOR.md` for exactly what it will and will not do.
+
+## Automation reliability (2026-11-24)
+See CHANGELOG. Compiled status of these `:app` edits is only known after the next CI run; nothing has run on a phone.
 
 ## What "anything I say gets done" can and cannot mean
 It cannot mean everything. Android blocks apps from some things by design, and JARVIS does not try to get around that: see `docs/PHONE_OPERATOR.md`. In short: banking, payment and password-manager apps, system permission screens and JARVIS's own screens are never read or pressed; money is never moved; the person's confirmation is always a tap in JARVIS itself, never something the AI or text on a screen can give.

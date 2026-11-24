@@ -95,12 +95,24 @@ class ProductivityStore(
     private val flow = MutableStateFlow(ProductivityState())
     val state: StateFlow<ProductivityState> = flow.asStateFlow()
 
+    /** True when the last attempt to write to storage failed: tasks, notes and reminders on screen then exist only in memory until a later save works. */
     @Volatile
     var saveFailed: Boolean = false
         private set
 
+    /** Set when the saved file could not be read, or when some entries in it were unreadable. The damaged text is backed up first. */
+    @Volatile
+    var loadProblem: String? = null
+        private set
+
     init {
         load()
+    }
+
+    /** Writes what is in memory again. Called at each wake-up while [saveFailed] is true, so a disk that has room again saves the data by itself. */
+    fun retrySave(): Boolean = synchronized(lock) {
+        commit(flow.value)
+        !saveFailed
     }
 
     fun addTask(title: String, priority: Priority = Priority.NORMAL, dueMs: Long? = null): TaskItem? = synchronized(lock) {
@@ -183,13 +195,23 @@ class ProductivityStore(
                 }.toString(),
             )
             false
-        } catch (e: IOException) {
+        } catch (e: Exception) {
+            // Not only IOException: any failure to write means the data is not safely stored.
             true
         }
     }
 
     private fun load() {
-        val root = parseJson(storage.read()) as? JsonObject ?: return
+        val raw = storage.read()
+        if (raw.isNullOrBlank()) return
+        val root = parseJson(raw) as? JsonObject
+        if (root == null) {
+            // Never let a damaged file quietly become an empty planner that the next save overwrites.
+            storage.backupCorrupt(raw)
+            loadProblem = "The saved planner file could not be read, so no tasks, notes or reminders were loaded. A copy of it was kept."
+            return
+        }
+        val expected = listOf("tasks", "notes", "reminders").sumOf { (root[it] as? kotlinx.serialization.json.JsonArray)?.size ?: 0 }
         flow.value = ProductivityState(
             tasks = root.objs("tasks").mapNotNull { o ->
                 TaskItem(
@@ -214,6 +236,11 @@ class ProductivityStore(
                 )
             },
         )
+        val kept = flow.value.tasks.size + flow.value.notes.size + flow.value.reminders.size
+        if (kept < expected) {
+            storage.backupCorrupt(raw)
+            loadProblem = "${expected - kept} saved item(s) could not be read and were left out. A copy of the file was kept."
+        }
     }
 
     companion object {

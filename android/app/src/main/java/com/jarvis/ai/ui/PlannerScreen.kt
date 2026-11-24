@@ -62,6 +62,10 @@ fun PlannerScreen(container: AppContainer) {
             }
         }
 
+        container.productivity.loadProblem?.let { problem ->
+            GlassCard(accent = JarvisColors.Warning) { Text(problem, color = JarvisColors.Warning) }
+        }
+
         // ---- tasks ----
         SectionTitle(Glyph.CHECK_CIRCLE, "Tasks", "${state.tasks.count { !it.done }} open")
         GlassCard {
