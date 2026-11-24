@@ -37,6 +37,11 @@
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+    <!-- Special access the person grants in Settings: brightness by voice, and silent mode by voice. Nothing happens until they do. -->
+    <uses-permission
+        android:name="android.permission.WRITE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
     <!-- The flashlight tool only works on phones with a flash; the app still installs without one. -->
     <uses-feature

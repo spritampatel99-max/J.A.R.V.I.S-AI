@@ -296,6 +296,8 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         media = AndroidMediaKeys(appContext),
         email = AndroidEmailPort(appContext, foreground),
         camera = AndroidCameraLauncher(appContext, foreground),
+        settings = com.jarvis.ai.android.device.AndroidPhoneSettings(appContext, foreground),
+        access = com.jarvis.ai.android.device.AndroidAccessReporter(appContext),
         whatsappSender = object : com.jarvis.ai.ai.tools.builtin.WhatsAppSender {
             override val enabled: Boolean get() = settings.whatsappSendOn
 

@@ -124,6 +124,18 @@ enum class AccessKey(
         "The name of a Bluetooth device when it connects. It does not read what is sent over Bluetooth and does not scan for or pair devices.",
         "Settings > Apps > JARVIS 3.0 > Permissions > Nearby devices.",
     ),
+    WRITE_SETTINGS(
+        "Modify system settings", AccessKind.SPECIAL, Manifest.permission.WRITE_SETTINGS, true,
+        "Lets you say \"set brightness to 60 percent\". Without it, Android does not let an app change the screen brightness.",
+        "It lets the app change system settings such as brightness. It cannot read your files, messages or anything on screen.",
+        "Settings > Apps > Special access > Modify system settings.",
+    ),
+    DND_ACCESS(
+        "Do not disturb access", AccessKind.SPECIAL, Manifest.permission.ACCESS_NOTIFICATION_POLICY, true,
+        "Lets you say \"put the phone on silent\". Without it, Android allows vibrate at most.",
+        "It lets the app switch the ringer between normal, vibrate and silent. It does not read any notification.",
+        "Settings > Apps > Special access > Do Not Disturb access.",
+    ),
     NOTIFICATION_ACCESS(
         "Read notifications", AccessKind.SPECIAL, null, true,
         "Lets you say \"read my notifications\" or \"clear my notifications\".",
@@ -163,6 +175,14 @@ object AccessChecks {
             if (mode == AppOpsManager.MODE_ALLOWED) AccessState.ALLOWED else AccessState.NOT_ALLOWED
         }
 
+        AccessKey.WRITE_SETTINGS ->
+            if (Settings.System.canWrite(context)) AccessState.ALLOWED else AccessState.NOT_ALLOWED
+
+        AccessKey.DND_ACCESS -> {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            if (manager.isNotificationPolicyAccessGranted) AccessState.ALLOWED else AccessState.NOT_ALLOWED
+        }
+
         AccessKey.NOTIFICATION_ACCESS ->
             if (NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)) AccessState.ALLOWED else AccessState.NOT_ALLOWED
 
@@ -192,6 +212,8 @@ object AccessChecks {
             AccessKey.EXACT_ALARMS -> Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri)
             AccessKey.OVERLAY -> Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, packageUri)
             AccessKey.USAGE_ACCESS -> Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+            AccessKey.WRITE_SETTINGS -> Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, packageUri)
+            AccessKey.DND_ACCESS -> Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
             AccessKey.ACCESSIBILITY -> Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             AccessKey.NOTIFICATION_ACCESS -> Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
             AccessKey.NOTIFICATIONS -> Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)

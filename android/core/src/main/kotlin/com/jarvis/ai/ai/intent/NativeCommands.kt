@@ -66,7 +66,278 @@ object NativeCommands {
     }
 
     private fun single(text: String, clock: Clock): One? =
-        flashlight(text) ?: youtube(text) ?: camera(text) ?: timer(text) ?: media(text) ?: alarm(text, clock) ?: website(text) ?: deviceInfo(text) ?: time(text) ?: weather(text) ?: calls(text) ?: phone(text) ?: offline(text) ?: openApp(text)
+        flashlight(text) ?: youtube(text) ?: camera(text) ?: timer(text) ?: media(text) ?: alarm(text, clock) ?: website(text) ?: deviceInfo(text) ?: onPhone(text) ?: time(text) ?: weather(text) ?: calls(text) ?: phone(text) ?: offline(text) ?: openApp(text)
+
+
+    // ---- built-in commands that work on the phone itself ------------------------------------------------------------------
+    //
+    // Calculator, unit converter, coin and dice, brightness, ringer mode, Settings pages, dismiss alarm, copy, app count, Maps and the
+    // access check. Whole sentences only. Android does not let an app flip Wi-Fi, Bluetooth, airplane mode or mobile data, so those
+    // phrases open the right Settings page and the tool says that is what it did.
+
+    private fun onPhone(text: String): One? =
+        calculator(text) ?: convertUnits(text) ?: randomPick(text) ?: brightness(text) ?: soundMode(text) ?: settingsPage(text)
+            ?: dismissAlarm(text) ?: maps(text) ?: countApps(text) ?: accessCheck(text) ?: clipboard(text)
+
+    private val CALC_VERB = Regex("""^(?:calculate|compute|work out|solve|what(?:'s| is)|whats|how much is) (.{1,150})$""", RegexOption.IGNORE_CASE)
+
+    private fun calculator(text: String): One? {
+        val verb = CALC_VERB.matchEntire(text)?.groupValues?.get(1)?.trim()
+        val expression = when {
+            verb != null -> verb.takeIf { com.jarvis.ai.ai.tools.builtin.Calculator.looksLikeSum(it) }
+            // Without a verb, only a spoken sum such as "15 percent of 2400" or "2 plus 2": digits alone are never treated as a calculation.
+            text.firstOrNull()?.let { it.isDigit() || it == '(' } == true && text.any { it.isLetter() } &&
+                com.jarvis.ai.ai.tools.builtin.Calculator.evaluate(text) is com.jarvis.ai.ai.tools.builtin.Calculator.Outcome.Value -> text
+            else -> null
+        } ?: return null
+        return One.Step("calculate", "Calculate ${expression.take(60)}", buildJsonObject { put("expression", expression) })
+    }
+
+    private const val UNIT = """[\p{L}°/ ]{1,30}?"""
+    private const val NUMBER = """-?\d[\d,]*(?:\.\d+)?"""
+    private val CONVERT_PATTERNS = listOf(
+        Regex("""^(?:convert|change) ($NUMBER) ($UNIT) (?:to|into|in) ($UNIT)$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:what(?:'s| is)|whats|how (?:much|many) is) ($NUMBER) ($UNIT) (?:in|to|into) ($UNIT)$""", RegexOption.IGNORE_CASE),
+    )
+    private val CONVERT_HOW_MANY_IS = Regex("""^how (?:many|much) ($UNIT) (?:is|are|in) ($NUMBER) ($UNIT)$""", RegexOption.IGNORE_CASE)
+    private val CONVERT_HOW_MANY_IN = Regex("""^how (?:many|much) ($UNIT) (?:are |is )?(?:there )?in (?:an? |one |1 )?($UNIT)$""", RegexOption.IGNORE_CASE)
+
+    private fun convertUnits(text: String): One? {
+        val parts: Triple<String, String, String> = run {
+            for (p in CONVERT_PATTERNS) {
+                val g = p.matchEntire(text)?.groupValues ?: continue
+                return@run Triple(g[1], g[2].trim(), g[3].trim())
+            }
+            CONVERT_HOW_MANY_IS.matchEntire(text)?.groupValues?.let { return@run Triple(it[2], it[3].trim(), it[1].trim()) }
+            CONVERT_HOW_MANY_IN.matchEntire(text)?.groupValues?.let { return@run Triple("1", it[2].trim(), it[1].trim()) }
+            return null
+        }
+        val (value, from, to) = parts
+        if (com.jarvis.ai.ai.tools.builtin.UnitConverter.resolve(from) == null || com.jarvis.ai.ai.tools.builtin.UnitConverter.resolve(to) == null) return null
+        return One.Step(
+            "convert_units",
+            "Convert $value ${from.take(20)} to ${to.take(20)}",
+            buildJsonObject {
+                put("value", value)
+                put("from", from)
+                put("to", to)
+            },
+        )
+    }
+
+    private val COIN = Regex("""^(?:(?:flip|toss|spin) (?:a |the )?coin|heads or tails)$""", RegexOption.IGNORE_CASE)
+    private val DICE = Regex("""^(?:roll|throw) (?:a |the )?(?:dice|die)$""", RegexOption.IGNORE_CASE)
+    private val DICE_SIDES = Regex("""^(?:roll|throw) (?:a |an )?(\d{1,4})[- ]sided (?:dice|die)$""", RegexOption.IGNORE_CASE)
+    private val RANDOM_NUMBER = Regex(
+        """^(?:(?:pick|give me|choose|generate|say) (?:me )?(?:a |any )?)?random number(?: (?:between|from) (\d{1,7}) (?:and|to) (\d{1,7}))?$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private fun randomPick(text: String): One? {
+        if (COIN.matches(text)) return One.Step("random_pick", "Flip a coin", buildJsonObject { put("kind", "coin") })
+        if (DICE.matches(text)) return One.Step("random_pick", "Roll a die", buildJsonObject { put("kind", "dice") })
+        DICE_SIDES.matchEntire(text)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it in 2..1_000 }?.let { sides ->
+            return One.Step(
+                "random_pick",
+                "Roll a $sides-sided die",
+                buildJsonObject {
+                    put("kind", "dice")
+                    put("sides", sides)
+                },
+            )
+        }
+        val g = RANDOM_NUMBER.matchEntire(text)?.groupValues ?: return null
+        val low = g[1].toIntOrNull()
+        val high = g[2].toIntOrNull()
+        if (g[1].isNotEmpty() && (low == null || high == null || high < low || high < 1 || high > 1_000_000)) return null
+        return One.Step(
+            "random_pick",
+            "Pick a random number",
+            buildJsonObject {
+                put("kind", "number")
+                if (low != null && high != null) {
+                    put("low", low)
+                    put("high", high)
+                }
+            },
+        )
+    }
+
+    private const val SCREEN = """(?:the |my )?(?:screen |display |phone )?"""
+    private val BRIGHT_SET = listOf(
+        Regex("""^(?:(?:set|change|make|put|turn) )?$SCREEN?brightness (?:to |at |on )?(\d{1,3})(?: ?%| percent| per cent)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:set|change|make|put|turn) $SCREEN?brightness (?:to |at )?(\d{1,3})(?: ?%| percent| per cent)?$""", RegexOption.IGNORE_CASE),
+    )
+    private val BRIGHT_MAX = Regex("""^(?:(?:set|turn|put|make) $SCREEN?brightness (?:to |at )?(?:max|maximum|full|highest)|(?:max|maximum|full) brightness)$""", RegexOption.IGNORE_CASE)
+    private val BRIGHT_UP = Regex(
+        """^(?:(?:increase|raise|boost|turn up|bump up|brighten) $SCREEN?brightness|brighten $SCREEN(?:screen|display)|make $SCREEN(?:screen|display) brighter|brightness up|screen brighter)$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val BRIGHT_DOWN = Regex(
+        """^(?:(?:decrease|lower|reduce|turn down|bump down) $SCREEN?brightness|dim $SCREEN(?:screen|display)|make $SCREEN(?:screen|display) (?:dimmer|darker)|brightness down|screen dimmer)$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private fun brightness(text: String): One? {
+        for (p in BRIGHT_SET) {
+            val percent = p.matchEntire(text)?.groupValues?.get(1)?.toIntOrNull() ?: continue
+            if (percent !in 1..100) return null
+            return brightnessStep("set", percent)
+        }
+        if (BRIGHT_MAX.matches(text)) return brightnessStep("set", 100)
+        if (BRIGHT_UP.matches(text)) return brightnessStep("up", null)
+        if (BRIGHT_DOWN.matches(text)) return brightnessStep("down", null)
+        return null
+    }
+
+    private fun brightnessStep(action: String, percent: Int?): One = One.Step(
+        "set_brightness",
+        when (action) {
+            "up" -> "Make the screen brighter"
+            "down" -> "Make the screen dimmer"
+            else -> "Set the brightness to $percent%"
+        },
+        buildJsonObject {
+            put("action", action)
+            if (percent != null) put("percent", percent)
+        },
+    )
+
+    private val SOUND_PATTERNS = listOf(
+        Regex("""^(?:put|set|switch|turn|keep|change) (?:the |my )?(?:phone |ringer |device |sound )?(?:on |to |into )(silent|vibrate|normal)(?: mode)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:go|switch|change) (?:to |into )?(silent|vibrate|normal) mode$""", RegexOption.IGNORE_CASE),
+        Regex("""^(silent|vibrate|normal) mode(?: on)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:turn on|enable|activate) (silent|vibrate) mode$""", RegexOption.IGNORE_CASE),
+    )
+    private val SOUND_OFF = Regex("""^(?:turn off|disable|deactivate) (?:the |my )?(?:silent|vibrate) mode$""", RegexOption.IGNORE_CASE)
+    private val SOUND_MUTE = Regex("""^(?:mute|silence) (?:the |my )?(?:phone|ringer|device)$""", RegexOption.IGNORE_CASE)
+    private val SOUND_UNMUTE = Regex("""^unmute (?:the |my )?(?:phone|ringer|device)$""", RegexOption.IGNORE_CASE)
+
+    private fun soundMode(text: String): One? {
+        val mode = SOUND_PATTERNS.firstNotNullOfOrNull { it.matchEntire(text)?.groupValues?.get(1)?.lowercase(Locale.ROOT) }
+            ?: when {
+                SOUND_OFF.matches(text) || SOUND_UNMUTE.matches(text) -> "normal"
+                SOUND_MUTE.matches(text) -> "silent"
+                else -> null
+            }
+            ?: return null
+        return One.Step("set_sound_mode", "Set the phone to $mode mode", buildJsonObject { put("mode", mode) })
+    }
+
+    /** Spoken name to the Settings page; order matters, the longer names come first. */
+    private val SETTINGS_PAGES = linkedMapOf(
+        "battery saver" to "battery_saver", "power saving" to "battery_saver", "power saver" to "battery_saver",
+        "airplane mode" to "airplane_mode", "aeroplane mode" to "airplane_mode", "flight mode" to "airplane_mode",
+        "mobile hotspot" to "hotspot", "hotspot" to "hotspot", "tethering" to "hotspot",
+        "mobile data" to "mobile_network", "cellular data" to "mobile_network", "mobile network" to "mobile_network", "network" to "mobile_network",
+        "data usage" to "data_usage", "wifi" to "wifi", "wi-fi" to "wifi", "wi fi" to "wifi", "bluetooth" to "bluetooth",
+        "battery" to "battery", "display" to "display", "screen" to "display", "brightness" to "display",
+        "sound" to "sound", "volume" to "sound", "ringtone" to "sound", "storage" to "storage",
+        "apps" to "apps", "app" to "apps", "default apps" to "default_apps", "location" to "location", "gps" to "location",
+        "notification" to "notifications", "notifications" to "notifications", "accessibility" to "accessibility",
+        "date and time" to "date_time", "date & time" to "date_time", "time zone" to "date_time", "language" to "language", "languages" to "language",
+        "vpn" to "vpn", "nfc" to "nfc", "privacy" to "privacy", "security" to "security", "developer options" to "developer",
+        "notification access" to "notification_access", "display over other apps" to "display_over_apps",
+        "modify system settings" to "write_settings", "do not disturb access" to "do_not_disturb_access",
+    )
+
+    /** Names a person can say after "turn on/off": the switches that Android keeps behind a Settings page. */
+    private val TOGGLE_NAMES = setOf(
+        "battery saver", "power saving", "power saver", "airplane mode", "aeroplane mode", "flight mode", "mobile hotspot", "hotspot",
+        "mobile data", "cellular data", "wifi", "wi-fi", "wi fi", "bluetooth", "location", "gps", "nfc", "vpn",
+    )
+
+    private val SETTINGS_OPEN = Regex("""^(?:(?:open|show|go to|take me to|launch) )?(?:the |my )?([\p{L}&' -]{2,30}?) settings$""", RegexOption.IGNORE_CASE)
+    private val TOGGLE_A = Regex("""^(?:turn|switch|toggle) (on|off) (?:the |my )?([\p{L}' -]{2,20})$""", RegexOption.IGNORE_CASE)
+    private val TOGGLE_B = Regex("""^(?:turn|switch|toggle) (?:the |my )?([\p{L}' -]{2,20}) (on|off)$""", RegexOption.IGNORE_CASE)
+    private val TOGGLE_C = Regex("""^(enable|disable) (?:the |my )?([\p{L}' -]{2,20})$""", RegexOption.IGNORE_CASE)
+
+    private fun settingsPage(text: String): One? {
+        SETTINGS_OPEN.matchEntire(text)?.groupValues?.get(1)?.trim()?.lowercase(Locale.ROOT)?.let { name ->
+            val page = SETTINGS_PAGES[name] ?: return null
+            return One.Step("open_settings", "Open $name settings", buildJsonObject { put("page", page) })
+        }
+        val (state, name) = TOGGLE_A.matchEntire(text)?.groupValues?.let { it[1] to it[2] }
+            ?: TOGGLE_B.matchEntire(text)?.groupValues?.let { it[2] to it[1] }
+            ?: TOGGLE_C.matchEntire(text)?.groupValues?.let { (if (it[1].equals("enable", true)) "on" else "off") to it[2] }
+            ?: return null
+        val key = name.trim().lowercase(Locale.ROOT)
+        if (key !in TOGGLE_NAMES) return null
+        val page = SETTINGS_PAGES[key] ?: return null
+        return One.Step("open_settings", "Open $key settings to turn it ${state.lowercase(Locale.ROOT)}", buildJsonObject { put("page", page) })
+    }
+
+    private val DISMISS_ALARM = Regex("""^(?:stop|dismiss|turn off|switch off|cancel|silence|kill) (?:the |my |this |that |next |ringing )*alarm$""", RegexOption.IGNORE_CASE)
+
+    private fun dismissAlarm(text: String): One? =
+        if (DISMISS_ALARM.matches(text)) One.Step("dismiss_alarm", "Dismiss the ringing or next alarm", JsonObject(emptyMap())) else null
+
+    private val DIRECTIONS = listOf(
+        Regex("""^(?:navigate|drive|walk|route|guide) (?:me )?(?:to|for) (?:the )?(.{2,100})$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:take|get) me to (?:the )?(.{2,100})$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:give me |get |show |show me |find )?(?:the )?directions? (?:to|for) (?:the )?(.{2,100})$""", RegexOption.IGNORE_CASE),
+        Regex("""^how (?:do|can) i (?:get|go|drive|walk|reach) to (?:the )?(.{2,100})$""", RegexOption.IGNORE_CASE),
+        Regex("""^how to (?:get|reach|go) to (?:the )?(.{2,100})$""", RegexOption.IGNORE_CASE),
+    )
+    private val NEARBY = Regex(
+        """^(?:find|show|search|look for|where(?:'s| is)) (?:me )?(?:the |a |an |some )?(?:nearest |nearby |closest )?(.{2,60}?) (?:near me|nearby|around me|near here|close by)$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val NOT_A_PLACE = setOf("it", "this", "that", "there", "here", "them", "one", "something", "anything", "next slide", "the next")
+
+    private fun maps(text: String): One? {
+        for (p in DIRECTIONS) {
+            val place = p.matchEntire(text)?.groupValues?.get(1)?.trim()?.trim('"') ?: continue
+            if (place.lowercase(Locale.ROOT) in NOT_A_PLACE) return null
+            return One.Step(
+                "open_maps",
+                "Directions to ${place.take(60)}",
+                buildJsonObject {
+                    put("query", place)
+                    put("mode", "directions")
+                },
+            )
+        }
+        val thing = NEARBY.matchEntire(text)?.groupValues?.get(1)?.trim()?.trim('"') ?: return null
+        val full = text.substring(text.indexOf(thing, ignoreCase = true)).trim()
+        val query = if (full.isEmpty()) "$thing near me" else full
+        return One.Step(
+            "open_maps",
+            "Search Maps for ${query.take(60)}",
+            buildJsonObject {
+                put("query", query)
+                put("mode", "search")
+            },
+        )
+    }
+
+    private val COUNT_APPS = listOf(
+        Regex("""^how many apps (?:do i have|have i (?:got )?installed|are (?:there )?(?:installed )?(?:on|in) (?:my|this) phone|are installed(?: on (?:my|this) phone)?|are (?:there )?(?:installed )?(?:on )?(?:my|this) phone)$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:count|number of) (?:my |the |all )?(?:installed )?apps(?: (?:on|in) (?:my|this) phone)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^how many (?:installed )?apps(?: are there)?$""", RegexOption.IGNORE_CASE),
+    )
+
+    private fun countApps(text: String): One? =
+        if (COUNT_APPS.any { it.matches(text) }) One.Step("count_apps", "Count the apps on this phone", JsonObject(emptyMap())) else null
+
+    private val ACCESS_CHECK = listOf(
+        Regex("""^(?:check|show|list|tell me|what are|run)(?: me)? (?:my |the |your )?(?:accesses|access|permissions)(?: (?:status|check|doctor))?$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:which|what) (?:accesses|access|permissions) (?:are |is )?(?:off|missing|disabled|not (?:on|allowed|switched on|enabled)|turned off)$""", RegexOption.IGNORE_CASE),
+        Regex("""^what (?:can(?:'t| not)|cannot) you do(?: right now)?$""", RegexOption.IGNORE_CASE),
+        Regex("""^what(?:'s| is) not working$""", RegexOption.IGNORE_CASE),
+        Regex("""^(?:what|which) (?:access|accesses|permissions) do you need$""", RegexOption.IGNORE_CASE),
+    )
+
+    private fun accessCheck(text: String): One? =
+        if (ACCESS_CHECK.any { it.matches(text) }) One.Step("check_access", "Check which accesses are switched on", JsonObject(emptyMap())) else null
+
+    private val COPY = Regex("""^copy (.{1,300}?) to (?:the |my )?clipboard$""", RegexOption.IGNORE_CASE)
+
+    private fun clipboard(text: String): One? {
+        val words = COPY.matchEntire(text)?.groupValues?.get(1)?.trim()?.trim('"', '“', '”')?.trim().orEmpty()
+        if (words.isEmpty() || words.lowercase(Locale.ROOT) in setOf("it", "this", "that", "text")) return null
+        return One.Step("copy_to_clipboard", "Copy ${words.length} characters", buildJsonObject { put("text", words) })
+    }
 
     // ---- weather ---------------------------------------------------------------------------------------------------
     //

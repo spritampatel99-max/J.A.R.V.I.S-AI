@@ -81,6 +81,10 @@ class DevicePorts(
     val camera: CameraLauncher? = null,
     /** Lets a WhatsApp message be sent hands-free. Absent, or [WhatsAppSender.enabled] false, the person presses Send. */
     val whatsappSender: WhatsAppSender? = null,
+    /** Brightness, sound mode, Settings pages, clipboard, dismiss alarm. Without it those tools are simply not offered. */
+    val settings: PhoneSettingsPort? = null,
+    /** Lets "which accesses are off?" be answered from Android's real state. */
+    val access: AccessReporter? = null,
 )
 
 /** Presses Send in WhatsApp for a message that was just opened with the text typed in. Off unless the person switched it on. */

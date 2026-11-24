@@ -46,6 +46,14 @@ object WebLinks {
     fun youtubeSearchUrl(query: String): String =
         YOUTUBE_SEARCH_PREFIX + URLEncoder.encode(query.trim(), "UTF-8")
 
+    /** Google Maps directions to [place]; the Maps app opens it when installed, else the browser. */
+    fun mapsDirectionsUrl(place: String): String =
+        "https://www.google.com/maps/dir/?api=1&destination=" + URLEncoder.encode(place.trim(), "UTF-8")
+
+    /** Google Maps search for [query], such as "petrol pump near me". */
+    fun mapsSearchUrl(query: String): String =
+        "https://www.google.com/maps/search/?api=1&query=" + URLEncoder.encode(query.trim(), "UTF-8")
+
     const val YOUTUBE_HOME = "https://www.youtube.com/"
 
     private const val YOUTUBE_SEARCH_PREFIX = "https://www.youtube.com/results?search_query="

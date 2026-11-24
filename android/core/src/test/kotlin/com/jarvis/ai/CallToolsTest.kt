@@ -439,8 +439,8 @@ class CallToolsTest {
         assertTrue(names(ports(ScriptedContacts(), null)).none { it in callTools }, "contacts alone must not expose half-working call tools")
         assertTrue(names(ports(null, ScriptedCalls())).none { it in callTools })
         assertTrue(names(ports(ScriptedContacts(), ScriptedCalls())).containsAll(callTools))
-        assertEquals(6, BuiltinTools.create(ports(null, null)).size)
-        assertEquals(10, BuiltinTools.create(ports(ScriptedContacts(), ScriptedCalls())).size)
+        assertEquals(10, BuiltinTools.create(ports(null, null)).size)
+        assertEquals(14, BuiltinTools.create(ports(ScriptedContacts(), ScriptedCalls())).size)
     }
 
     // ---- through the real executor: confirmation, audit, honest report ----------------------------------------------------
