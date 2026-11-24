@@ -26,6 +26,9 @@ internal sealed interface ContactLookup {
                     label = labelPart
                 }
             }
+            if (found is ContactSearch.Found && found.contacts.isEmpty()) {
+                similarNames(contacts, query)?.let { return Stop(ToolError.NeedsInput(it)) }
+            }
             return when (found) {
                 ContactSearch.PermissionMissing -> Stop(
                     ToolError.PermissionDenied(setOf(CallPermissions.READ_CONTACTS), "Contacts access is off. Allow it in the Access tab and ask again."),
@@ -41,6 +44,28 @@ internal sealed interface ContactLookup {
                 }
             }
         }
+
+        /**
+         * "Rohit Kumar" finds no contact, but "Rohit" is saved. Each word of the name is searched on its own and whatever turns up is offered
+         * as a question. It is never chosen for the person: a first name alone could be the wrong Rohit.
+         */
+        private suspend fun similarNames(contacts: ContactsPort, query: String): String? {
+            val words = query.trim().split(Regex("""\s+""")).map { it.filter { c -> c.isLetterOrDigit() } }.filter { it.length >= MIN_WORD }.distinct().take(MAX_WORDS)
+            if (words.size < 2) return null
+            val names = LinkedHashMap<String, String>()
+            for (word in words) {
+                val result = search(contacts, word) as? ContactSearch.Found ?: continue
+                result.contacts.forEach { names.putIfAbsent(it.id, it.name.trim().take(40)) }
+            }
+            val list = names.values.filter { it.isNotEmpty() }.distinct()
+            if (list.isEmpty()) return null
+            val shown = list.take(MAX_SUGGESTIONS).joinToString(", ") + if (list.size > MAX_SUGGESTIONS) " and more" else ""
+            return "I could not find a contact called \"${query.trim().take(60)}\". Did you mean: $shown? Say the full name of the one you mean."
+        }
+
+        private const val MIN_WORD = 3
+        private const val MAX_WORDS = 3
+        private const val MAX_SUGGESTIONS = 5
 
         private suspend fun search(contacts: ContactsPort, query: String): ContactSearch? =
             try {

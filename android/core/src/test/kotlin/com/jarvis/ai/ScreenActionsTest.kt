@@ -461,6 +461,32 @@ class ScreenActionsTest {
         assertNotNull(NativeCommands.match("read my notifications"))
         assertEquals("read_notifications", tool("read my notifications"))
     }
+
+    // ---- guards that must hold even when the Android side forgets them ------------------------------------------------
+
+    @Test
+    fun scrollingNeverHappensInABankingApp() = runTest {
+        val raw = Raw(front = bank, enforceAllow = false)
+        val result = control(raw).scroll(down = true)
+        assertIs<ScreenAct.OffLimits>(result)
+    }
+
+    @Test
+    fun anApprovedPressStillRefusesAMoneyButtonAndNeverTouchesTheScreen() = runTest {
+        val raw = Raw()
+        for (label in listOf("Pay now", "Buy", "Transfer money", "Send money")) {
+            val result = control(raw).tapApproved(label)
+            assertIs<ScreenAct.Failed>(result, label)
+        }
+        assertTrue(raw.taps.isEmpty(), "a money button was pressed: ${raw.taps}")
+    }
+
+    @Test
+    fun anApprovedPressInABankingAppIsOffLimitsAndNeverTouchesTheScreen() = runTest {
+        val raw = Raw(front = bank, enforceAllow = false)
+        assertIs<ScreenAct.OffLimits>(control(raw).tapApproved("Pin chat"))
+        assertTrue(raw.taps.isEmpty())
+    }
 }
 
 class TapTypePhrasesTest {

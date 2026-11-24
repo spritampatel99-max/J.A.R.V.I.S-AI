@@ -148,7 +148,7 @@ object FeatureCatalog {
         Feature(
             FeatureId.MOBILE_DATA_MONITOR, "Mobile Data Monitor",
             "See how much mobile data the phone and individual apps have used today, this week and this month. Needs Usage access.",
-            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
+            Readiness.Planned(5), InternetNeed.NONE, OfflineSupport.FULL,
             permissions = listOf(req(PermissionId.USAGE_ACCESS)),
         ),
         Feature(
@@ -163,13 +163,13 @@ object FeatureCatalog {
         Feature(
             FeatureId.FILE_MANAGER, "File Manager",
             "Browse a folder you pick with the Android file picker, make folders, rename, delete after a confirmation, and sort a folder's files by type after a preview. No all-files access is requested.",
-            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
+            Readiness.Planned(5), InternetNeed.NONE, OfflineSupport.FULL,
             capabilities = setOf(Capability.STORAGE_ACCESS_FRAMEWORK),
         ),
         Feature(
             FeatureId.DOCUMENT_INTELLIGENCE, "Document Intelligence",
             "Import text, Markdown, CSV, HTML, Word (.docx) or PDF files and search them on the phone. Asking an AI about a document is a separate button and sends only the matching passages to your cloud provider.",
-            Readiness.Available, InternetNeed.OPTIONAL, OfflineSupport.PARTIAL,
+            Readiness.Planned(6), InternetNeed.OPTIONAL, OfflineSupport.PARTIAL,
             requires = setOf(FeatureId.FILE_MANAGER, FeatureId.AI_ASSISTANT),
             capabilities = setOf(Capability.LOCAL_DATABASE),
         ),
@@ -222,19 +222,19 @@ object FeatureCatalog {
         Feature(
             FeatureId.PERSONAL_ROUTINES, "Personal Routines",
             "Morning and evening routines built from your own steps: a reminder at the time you choose, and Jarvis reads the steps to you when you ask.",
-            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
+            Readiness.Planned(6), InternetNeed.NONE, OfflineSupport.FULL,
             requires = setOf(FeatureId.AUTOMATION_STUDIO),
         ),
         Feature(
             FeatureId.MULTILINGUAL_ASSISTANT, "Multilingual Assistant",
-            "Choose the language Jarvis answers in and the language it listens for (English, Hindi and other Indian languages). The phone's own speech engine must support it.",
+            "Choose English or Hindi for the app. Jarvis listens for that language and answers in the language you speak or type (English, Hindi or Hinglish). The phone's own speech engine must support Hindi.",
             Readiness.Available, InternetNeed.OPTIONAL, OfflineSupport.PARTIAL,
             requires = setOf(FeatureId.AI_ASSISTANT),
         ),
         Feature(
             FeatureId.ADAPTIVE_DASHBOARD, "Adaptive Dashboard",
             "A home screen with shortcuts to the things you ask for most, counted on this phone only.",
-            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
+            Readiness.Planned(7), InternetNeed.NONE, OfflineSupport.FULL,
         ),
         Feature(
             FeatureId.BLUETOOTH_COMPANION, "Bluetooth Companion",

@@ -409,3 +409,40 @@ class PhoneCommandsTest {
         assertIs<ToolResult.Failure>(CheckAccessTool(reporter).execute(args()))
     }
 }
+
+class ContactNameFallbackTest {
+
+    private class Book(private val people: List<com.jarvis.ai.ai.tools.ContactEntry>) : com.jarvis.ai.ai.tools.builtin.ContactsPort {
+        val searches = mutableListOf<String>()
+        override suspend fun search(query: String): com.jarvis.ai.ai.tools.builtin.ContactSearch {
+            searches += query
+            return com.jarvis.ai.ai.tools.builtin.ContactSearch.Found(people.filter { it.name.contains(query, ignoreCase = true) })
+        }
+    }
+
+    private fun person(id: String, name: String) =
+        com.jarvis.ai.ai.tools.ContactEntry(id, name, listOf(com.jarvis.ai.ai.tools.ContactNumber("+919876543210", "mobile")))
+
+
+    @Test
+    fun aNameThatIsNotSavedOffersWhatIsSavedButNeverPicksIt() = runTest {
+        val book = Book(listOf(person("1", "Rohit Verma")))
+        val outcome = com.jarvis.ai.ai.tools.builtin.ContactLookupForTest.resolve(book, "Rohit Kumar")
+        assertTrue(outcome.startsWith("ASK:"), outcome)
+        assertTrue(outcome.contains("Rohit Verma"))
+    }
+
+    @Test
+    fun aSingleWordNameIsNotWidenedAndNothingMatchingStaysNoMatch() = runTest {
+        val book = Book(listOf(person("1", "Rohit Verma")))
+        assertTrue(com.jarvis.ai.ai.tools.builtin.ContactLookupForTest.resolve(book, "Zorblax").startsWith("STOP:"))
+        assertTrue(com.jarvis.ai.ai.tools.builtin.ContactLookupForTest.resolve(book, "Zorblax Qux").startsWith("STOP:"))
+        assertEquals(listOf("Zorblax"), book.searches.take(1))
+    }
+
+    @Test
+    fun anExactNameStillResolvesDirectly() = runTest {
+        val book = Book(listOf(person("1", "Rohit Verma")))
+        assertTrue(com.jarvis.ai.ai.tools.builtin.ContactLookupForTest.resolve(book, "Rohit Verma").startsWith("FOUND:"))
+    }
+}

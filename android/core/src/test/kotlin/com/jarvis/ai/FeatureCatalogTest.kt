@@ -29,9 +29,8 @@ class FeatureCatalogTest {
         FeatureId.AUTOMATION_STUDIO, FeatureId.AI_MEMORY, FeatureId.SMART_PLANNER, FeatureId.CUSTOM_AGENT_CREATOR,
         FeatureId.SECURITY_CENTER, FeatureId.OFFLINE_PREPARATION_CENTER,
         FeatureId.HANDS_FREE, FeatureId.APPLICATION_LAUNCHER, FeatureId.NOTIFICATION_INTELLIGENCE,
-        FeatureId.WHATSAPP_ASSISTANT, FeatureId.SMS_ASSISTANT, FeatureId.MOBILE_DATA_MONITOR, FeatureId.FILE_MANAGER,
-        FeatureId.DOCUMENT_INTELLIGENCE, FeatureId.RESEARCH_WEB, FeatureId.OFFLINE_KNOWLEDGE, FeatureId.PERSONAL_ROUTINES,
-        FeatureId.MULTILINGUAL_ASSISTANT, FeatureId.ADAPTIVE_DASHBOARD, FeatureId.BLUETOOTH_COMPANION,
+        FeatureId.WHATSAPP_ASSISTANT, FeatureId.SMS_ASSISTANT, FeatureId.RESEARCH_WEB, FeatureId.OFFLINE_KNOWLEDGE,
+        FeatureId.MULTILINGUAL_ASSISTANT, FeatureId.BLUETOOTH_COMPANION,
     )
 
     /** Same catalogue with every feature treated as built, to exercise dependency rules that matter once the phases land. */

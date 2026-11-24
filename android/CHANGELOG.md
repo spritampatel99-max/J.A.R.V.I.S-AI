@@ -82,3 +82,15 @@ Android 14+ move (`minSdk` 34, target 35) and the owner's second list. `:core` p
 - Photos: system photo picker, shrunk JPEG, sent to a cloud AI only (Anthropic, Gemini, OpenAI-style providers), refused for on-device models, never saved. The own-endpoint provider may not accept images.
 - Fix found while testing: a Devanagari "send" label was not recognised as risky because combining marks split the word.
 - Tests: 928 pass. Mutation checks: each new safety rule was deliberately broken and a test failed; two gaps found (front-app check and the Android-side guard) now covered.
+
+## 2026-11-23 to 11-24 (CI compiles `:app`; nothing run on a phone)
+
+`:core` passes 1029 offline tests. Run 45349376355: `:core:test`, `:app:assembleDebug` and lint passed; the 16 KB check still reports Vosk's prebuilt library.
+
+- New: ElevenLabs voice chosen at setup (your own key); Bluetooth companion (offer hands-free on connect, read notifications aloud); light / dark / system theme; header overlap fix.
+- New: WhatsApp unread-chat count from the chat list; YouTube "play <song>" presses the first real video result. Screen markers unverified against the real apps.
+- New built-in commands: brightness, sound mode, 30 Settings pages, cancel alarm, clipboard, count apps, Maps, access check, calculator, unit converter, random pick (11 tools). Similar-name suggestions when a contact is not found.
+- New: barge-in (the wake word stops JARVIS speaking; "stop" / "quiet" / "repeat that" on the phone; the cut-off answer is marked so the next sentence can change it), and a phone operator ("do it in any app", off by default, number-only moves, asks before critical presses, never presses money controls).
+- Fixed: five features (Mobile Data Monitor, File Manager, Document Intelligence, Personal Routines, Adaptive Dashboard) were marked available with no code behind them; they are planned again. The Multilingual description now says English and Hindi.
+- Mutation checks: two guards were not watched by any test (scrolling in a banking app; an approved press on a money button). Tests added; both mutations are now caught.
+- Docs: `STATUS.md` rewritten (it still described the 2026-11-22 zip); `docs/PHONE_OPERATOR.md` added.
