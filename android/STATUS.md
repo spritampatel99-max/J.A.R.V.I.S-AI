@@ -20,7 +20,7 @@ This workspace cannot reach Google's Android build servers, so the app is built 
 - **Phone operator** ("do it for me in any app"): off until you switch it on in Prefs > Access > Phone operator (also needs Accessibility and "press buttons and type"). See `docs/PHONE_OPERATOR.md` for exactly what it will and will not do.
 
 ## Automation reliability (2026-11-24)
-See CHANGELOG. Compiled status of these `:app` edits is only known after the next CI run; nothing has run on a phone.
+See CHANGELOG. Compiled in CI (run 45398622640: core tests, app build and lint passed; the 16 KB check still flags Vosk). Nothing has run on a phone.
 
 ## What "anything I say gets done" can and cannot mean
 It cannot mean everything. Android blocks apps from some things by design, and JARVIS does not try to get around that: see `docs/PHONE_OPERATOR.md`. In short: banking, payment and password-manager apps, system permission screens and JARVIS's own screens are never read or pressed; money is never moved; the person's confirmation is always a tap in JARVIS itself, never something the AI or text on a screen can give.

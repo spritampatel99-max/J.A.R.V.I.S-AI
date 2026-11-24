@@ -95,7 +95,7 @@ Android 14+ move (`minSdk` 34, target 35) and the owner's second list. `:core` p
 - Mutation checks: two guards were not watched by any test (scrolling in a banking app; an approved press on a money button). Tests added; both mutations are now caught.
 - Docs: `STATUS.md` rewritten (it still described the 2026-11-22 zip); `docs/PHONE_OPERATOR.md` added.
 
-## 2026-11-24 (automation reliability audit; core tested, `:app` part compiled in CI only after this entry)
+## 2026-11-24 (automation reliability audit; core tested; CI run 45398622640 compiled `:app`, nothing run on a phone)
 
 `:core` passes 1055 offline tests. Done from the pasted automation audit:
 - Problem 01: `ScheduleEngine` (moved to `:core` so it can be tested) isolates every stage and every reminder, asks Android for the next wake-up before the long work and again in a `finally`, and never throws when Android refuses the request. `lastProblem` and a warning card on the Automations screen show what failed.
