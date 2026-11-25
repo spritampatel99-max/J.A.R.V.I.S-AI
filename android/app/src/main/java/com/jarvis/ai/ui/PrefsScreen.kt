@@ -356,5 +356,5 @@ private fun VoiceOption(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun sliderColors() = SliderDefaults.colors(
     thumbColor = Color.White,
     activeTrackColor = JarvisColors.Violet,
-    inactiveTrackColor = Color(0xFF1C243C),
+    inactiveTrackColor = JarvisColors.SwitchOff,
 )

@@ -54,6 +54,10 @@ class BluetoothReceiver : BroadcastReceiver() {
                     }
                     if (offerListening) offerToListen(context, name)
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Nothing here is worth crashing the app for (a Bluetooth, speech or notification service that misbehaves): skip the announcement.
             } finally {
                 pending.finish()
             }

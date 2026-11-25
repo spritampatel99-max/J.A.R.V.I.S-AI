@@ -81,6 +81,7 @@ jobs:
             [ -f "$f.log" ] || continue
             { echo "== $f (last 60 lines)"; tail -n 60 "$f.log"; echo; echo "== $f problems"; grep -nE "^e: |error:|FAILED|What went wrong|Could not (resolve|find)|Execution failed|AAPT|Manifest merger|Duplicate class" "$f.log" | head -400; } | head -c 300000 > "$rep/$f.txt"
           done
+          [ -f app/build/reports/lint-report.txt ] && head -c 250000 app/build/reports/lint-report.txt > "$rep/lint-report.txt"
           { echo "run=$GITHUB_RUN_ID sha=$GITHUB_SHA"; echo "core=${{ steps.core.outcome }} app=${{ steps.app.outcome }} lint=${{ steps.lint.outcome }} kb16=${{ steps.kb16.outcome }}"; } > "$rep/RESULT.txt"
           cd "$rep"
           git init -q

@@ -34,6 +34,13 @@ android {
         compose = true
     }
 
+    lint {
+        // Writes every lint finding (not only errors) as plain text so the CI log can show them.
+        textReport = true
+        textOutput = layout.buildDirectory.file("reports/lint-report.txt").get().asFile
+        abortOnError = true
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

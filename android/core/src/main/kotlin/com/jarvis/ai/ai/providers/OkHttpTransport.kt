@@ -53,7 +53,7 @@ class OkHttpTransport(
         }
         response.use { resp ->
             val text = try {
-                resp.body?.string().orEmpty()
+                resp.peekBody(MAX_BODY_BYTES).string()
             } catch (e: InterruptedIOException) {
                 throw ProviderError.Timeout("Reading the response timed out", e)
             } catch (e: IOException) {
@@ -67,6 +67,9 @@ class OkHttpTransport(
 
     private companion object {
         val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        /** A chat answer or model list is far smaller than this; a larger body is cut off instead of being read into memory whole. */
+        const val MAX_BODY_BYTES = 8L * 1024 * 1024
     }
 }
 

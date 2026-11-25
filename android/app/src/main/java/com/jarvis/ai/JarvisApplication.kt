@@ -16,6 +16,14 @@ class JarvisApplication : Application() {
         super.onCreate()
         registerActivityLifecycleCallbacks(foreground)
         // Deliver anything that came due while the app was not running and ask Android for the next wake-up.
-        CoroutineScope(Dispatchers.Default).launch { container.schedule.tick() }
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                container.schedule.tick()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A problem here must never stop the app from opening; the wake-up is asked for again the next time anything runs.
+            }
+        }
     }
 }

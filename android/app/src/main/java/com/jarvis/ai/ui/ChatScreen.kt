@@ -297,7 +297,7 @@ private fun MessageBubble(item: ChatItem, animate: Boolean, time: String, modifi
     val fill: Brush = when {
         isUser -> Brush.linearGradient(listOf(JarvisColors.Violet.copy(alpha = 0.45f), JarvisColors.Blue.copy(alpha = 0.35f)))
         isSystem -> SolidColor(colors.error.copy(alpha = 0.12f))
-        else -> Brush.verticalGradient(listOf(Color(0xFF141A2E).copy(alpha = 0.95f), Color(0xFF0D1222).copy(alpha = 0.95f)))
+        else -> Brush.verticalGradient(listOf(JarvisColors.CardTop.copy(alpha = 0.95f), JarvisColors.CardBottom.copy(alpha = 0.95f)))
     }
     val edge = when {
         isUser -> JarvisColors.Violet.copy(alpha = 0.55f)
@@ -398,7 +398,7 @@ fun ConfirmationOverlay(request: ConfirmationRequest, onAllow: () -> Unit, onDen
                 .fillMaxWidth()
                 .widthIn(max = 420.dp)
                 .clip(RoundedCornerShape(32.dp))
-                .background(Brush.verticalGradient(listOf(Color(0xFF182038), Color(0xFF0D1222))))
+                .background(Brush.verticalGradient(listOf(JarvisColors.CardTop, JarvisColors.CardBottom)))
                 .border(1.dp, Brush.linearGradient(JarvisColors.Spectrum.map { it.copy(alpha = 0.6f) }), RoundedCornerShape(32.dp))
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

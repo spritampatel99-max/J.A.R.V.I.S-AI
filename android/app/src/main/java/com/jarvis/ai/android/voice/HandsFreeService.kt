@@ -99,10 +99,10 @@ class HandsFreeService : Service() {
             stopHandsFree()
             return START_NOT_STICKY
         }
-        if (controller?.isActive == true) return START_NOT_STICKY
-
         createChannel()
+        // Always enter the foreground first, even when listening is already running: every startForegroundService() call must be answered.
         if (!enterForeground()) return START_NOT_STICKY
+        if (controller?.isActive == true) return START_NOT_STICKY
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             return fail("Allow the microphone first (Prefs > Access).")
@@ -439,6 +439,12 @@ class HandsFreeService : Service() {
 
         /** Must be called while the app is on screen: Android refuses to start a microphone service from the background. */
         fun start(context: Context) {
+            // Checked HERE, before Android is asked to start a foreground service: a service that was started as foreground and then stops itself
+            // without having entered the foreground (which is what happens when the microphone is not allowed) crashes the whole app.
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                status.value = HandsFreeStatus.Problem("Allow the microphone first (Prefs > Access), then turn hands-free on.")
+                return
+            }
             status.value = HandsFreeStatus.Waiting
             try {
                 ContextCompat.startForegroundService(context, Intent(context, HandsFreeService::class.java))
