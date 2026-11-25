@@ -3,7 +3,7 @@
 A standalone personal AI assistant for Android 11+ (API 30). It is built to run on the phone itself: no
 desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
 
-**Status: early foundation, no release build.** `:core:test` passes under Gradle on the owner's PC, and an earlier version of the debug app was built, installed and shown running on the owner's phone (screenshots, 2026-11-08). The latest rounds of changes (model install, access screen, built-in commands, the Stitch-based screens, voice and calls, memory, planner, automations, custom agents, offline and security screens, hands-free, phone control, the offline library, messages / timers / media keys and the AI-mode router) have **not been compiled yet**: the workspace that wrote them cannot reach Google's Android build servers. `:core` is tested offline (837 tests); `:app` is not. How this project lines up with the "JARVIS 3.0" summary is in [`docs/JARVIS_3_SUMMARY_MATCH.md`](docs/JARVIS_3_SUMMARY_MATCH.md). See
+**Status: early foundation, no release build.** Read `STATUS.md` first; it is the current truth. `:core` is tested offline (1058 tests) and compiled and tested by GitHub Actions on branch `ci/android-build`; `:app` compiles there too (debug APK only). **Nothing in the latest rounds has been run on a phone.** An earlier version of the debug app was built, installed and shown running on the owner's phone (2026-11-08). How this project is built: `docs/BUILD_ON_GITHUB.md`.
 [`docs/testing/BUILD_AND_TEST_REPORT.md`](docs/testing/BUILD_AND_TEST_REPORT.md) for exactly what was and was not run, and
 [`docs/ROADMAP.md`](docs/ROADMAP.md) for the ten-phase plan.
 
@@ -34,7 +34,7 @@ desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
   measured / estimate / not available, a model recommendation that explains its reasons, a feature chooser, a storage review
   and a permissions step. It downloads nothing and asks for nothing until you tap. See [`docs/setup/ONBOARDING.md`](docs/setup/ONBOARDING.md).
 
-**Not built yet:** a working on-device chat engine (the LiteRT-LM engine is an unverified opt-in, so AI chat needs internet and a cloud key by default), tapping or typing inside other apps (deliberately not requested from Android), streaming replies, a light theme, a floating orb, document reading, agent knowledge sources, a memory-suggestion generator, editing an automation, and a signed release build. See the roadmap for the state of each phase.
+**Not built yet:** a working on-device chat engine (the LiteRT-LM engine is an unverified opt-in, so AI chat needs internet and a cloud key by default), tapping at screen coordinates and swipes (opt-in label tap / type exists; see STATUS.md), streaming replies, a floating orb, document reading, a file manager, a data monitor, personal routines, an adaptive dashboard, agent knowledge sources, a memory-suggestion generator, editing an automation, and a signed release build. See the roadmap for the state of each phase.
 
 ## Requirements
 

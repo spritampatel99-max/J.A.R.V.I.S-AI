@@ -101,10 +101,11 @@ fun MutedText(text: String, modifier: Modifier = Modifier) {
     Text(text, modifier, style = MaterialTheme.typography.bodySmall, color = JarvisColors.Muted)
 }
 
-private val WHEN_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.getDefault())
+/** Built on each use: the app language can be switched while the app runs, and a formatter kept from start-up would stay in the old language. */
+private fun whenFormat(): DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.getDefault())
 
 /** "Tue 10 Nov, 18:30" in the phone's time zone. */
 fun formatWhen(epochMs: Long, zone: ZoneId = ZoneId.systemDefault()): String =
-    WHEN_FORMAT.format(Instant.ofEpochMilli(epochMs).atZone(zone))
+    whenFormat().format(Instant.ofEpochMilli(epochMs).atZone(zone))
 
 fun formatClock(hour: Int, minute: Int): String = "%02d:%02d".format(hour, minute)
