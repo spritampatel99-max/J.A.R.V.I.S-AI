@@ -24,9 +24,10 @@ desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
 - **Offline library:** a Kiwix `.zim` Wikipedia file (Simple English about 1 GB, Top articles about 2.1 GB) you download or import with a tap. "Search offline for black hole" answers from it with no internet. It looks things up; it does not chat.
 - **Logs:** conversations saved on the phone only (keys removed), searchable, deletable, plus the action record.
 - Thirty-two tools. **Phone:** flashlight, alarm and timer (handed to the Clock app), open a link, open YouTube, open an app, media keys, device info, current time. **Calls and messages:** call a contact, call a number, answer, end, text (SMS), WhatsApp, email (all drafts: you press Send). **Camera:** open the camera app for a photo or a video (you press the shutter). **Phone control:** read screen, scroll, navigate (Back/Home/Recents/lock/screenshot), read and clear notifications. **Productivity:** add task, add note, add reminder, daily overview, show notification, notify overview. **Lookups (read-only):** weather, Wikipedia, a grounded web answer, and the offline library. Lookup text is untrusted content: it can be shown and read aloud but cannot approve or trigger anything.
+- **Personal Routines, Mobile Data Monitor and home shortcuts** (written 2026-11-26, never run on a phone): named step lists you can have read out or shown as a daily notification; your mobile-data use today / this week / this month per app (needs Usage access); and one-tap shortcuts for requests that worked twice. See [`docs/ROUTINES_DATA_SHORTCUTS.md`](docs/ROUTINES_DATA_SHORTCUTS.md).
 - **Memory** that saves only what you add or clearly ask to remember ("remember that …"), with delete and clear in Prefs. See [`docs/ai/MEMORY_AND_PLANNER.md`](docs/ai/MEMORY_AND_PLANNER.md).
 - **Tasks, notes and reminders** with one Android alarm wake-up, re-armed after reboot and app update, and honest "not shown" reporting when notifications are blocked.
-- **Automations** limited to four low-risk actions (add task, add note, show notification, notify overview) on a daily, weekly or every-N-minutes schedule. See [`docs/AUTOMATIONS.md`](docs/AUTOMATIONS.md).
+- **Automations** limited to five low-risk actions (add task, add note, show notification, notify overview, show a routine) on a daily, weekly or every-N-minutes schedule. See [`docs/AUTOMATIONS.md`](docs/AUTOMATIONS.md).
 - **Custom Agent Creator**: a five-step wizard that builds an agent as plain configuration, previews it with no tools, and activates it only after your Approve tap. Memory is private to each agent. See [`docs/ai/CUSTOM_AGENTS.md`](docs/ai/CUSTOM_AGENTS.md).
 - **Offline report and security review** screens that state what works without internet and what was and was not checked. See [`docs/security/OFFLINE_AND_SECURITY_REVIEW.md`](docs/security/OFFLINE_AND_SECURITY_REVIEW.md).
 - Native confirmation dialog for sensitive actions, with an activity/audit log.
@@ -34,7 +35,7 @@ desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
   measured / estimate / not available, a model recommendation that explains its reasons, a feature chooser, a storage review
   and a permissions step. It downloads nothing and asks for nothing until you tap. See [`docs/setup/ONBOARDING.md`](docs/setup/ONBOARDING.md).
 
-**Not built yet:** a working on-device chat engine (the LiteRT-LM engine is an unverified opt-in, so AI chat needs internet and a cloud key by default), tapping at screen coordinates and swipes (opt-in label tap / type exists; see STATUS.md), streaming replies, a floating orb, document reading, a file manager, a data monitor, personal routines, an adaptive dashboard, agent knowledge sources, a memory-suggestion generator, editing an automation, and a signed release build. See the roadmap for the state of each phase.
+**Not built yet:** a working on-device chat engine (the LiteRT-LM engine is an unverified opt-in, so AI chat needs internet and a cloud key by default), tapping at screen coordinates and swipes (opt-in label tap / type exists; see STATUS.md), streaming replies, a floating orb, document reading, a file manager, agent knowledge sources, a memory-suggestion generator, editing an automation, and a signed release build. See the roadmap for the state of each phase.
 
 ## Requirements
 
@@ -83,6 +84,6 @@ settings through `~/.gradle/gradle.properties` or environment variables, add a `
 
 [`docs/PROJECT_AUDIT.md`](docs/PROJECT_AUDIT.md) · [`docs/ROADMAP.md`](docs/ROADMAP.md) · [`docs/setup/ONBOARDING.md`](docs/setup/ONBOARDING.md) ·
 [`docs/ai/CLOUD_PROVIDERS.md`](docs/ai/CLOUD_PROVIDERS.md) · [`docs/ai/LOCAL_MODELS.md`](docs/ai/LOCAL_MODELS.md) · [`docs/setup/ACCESS.md`](docs/setup/ACCESS.md) · [`docs/security/SECURITY.md`](docs/security/SECURITY.md) ·
-[`docs/ai/MEMORY_AND_PLANNER.md`](docs/ai/MEMORY_AND_PLANNER.md) · [`docs/AUTOMATIONS.md`](docs/AUTOMATIONS.md) · [`docs/ai/CUSTOM_AGENTS.md`](docs/ai/CUSTOM_AGENTS.md) ·
+[`docs/ai/MEMORY_AND_PLANNER.md`](docs/ai/MEMORY_AND_PLANNER.md) · [`docs/AUTOMATIONS.md`](docs/AUTOMATIONS.md) · [`docs/ROUTINES_DATA_SHORTCUTS.md`](docs/ROUTINES_DATA_SHORTCUTS.md) · [`docs/ai/CUSTOM_AGENTS.md`](docs/ai/CUSTOM_AGENTS.md) ·
 [`docs/security/OFFLINE_AND_SECURITY_REVIEW.md`](docs/security/OFFLINE_AND_SECURITY_REVIEW.md) · [`docs/release/RELEASE_CHECKLIST.md`](docs/release/RELEASE_CHECKLIST.md) ·
 [`docs/testing/BUILD_AND_TEST_REPORT.md`](docs/testing/BUILD_AND_TEST_REPORT.md) · [`CHANGELOG.md`](CHANGELOG.md)

@@ -143,6 +143,14 @@ class RoutinesTest {
         assertTrue(store.routines.value.isEmpty())
     }
 
+    @Test fun `the limits themselves are allowed`() {
+        assertIs<RoutineSave.Saved>(store.save("n".repeat(RoutineStore.MAX_NAME), List(RoutineStore.MAX_STEPS) { "s".repeat(RoutineStore.MAX_STEP) }, 23, 59))
+        assertIs<RoutineSave.Saved>(store.save("Edge", listOf("x"), 0, 0))
+        assertIs<RoutineSave.Rejected>(store.save("n".repeat(RoutineStore.MAX_NAME + 1), listOf("x"), null, null))
+        assertIs<RoutineSave.Rejected>(store.save("Edge", listOf("x"), -1, 0))
+        assertIs<RoutineSave.Rejected>(store.save("Edge", listOf("x"), 0, 60))
+    }
+
     @Test fun `there is a limit on how many routines`() {
         repeat(RoutineStore.MAX_ROUTINES) { saved("Routine number ${'a' + it}", "x") }
         assertTrue(assertIs<RoutineSave.Rejected>(store.save("One more thing", listOf("x"), null, null)).problems.single().contains("At most"))

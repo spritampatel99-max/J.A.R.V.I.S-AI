@@ -21,7 +21,7 @@ page for each special one. Every step can be declined. Nothing is granted withou
 | Display over other apps | Settings page | **Yes**: lets the app start another app from the background, and shows the hands-free overlay |
 | Accessibility service | Settings page | **Yes**: read the visible screen text, scroll, press Back / Home / Recents / lock / screenshot. Pressing a labelled button, typing, and pressing Send in WhatsApp are extra switches in Prefs > Phone control, off until you turn them on. Screen text is not logged or given to a model |
 | Notification access | Settings page | **Yes**: read and clear notifications. Text stays on the phone and is not logged or given to a model |
-| Usage access | Settings page | No: the data monitor is planned, not built |
+| Usage access | Settings page | **Yes**: the Mobile Data Monitor reads how much mobile data each app used (byte counts only: never what was sent, which sites, or screen time). Not used for anything else. See `docs/ROUTINES_DATA_SHORTCUTS.md` |
 
 Android may grey out the Accessibility and Notification-access switches for an app that was installed outside the Play Store. If so: Settings > Apps > JARVIS 3.0 > three dots > "Allow restricted settings", then try again.
 

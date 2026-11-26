@@ -47,7 +47,7 @@ permission explanations. Details and limits in `setup/ONBOARDING.md`.
 
 ## Phase 7 to 9: what exists
 
-See the three documents named in the table. In short: memory with explicit saving, tasks / notes / reminders with an alarm wake-up, automations restricted to four low-risk actions, custom agents as configuration only (draft, preview without tools, activate on a tap), an offline report with a real storage self-test, and a security review that lists what it did not check.
+See the three documents named in the table. In short: memory with explicit saving, tasks / notes / reminders with an alarm wake-up, automations restricted to five low-risk actions, custom agents as configuration only (draft, preview without tools, activate on a tap), an offline report with a real storage self-test, and a security review that lists what it did not check.
 
 ## Not yet built for the cloud side
 

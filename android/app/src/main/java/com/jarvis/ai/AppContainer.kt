@@ -373,7 +373,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     private val guardedNotifications = GuardedNotifications(AndroidNotificationPort(), screenGuard)
 
     /** What the assistant can do: the phone tools, the planner and reminder tools, the phone-control tools and the read-only internet lookups. */
-    val registry = ToolRegistry(
+    val registry: ToolRegistry = ToolRegistry(
         BuiltinTools.create(ports) +
             ScreenTools.create(screenControl, guardedNotifications, apps = ports.apps, urls = ports.urls) +
             listOfNotNull(
