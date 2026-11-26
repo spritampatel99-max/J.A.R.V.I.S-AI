@@ -3,7 +3,7 @@
 A standalone personal AI assistant for Android 11+ (API 30). It is built to run on the phone itself: no
 desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
 
-**Status: early foundation, no release build.** Read `STATUS.md` first; it is the current truth. `:core` is tested offline (1058 tests) and compiled and tested by GitHub Actions on branch `ci/android-build`; `:app` compiles there too (debug APK only). **Nothing in the latest rounds has been run on a phone.** An earlier version of the debug app was built, installed and shown running on the owner's phone (2026-11-08). How this project is built: `docs/BUILD_ON_GITHUB.md`.
+**Status: early foundation, no release build.** Read `STATUS.md` first; it is the current truth. `:core` is tested offline (1142 tests) and compiled and tested by GitHub Actions on branch `ci/android-build`; `:app` compiles there too (debug APK only). **Nothing in the latest rounds has been run on a phone.** An earlier version of the debug app was built, installed and shown running on the owner's phone (2026-11-08). How this project is built: `docs/BUILD_ON_GITHUB.md`.
 [`docs/testing/BUILD_AND_TEST_REPORT.md`](docs/testing/BUILD_AND_TEST_REPORT.md) for exactly what was and was not run, and
 [`docs/ROADMAP.md`](docs/ROADMAP.md) for the ten-phase plan.
 

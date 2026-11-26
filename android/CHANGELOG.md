@@ -108,3 +108,17 @@ Android 14+ move (`minSdk` 34, target 35) and the owner's second list. `:core` p
 ## 2026-11-24 (payment apps going to the home screen)
 - Cause not confirmed on a phone. JARVIS never presses Home by itself (only the opt-in phone operator can, when told to). Payment and banking apps are known to close themselves when a screen-reading accessibility service or a draw-over-other-apps window is active; JARVIS has both.
 - New: **payment mode** ("payment mode", "I am going to pay"): asks Android to switch off JARVIS's accessibility service and stops hands-free listening. Android only lets the person switch the service back on (Settings > Accessibility > JARVIS). `:core` 1058 tests.
+
+## 2026-11-25 / 2026-11-26 (audit round; core tested; CI run 45815957725 compiled `:app`, nothing run on a phone)
+
+`:core` passes 1142 offline tests. CI: core, app (0 compiler warnings), lint (0 errors, 39 warnings; 81 before) and the 16 KB check all passed. Full table in `docs/AUDIT_2026-11-25.md`.
+- Hardening: key store (`has` is true only for a key that can be decrypted; Keystore failures no longer crash a save); hands-free start order on Android 14 (permission checked before entering the foreground); Bluetooth receiver catches failures; the Bluetooth notification opens the app on tap; start-up scheduler tick guarded; provider and web responses capped at 8 MB; backup and transfer rules exclude everything; date formatter follows the app language.
+- Light theme: the confirmation dialog and assistant bubble used a fixed dark background with theme text colour; now palette colours (never viewed on a phone).
+- Automations: clock and time-zone changes recompute the next run (`TIME_SET`, `TIMEZONE_CHANGED`); a routine reminder is the fifth allowed action. Retried saves at every wake-up now include routines and shortcuts.
+- Execution report: a replanned run keeps its history ("Tried first, then replaced"); success counts use the final attempts only; an empty replacement plan does not hide the earlier attempts.
+- New: Personal Routines, Mobile Data Monitor, home shortcuts (`docs/ROUTINES_DATA_SHORTCUTS.md`). The three features were marked "planned" until they existed; they are now "available" in the catalogue, with the not-verified lines in their descriptions.
+- 16 KB: Vosk 0.3.75 and JNA 5.17.0 pass the page-size check (they did not at 0.3.47 / 5.13.0). Not tried on a phone.
+- Lint: 39 "use KTX" suggestions fixed; `AccessibilityNodeInfo.obtain` replaced by the copy constructor; deprecated telephony and network-type calls have no replacement for this app and are marked with the reason; obsolete `mipmap-anydpi-v26` folder renamed.
+- Mutation checks: 30 deliberate breaks of the new logic (replanning history, clock rule, routines, data usage, shortcuts), all caught by a test.
+- Docs: `STATUS.md` rewritten, `docs/AUDIT_2026-11-25.md` statuses updated, `docs/AUTOMATIONS.md` clock rules, `docs/setup/ACCESS.md` Usage access row, `docs/ROUTINES_DATA_SHORTCUTS.md` new.
+- Not done: File Manager and Document Intelligence (need screens I cannot check), library / AGP / targetSdk upgrades (left until after a phone test), anything that needs the app to run on a phone.

@@ -1,6 +1,6 @@
 # Automations (Phase 7)
 
-Status: rules and runner are in `:core` and unit-tested offline. The screen and the scheduler hookup are in `:app` and **have never been compiled or run**.
+Status: rules and runner are in `:core` and unit-tested offline. The screen and the scheduler hookup are in `:app`; they compile in GitHub Actions and have **never been run on a phone**.
 
 An automation is "at this time, or this often, do these things". It is deliberately small.
 
