@@ -437,22 +437,28 @@ class HandsFreeService : Service() {
 
         val isRunning: Boolean get() = status.value is HandsFreeStatus.Waiting || status.value is HandsFreeStatus.Busy
 
-        /** Must be called while the app is on screen: Android refuses to start a microphone service from the background. */
-        fun start(context: Context) {
+        /**
+         * Must be called while the app is on screen: Android refuses to start a microphone service from the background.
+         * @return true if Android accepted the start; false if it was refused (the reason is in [state]), so the caller does not record "on".
+         */
+        fun start(context: Context): Boolean {
             // Checked HERE, before Android is asked to start a foreground service: a service that was started as foreground and then stops itself
             // without having entered the foreground (which is what happens when the microphone is not allowed) crashes the whole app.
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 status.value = HandsFreeStatus.Problem("Allow the microphone first (Prefs > Access), then turn hands-free on.")
-                return
+                return false
             }
             status.value = HandsFreeStatus.Waiting
-            try {
+            return try {
                 ContextCompat.startForegroundService(context, Intent(context, HandsFreeService::class.java))
+                true
             } catch (e: IllegalStateException) {
                 // Android 12+ throws here when the app is not on screen (ForegroundServiceStartNotAllowedException).
                 status.value = HandsFreeStatus.Problem("Android only lets hands-free start while the app is on screen. Open the app and turn it on there.")
+                false
             } catch (e: SecurityException) {
                 status.value = HandsFreeStatus.Problem("Android did not allow a microphone service (${e.javaClass.simpleName}). Allow the microphone first.")
+                false
             }
         }
 

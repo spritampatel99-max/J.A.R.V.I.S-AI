@@ -122,6 +122,32 @@ class AutomationStore(private val storage: TextStorage, private val time: TimeSo
     }
 
     /**
+     * The phone's clock was set, or its time zone changed. A daily or weekly automation is tied to the wall clock ("every day at 8:00"), so its next
+     * run is worked out again from now in the zone the phone is in now. An "every N minutes" automation keeps its rhythm but is never left more than
+     * one interval away (a clock set backwards would otherwise push it hours into the future). Left alone: paused automations, one that is running, and
+     * one already due, which runs once, so a clock set forwards does not make a due run disappear. Returns how many automations changed.
+     */
+    fun recomputeSchedules(zone: ZoneId): Int = synchronized(lock) {
+        val now = time.nowMs()
+        var changed = 0
+        val next = flow.value.map { a ->
+            if (!a.enabled || a.runningSinceMs != null) return@map a
+            val due = a.nextRunMs
+            if (due != null && due <= now) return@map a
+            val trigger = a.trigger
+            val fresh = if (trigger is AutoTrigger.Every) {
+                val limit = now + trigger.minutes * 60_000L
+                if (due == null || due > limit) limit else due
+            } else {
+                nextRun(trigger, now, zone)
+            }
+            if (fresh == due) a else a.copy(nextRunMs = fresh).also { changed++ }
+        }
+        if (changed > 0) commit(next)
+        changed
+    }
+
+    /**
      * The next time strictly after [nowMs]. A fixed-interval "every N minutes" automation counts from the slot that was due ([anchorMs]), so a
      * late start never shifts the grid; slots missed while the phone was off are skipped, not replayed.
      */

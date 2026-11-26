@@ -6,6 +6,7 @@ import com.jarvis.ai.productivity.ProductivityStore
 import com.jarvis.ai.productivity.WakeScheduler
 import com.jarvis.ai.update.NightlyHook
 import java.text.DateFormat
+import java.time.ZoneId
 import java.util.Date
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -30,6 +31,8 @@ class ScheduleEngine(
     private val onWake: (Long) -> Unit = {},
     /** The optional nightly review. It only reads and notifies; it is asked for a wake-up time and to run when owed. */
     private val nightly: NightlyHook? = null,
+    /** The zone the phone is in right now, asked each time because it can change while the app is alive. */
+    private val zone: () -> ZoneId = { ZoneId.systemDefault() },
 ) {
     private val lock = Mutex()
 
@@ -38,7 +41,8 @@ class ScheduleEngine(
     var lastProblem: String? = null
         private set
 
-    suspend fun tick() = lock.withLock {
+    /** @param clockChanged the phone's clock was set or its time zone changed: wall-clock automations are scheduled again before anything runs. */
+    suspend fun tick(clockChanged: Boolean = false) = lock.withLock {
         val now = time.nowMs()
         var problem: String? = null
         fun failed(stage: String, e: Exception) {
@@ -49,6 +53,13 @@ class ScheduleEngine(
                 onWake(now)
             } catch (e: Exception) {
                 failed("Recording the wake-up", e)
+            }
+            if (clockChanged) {
+                try {
+                    automations.recomputeSchedules(zone())
+                } catch (e: Exception) {
+                    failed("Adjusting to the new time", e)
+                }
             }
             try {
                 // A write that failed earlier is tried again here, so a disk that has room again saves what was only in memory.

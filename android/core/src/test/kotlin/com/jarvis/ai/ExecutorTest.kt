@@ -1,6 +1,7 @@
 package com.jarvis.ai
 
 import com.jarvis.ai.ai.executor.ExecutionListener
+import com.jarvis.ai.ai.executor.ExecutionReport
 import com.jarvis.ai.ai.executor.ExecutionPolicy
 import com.jarvis.ai.ai.executor.Executor
 import com.jarvis.ai.ai.executor.StepOutcome
@@ -394,6 +395,106 @@ class ExecutorTest {
         assertEquals(2, report.replans)
         assertEquals(2, replanner.calls)
         assertEquals(3, failing.executions, "the original attempt plus two replans")
+    }
+
+    // ---- the report after a re-plan: history kept, final status separate -----------------------------
+
+    private suspend fun replannedRun(revisedSucceeds: Boolean): ExecutionReport {
+        val primary = FakeTool("set_alarm", behaviour = { ToolResult.Failure(ToolError.Failed("clock app crashed")) })
+        val backup = FakeTool("open_url", behaviour = if (revisedSucceeds) ({ ToolResult.Success("Opened.", Verification.CONFIRMED) }) else ({ ToolResult.Failure(ToolError.Failed("no browser")) }))
+        val done = FakeTool("flashlight")
+        val revised = Plan("goal", listOf(step(1, "open_url", description = "Open alarm website")))
+        val replanner = RecordingReplanner(listOf(PlanResult.Ready(revised, ProviderId.GROQ)))
+        return executor(primary, backup, done, replanner = replanner).execute(
+            plan(step(1, "flashlight", description = "Flashlight"), step(2, "set_alarm", description = "Set alarm", critical = true)),
+        )
+    }
+
+    @Test
+    fun theHistoryKeepsEveryAttemptAndTellsOriginalsFromReplannedOnes() = runTest {
+        val report = replannedRun(revisedSucceeds = true)
+        assertEquals(listOf("flashlight", "set_alarm", "open_url"), report.outcomes.map { it.step.tool })
+        assertEquals(listOf(0, 0, 1), report.outcomes.map { it.round })
+        assertEquals(listOf("0.1", "0.2", "1.1"), report.outcomes.map { it.id }, "each attempt has its own stable id")
+        assertEquals(3, report.outcomes.map { it.id }.toSet().size)
+    }
+
+    @Test
+    fun theFinalStatusLeavesOutAFailureThatAReplanTookOverFrom() = runTest {
+        val report = replannedRun(revisedSucceeds = true)
+        assertEquals(listOf("flashlight", "open_url"), report.final.map { it.step.tool })
+        assertEquals(listOf("set_alarm"), report.replaced.map { it.step.tool })
+        assertTrue(report.allSucceeded, "the task was done another way: the first failed attempt must not make the whole run look failed")
+        assertEquals(2, report.succeededCount)
+    }
+
+    @Test
+    fun theSummaryShowsWhatWasTriedFirstAndWhatSucceeded() = runTest {
+        val lines = replannedRun(revisedSucceeds = true).summary().lines()
+        assertTrue(lines[0].startsWith("✔ Flashlight"), lines[0])
+        assertTrue(lines[1].startsWith("✔ Open alarm website"), lines[1])
+        assertTrue(lines.any { it.contains("Re-planned 1 time") })
+        val at = lines.indexOf("Tried first, then replaced:")
+        assertTrue(at > 1, "the earlier attempt is listed after the final status")
+        assertTrue(lines[at + 1].trim().startsWith("✘ Set alarm: clock app crashed"), lines[at + 1])
+    }
+
+    @Test
+    fun aReplannedAttemptThatAlsoFailsIsReportedAsFailedNotHidden() = runTest {
+        val report = replannedRun(revisedSucceeds = false)
+        assertFalse(report.allSucceeded)
+        assertEquals(listOf(StepStatus.SUCCEEDED, StepStatus.FAILED), report.final.map { it.status })
+        assertEquals("open_url", report.final.last().step.tool)
+        assertTrue(report.summary().contains("✘ Open alarm website: no browser"))
+    }
+
+    @Test
+    fun withoutAUsableNewPlanTheFailureStaysTheFinalWord() = runTest {
+        val failing = FakeTool("set_alarm", behaviour = { ToolResult.Failure(ToolError.Failed("nope")) })
+        for (answer in listOf(PlanResult.Failed("x"), PlanResult.Reply("sorry", ProviderId.GROQ), PlanResult.Ready(Plan("goal", emptyList()), ProviderId.GROQ))) {
+            val report = executor(failing, replanner = RecordingReplanner(listOf(answer))).execute(plan(step(1, "set_alarm", critical = true)))
+            assertEquals(1, report.final.size, "$answer")
+            assertEquals(StepStatus.FAILED, report.final.single().status)
+            assertFalse(report.allSucceeded, "an empty plan must not make a failed task vanish: $answer")
+            assertTrue(report.replaced.isEmpty())
+        }
+    }
+
+    @Test
+    fun whenReplanningIsCappedOnlyTheLastAttemptIsFinal() = runTest {
+        val failing = FakeTool("set_alarm", behaviour = { ToolResult.Failure(ToolError.Failed("nope")) })
+        val again = Plan("goal", listOf(step(1, "set_alarm", critical = true)))
+        val report = executor(failing, replanner = RecordingReplanner(listOf(PlanResult.Ready(again, ProviderId.GROQ))), maxReplans = 2)
+            .execute(plan(step(1, "set_alarm", critical = true)))
+        assertEquals(listOf(0, 1, 2), report.outcomes.map { it.round })
+        assertEquals(listOf(true, true, false), report.outcomes.map { it.superseded })
+        assertEquals(listOf(2), report.final.map { it.round })
+        assertFalse(report.allSucceeded)
+    }
+
+    @Test
+    fun aFailureThatWasNotTheReplanTargetStaysInTheFinalStatus() = runTest {
+        val flash = FakeTool("flashlight", behaviour = { ToolResult.Failure(ToolError.Failed("no flash")) })
+        val alarm = FakeTool("set_alarm", behaviour = { ToolResult.Failure(ToolError.Failed("clock crashed")) })
+        val web = FakeTool("open_url")
+        val revised = Plan("goal", listOf(step(1, "open_url", description = "Open alarm website")))
+        val report = executor(flash, alarm, web, replanner = RecordingReplanner(listOf(PlanResult.Ready(revised, ProviderId.GROQ))))
+            .execute(plan(step(1, "flashlight", critical = false), step(2, "set_alarm", critical = true)))
+        assertEquals(listOf("set_alarm"), report.replaced.map { it.step.tool })
+        assertTrue(report.final.any { it.step.tool == "flashlight" && it.status == StepStatus.FAILED }, "an unrelated failure is not hidden by the re-plan")
+        assertFalse(report.allSucceeded)
+    }
+
+    @Test
+    fun aStepThatNeededRetriesSaysSo() = runTest {
+        var calls = 0
+        val flaky = FakeTool("flashlight", maxRetries = 2, behaviour = {
+            calls++
+            if (calls < 3) ToolResult.Failure(ToolError.Failed("busy", retryable = true)) else ToolResult.Success("On.", Verification.CONFIRMED)
+        })
+        val report = executor(flaky).execute(plan(step(1, "flashlight", description = "Flashlight")))
+        assertEquals(3, report.outcomes.single().attempts)
+        assertTrue(report.summary().contains("(after 3 tries)"), report.summary())
     }
 
     @Test

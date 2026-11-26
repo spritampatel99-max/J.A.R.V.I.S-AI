@@ -1,5 +1,6 @@
 package com.jarvis.ai.ui
 
+import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -22,11 +23,15 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var container: com.jarvis.ai.AppContainer
 
+    /** Set when the person tapped the "Bluetooth connected" notification; acted on once the screen is showing. */
+    private var startHandsFreeWhenShown = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         container = (application as JarvisApplication).container
+        noteStartRequest(intent)
         setContent {
             val prefs by container.settings.ui.collectAsStateWithLifecycle()
             val dark = isJarvisDark(prefs.themeMode)
@@ -60,6 +65,32 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        noteStartRequest(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Android lets a microphone service start only while the app is on screen. Tapping the notification brought it there, and this runs
+        // when the screen is showing. It starts only if hands-free is still wanted and not already running; any refusal shows on the Hands-free page.
+        if (startHandsFreeWhenShown) {
+            startHandsFreeWhenShown = false
+            if (container.settings.handsFreeOn && !HandsFreeService.isRunning) {
+                container.settings.handsFreeOn = HandsFreeService.start(this)
+            }
+        }
+    }
+
+    private fun noteStartRequest(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_START_HANDS_FREE, false) == true) {
+            // Consumed: turning the phone or reopening the app from recents must not start the microphone a second time.
+            intent.removeExtra(EXTRA_START_HANDS_FREE)
+            startHandsFreeWhenShown = true
+        }
+    }
+
     override fun onStop() {
         // Nothing keeps listening or talking once the app is out of sight, unless the person turned Hands-free on: its service
         // then owns the microphone and the voice, and leaving the app is exactly when it is meant to keep working.
@@ -73,5 +104,10 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         if (isFinishing && !HandsFreeService.isRunning) container.voice.shutdown()
         super.onDestroy()
+    }
+
+    companion object {
+        /** Put on the intent by the "Bluetooth connected" notification. Only this app can send it (the notification's intent is private to the app). */
+        const val EXTRA_START_HANDS_FREE = "com.jarvis.ai.extra.START_HANDS_FREE"
     }
 }

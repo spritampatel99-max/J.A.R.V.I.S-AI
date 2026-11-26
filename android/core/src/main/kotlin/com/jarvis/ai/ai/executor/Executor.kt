@@ -66,15 +66,31 @@ data class StepOutcome(
     val answer: String? = null,
     /** The tool said its result is the person's private content (messages, files). Such text is never sent to an outside voice service. */
     val private: Boolean = false,
-)
+    /** 0 for the original plan, 1 for the first re-plan, 2 for the second. Lets a report tell what was tried first from what replaced it. */
+    val round: Int = 0,
+    /** True for a failed step that a re-plan took over from: the attempt stays in the history, but it is no longer the answer for that task. */
+    val superseded: Boolean = false,
+) {
+    /** Stable for this run: "round.step". The same step number in a re-planned round is a different attempt, so the two never share an id. */
+    val id: String get() = "$round.${step.index}"
+}
 
 data class ExecutionReport(
     val goal: String,
+    /** The complete history, in the order things were tried: the original attempts and every re-planned one. Nothing is removed. */
     val outcomes: List<StepOutcome>,
     val replans: Int,
 ) {
-    val succeededCount: Int get() = outcomes.count { it.status == StepStatus.SUCCEEDED }
-    val allSucceeded: Boolean get() = outcomes.isNotEmpty() && outcomes.all { it.status == StepStatus.SUCCEEDED }
+    /** What ultimately happened, one entry per task: [outcomes] without the failed attempts that a re-plan took over from. */
+    val final: List<StepOutcome> get() = outcomes.filterNot { it.superseded }
+
+    /** The failed attempts that a re-plan replaced, kept for the person to see what was tried first. */
+    val replaced: List<StepOutcome> get() = outcomes.filter { it.superseded }
+
+    val succeededCount: Int get() = final.count { it.status == StepStatus.SUCCEEDED }
+
+    /** True when every task ended well. A failed first attempt that a re-plan then did differently and successfully does not count against it. */
+    val allSucceeded: Boolean get() = final.isNotEmpty() && final.all { it.status == StepStatus.SUCCEEDED }
 
     /** True when any step produced private content, so the reply must stay on the phone. */
     val containsPrivate: Boolean get() = outcomes.any { it.private }
@@ -86,25 +102,32 @@ data class ExecutionReport(
      */
     fun summary(): String {
         // When every step is an answer (weather, a fact), the reply is just the answer text: nothing to tick off.
-        if (outcomes.isNotEmpty() && outcomes.all { it.status == StepStatus.SUCCEEDED && it.answer != null }) {
-            return outcomes.joinToString("\n\n") { it.answer.orEmpty() }.trim() +
+        if (final.isNotEmpty() && final.all { it.status == StepStatus.SUCCEEDED && it.answer != null }) {
+            return final.joinToString("\n\n") { it.answer.orEmpty() }.trim() +
                 if (replans > 0) "\n(Re-planned $replans time${if (replans == 1) "" else "s"} after a failure.)" else ""
         }
         return checklist()
     }
 
     private fun checklist(): String = buildString {
-        for (o in outcomes) {
-            val mark = when (o.status) {
-                StepStatus.SUCCEEDED -> if (o.verification == Verification.CONFIRMED) "✔" else "➜"
-                StepStatus.FAILED -> "✘"
-                StepStatus.DENIED, StepStatus.EXPIRED -> "⊘"
-                StepStatus.BLOCKED -> "⛔"
-            }
-            appendLine("$mark ${o.step.description}: ${o.message}")
-        }
+        for (o in final) appendLine(line(o))
         if (replans > 0) appendLine("(Re-planned $replans time${if (replans == 1) "" else "s"} after a failure.)")
+        if (replaced.isNotEmpty()) {
+            appendLine("Tried first, then replaced:")
+            for (o in replaced) appendLine("  ${line(o)}")
+        }
     }.trimEnd()
+
+    private fun line(o: StepOutcome): String {
+        val mark = when (o.status) {
+            StepStatus.SUCCEEDED -> if (o.verification == Verification.CONFIRMED) "✔" else "➜"
+            StepStatus.FAILED -> "✘"
+            StepStatus.DENIED, StepStatus.EXPIRED -> "⊘"
+            StepStatus.BLOCKED -> "⛔"
+        }
+        val tries = if (o.attempts > 1) " (after ${o.attempts} tries)" else ""
+        return "$mark ${o.step.description}: ${o.message}$tries"
+    }
 }
 
 /** Progress callbacks for the UI. All have empty defaults. */
@@ -166,15 +189,21 @@ class Executor(
 
         while (true) {
             var replanTarget: StepOutcome? = null
+            var replanTargetAt = -1
 
             for (step in steps) {
                 currentCoroutineContext().ensureActive()
                 listener.onStepStarted(step)
                 val run = runStep(step, untrustedSeen)
                 if (run.untrusted) untrustedSeen = true
-                outcomes += run.outcome
-                listener.onStepFinished(run.outcome)
-                if (replanTarget == null && step.critical && run.replannable) replanTarget = run.outcome
+                // Tagged with the round it ran in, so the report can tell the first attempt from a re-planned one.
+                val outcome = run.outcome.copy(round = replans)
+                outcomes += outcome
+                listener.onStepFinished(outcome)
+                if (replanTarget == null && step.critical && run.replannable) {
+                    replanTarget = outcome
+                    replanTargetAt = outcomes.lastIndex
+                }
             }
 
             val target = replanTarget ?: break
@@ -184,7 +213,12 @@ class Executor(
 
             val completed = outcomes.filter { it.status == StepStatus.SUCCEEDED }.map { it.step }
             val revised = replanner.replan(plan.goal, completed, target.step, target.message)
-            if (revised is PlanResult.Ready) steps = revised.plan.steps else break
+            if (revised is PlanResult.Ready && revised.plan.steps.isNotEmpty()) {
+                // Only now is the failed step handed over to the new plan. If no new plan came (or it has nothing to run), the failure stays the
+                // final word on that task: an empty plan must never make a failed task disappear from the report.
+                outcomes[replanTargetAt] = outcomes[replanTargetAt].copy(superseded = true)
+                steps = revised.plan.steps
+            } else break
         }
         return ExecutionReport(plan.goal, outcomes.toList(), replans)
     }

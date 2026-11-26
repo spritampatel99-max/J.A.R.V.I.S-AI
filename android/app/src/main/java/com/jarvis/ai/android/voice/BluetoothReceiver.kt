@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.jarvis.ai.JarvisApplication
 import com.jarvis.ai.android.screen.ScreenHub
+import com.jarvis.ai.ui.MainActivity
 import com.jarvis.ai.voice.BluetoothRules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +30,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * "Start listening" notification.
  *
  * Why a notification and not simply starting to listen: since Android 14 the microphone cannot be started by a background broadcast.
- * It can be started by the person tapping a notification, so that is what this offers. Nothing here starts the microphone by itself.
+ * The person taps the notification, which opens the app, and the app then starts the listener while it is on screen. Nothing here starts
+ * the microphone by itself. (Not tried on a phone yet.)
  */
 class BluetoothReceiver : BroadcastReceiver() {
 
@@ -88,17 +90,21 @@ class BluetoothReceiver : BroadcastReceiver() {
                 description = "Offers to start listening for \"Jarvis\" when a Bluetooth headset or speaker connects"
             },
         )
-        // A tap on this notification is the person starting the microphone service, which Android allows from the background.
-        val start = PendingIntent.getForegroundService(
+        // A tap opens the app (so it is on screen, which Android requires) and the app then starts the listener. Starting the microphone
+        // service straight from the notification would depend on Android treating the tap as an exemption, which varies by phone.
+        val open = Intent(context, MainActivity::class.java)
+            .putExtra(MainActivity.EXTRA_START_HANDS_FREE, true)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val start = PendingIntent.getActivity(
             context,
             REQUEST_START,
-            Intent(context, HandsFreeService::class.java),
+            open,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle(if (deviceName != null) "Bluetooth connected: $deviceName" else "Bluetooth connected")
-            .setContentText("Tap to start listening for \"Jarvis\".")
+            .setContentText("Tap to open Jarvis and start listening for \"Jarvis\".")
             .setContentIntent(start)
             .setAutoCancel(true)
             .setTimeoutAfter(NOTIFICATION_TIMEOUT_MS)

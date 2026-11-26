@@ -70,8 +70,8 @@ fun HandsFreeScreen(container: AppContainer) {
             return
         }
         note = null
-        container.settings.handsFreeOn = true
-        HandsFreeService.start(context)
+        // "On" is recorded only when Android accepted the start, so a refused start does not leave the setting stuck on.
+        container.settings.handsFreeOn = HandsFreeService.start(context)
     }
 
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->

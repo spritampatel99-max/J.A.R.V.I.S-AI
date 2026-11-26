@@ -50,6 +50,11 @@ class SecureKeyStore(context: Context) {
         } catch (e: GeneralSecurityException) {
             Log.e(TAG, "Could not encrypt '$name': ${e.javaClass.simpleName}")
             false
+        } catch (e: RuntimeException) {
+            // Some phones throw a ProviderException (a RuntimeException) when their hardware key store misbehaves. The key is then not saved,
+            // and the caller is told so, instead of the app closing.
+            Log.e(TAG, "Could not encrypt '$name': ${e.javaClass.simpleName}")
+            false
         }
     }
 
@@ -73,10 +78,17 @@ class SecureKeyStore(context: Context) {
         } catch (e: IllegalArgumentException) {
             Log.w(TAG, "Stored value for '$name' is corrupt; treating it as not set")
             null
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "Key store failed reading '$name' (${e.javaClass.simpleName}); treating it as not set")
+            null
         }
     }
 
-    fun has(name: String): Boolean = prefs.contains(name)
+    /**
+     * True only when a key is saved AND can be read back. A value that Android can no longer decrypt (the lock screen was removed, the phone
+     * restored, the Keystore reset) counts as not set, so the screens ask for the key again instead of showing "saved" and then failing.
+     */
+    fun has(name: String): Boolean = prefs.contains(name) && get(name) != null
 
     fun remove(name: String) {
         cache.remove(name)

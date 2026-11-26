@@ -377,4 +377,79 @@ class AutomationReliabilityTest {
         engine(runner(reg)).tick()
         assertEquals(true, requestedWhileRunning, "if the process died during the run, Android would already hold the next wake-up")
     }
+
+    // ---- the clock or the time zone changes ------------------------------------------------------------------------------
+
+    private val tokyo = ZoneId.of("Asia/Tokyo")
+
+    @Test fun `a daily automation follows a new time zone`() {
+        val a = create(AutoTrigger.Daily(8, 0))
+        val before = a.nextRunMs!!
+        assertEquals(1, store.recomputeSchedules(tokyo))
+        val after = store.automations.value.first().nextRunMs!!
+        assertEquals(AutoTrigger.Daily(8, 0).nextAfter(Instant.ofEpochMilli(time.now).atZone(tokyo)).toInstant().toEpochMilli(), after)
+        assertTrue(after != before, "8:00 in Tokyo is a different moment from 8:00 in India")
+        assertTrue(after > time.now)
+    }
+
+    @Test fun `nothing changes when the zone did not change`() {
+        create(AutoTrigger.Daily(8, 0))
+        assertEquals(0, store.recomputeSchedules(zone))
+    }
+
+    @Test fun `an every-N-minutes automation is pulled in when the clock is set backwards`() {
+        val a = create(AutoTrigger.Every(60))
+        assertEquals(start.toEpochMilli() + 60 * minute, a.nextRunMs)
+        time.now -= 3 * 60 * minute // clock set three hours back: the stored time is now four hours away
+        assertEquals(1, store.recomputeSchedules(zone))
+        assertEquals(time.now + 60 * minute, store.automations.value.first().nextRunMs)
+        assertTrue(store.due(time.now).isEmpty(), "pulling it in must not make it run at once")
+    }
+
+    @Test fun `an every-N-minutes automation that is within one interval is left alone`() {
+        val a = create(AutoTrigger.Every(60))
+        time.now += 10 * minute
+        assertEquals(0, store.recomputeSchedules(zone))
+        assertEquals(a.nextRunMs, store.automations.value.first().nextRunMs)
+    }
+
+    @Test fun `a due automation is not skipped by a clock change`() {
+        val a = create(AutoTrigger.Daily(8, 0))
+        time.now = a.nextRunMs!! + 5 * minute // due, and the zone also changes
+        assertEquals(0, store.recomputeSchedules(tokyo))
+        assertEquals(listOf(a.id), store.due(time.now).map { it.id })
+    }
+
+    @Test fun `paused and running automations are not touched by a clock change`() {
+        val paused = create(AutoTrigger.Daily(8, 0), "Paused")
+        store.setEnabled(paused.id, false, zone)
+        val running = create(AutoTrigger.Daily(9, 0), "Running")
+        time.now = running.nextRunMs!!
+        assertTrue(store.claim(running.id, zone))
+        val movedOn = store.automations.value.first { it.id == running.id }.nextRunMs
+        time.now -= 30 * minute
+        store.recomputeSchedules(tokyo)
+        assertNull(store.automations.value.first { it.id == paused.id }.nextRunMs)
+        assertEquals(movedOn, store.automations.value.first { it.id == running.id }.nextRunMs)
+    }
+
+    @Test fun `a clock change tick schedules again and asks Android for the new wake-up`() = runTest {
+        create(AutoTrigger.Daily(8, 0))
+        var current = zone
+        val e = ScheduleEngine(planner, store, runner(), notify, wake, time, zone = { current })
+        e.tick()
+        val first = wake.requests.last()
+        current = tokyo
+        e.tick(clockChanged = true)
+        val expected = AutoTrigger.Daily(8, 0).nextAfter(Instant.ofEpochMilli(time.now).atZone(tokyo)).toInstant().toEpochMilli()
+        assertEquals(expected, wake.requests.last())
+        assertTrue(wake.requests.last() != first)
+    }
+
+    @Test fun `an ordinary tick does not move schedules`() = runTest {
+        val a = create(AutoTrigger.Daily(8, 0))
+        val e = ScheduleEngine(planner, store, runner(), notify, wake, time, zone = { tokyo })
+        e.tick()
+        assertEquals(a.nextRunMs, store.automations.value.first().nextRunMs)
+    }
 }
