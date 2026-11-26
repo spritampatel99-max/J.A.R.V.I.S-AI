@@ -93,6 +93,8 @@ object AutomationRules {
         ProductivityTools.ADD_NOTE,
         ProductivityTools.SHOW_NOTIFICATION,
         ProductivityTools.NOTIFY_OVERVIEW,
+        // Shows a saved routine's steps as a notification. It only reads the app's own data, like the overview above.
+        com.jarvis.ai.routines.RoutineTools.NOTIFY,
     )
 
     const val MAX_ACTIONS = 5
@@ -119,7 +121,7 @@ object AutomationRules {
             val n = i + 1
             val tool = registry.get(action.tool)
             when {
-                action.tool !in ALLOWED_TOOLS -> problems += "Action $n (${action.tool.take(40)}) cannot run on its own. Automations may only add a task, add a note, or show a notification."
+                action.tool !in ALLOWED_TOOLS -> problems += "Action $n (${action.tool.take(40)}) cannot run on its own. Automations may only add a task, add a note, or show a notification (including a routine)."
                 tool == null -> problems += "Action $n (${action.tool}) is not available in this build."
                 tool.spec.risk != Risk.LOW -> problems += "Action $n (${action.tool}) needs your confirmation, so it cannot run unattended."
                 else -> when (val check = ArgValidator.validate(tool.spec, action.parameters)) {

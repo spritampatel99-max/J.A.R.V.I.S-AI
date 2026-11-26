@@ -147,8 +147,8 @@ object FeatureCatalog {
         ),
         Feature(
             FeatureId.MOBILE_DATA_MONITOR, "Mobile Data Monitor",
-            "See how much mobile data the phone and individual apps have used today, this week and this month. Needs Usage access.",
-            Readiness.Planned(5), InternetNeed.NONE, OfflineSupport.FULL,
+            "See how much mobile data the phone and individual apps have used today, this week and this month, from Android's own counters. Needs Usage access. Wi-Fi is not counted.",
+            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
             permissions = listOf(req(PermissionId.USAGE_ACCESS)),
         ),
         Feature(
@@ -221,8 +221,10 @@ object FeatureCatalog {
         ),
         Feature(
             FeatureId.PERSONAL_ROUTINES, "Personal Routines",
-            "Morning and evening routines built from your own steps: a reminder at the time you choose, and Jarvis reads the steps to you when you ask.",
-            Readiness.Planned(6), InternetNeed.NONE, OfflineSupport.FULL,
+            "Morning and evening routines built from your own steps: a daily reminder at the time you choose, and Jarvis reads the steps to you when you ask. " +
+                "The steps are only read or shown, never run.",
+            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
+            permissions = listOf(opt(PermissionId.POST_NOTIFICATIONS), opt(PermissionId.EXACT_ALARMS)),
             requires = setOf(FeatureId.AUTOMATION_STUDIO),
         ),
         Feature(
@@ -233,8 +235,9 @@ object FeatureCatalog {
         ),
         Feature(
             FeatureId.ADAPTIVE_DASHBOARD, "Adaptive Dashboard",
-            "A home screen with shortcuts to the things you ask for most, counted on this phone only.",
-            Readiness.Planned(7), InternetNeed.NONE, OfflineSupport.FULL,
+            "A home screen with shortcuts to the things you ask for most, counted on this phone only. A request becomes a shortcut after it worked twice; " +
+                "numbers, links and anything that looks secret are never counted. You can switch counting off and clear it.",
+            Readiness.Available, InternetNeed.NONE, OfflineSupport.FULL,
         ),
         Feature(
             FeatureId.BLUETOOTH_COMPANION, "Bluetooth Companion",

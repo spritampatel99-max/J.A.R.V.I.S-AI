@@ -346,8 +346,18 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
     val memory = MemoryStore(AtomicTextStorage(appContext, "memory.json"), SystemTimeSource)
     val productivity = ProductivityStore(AtomicTextStorage(appContext, "planner.json"), SystemTimeSource)
     val automations = AutomationStore(AtomicTextStorage(appContext, "automations.json"), SystemTimeSource)
+    val routines = com.jarvis.ai.routines.RoutineStore(AtomicTextStorage(appContext, "routines.json"), SystemTimeSource)
+
+    /** What the person asks for most, counted on this phone only, for the shortcuts on the home screen. */
+    val shortcuts = com.jarvis.ai.dashboard.ShortcutStore(AtomicTextStorage(appContext, "shortcuts.json"), SystemTimeSource)
     private val wake = AndroidWakeScheduler(appContext)
     val notifier = AndroidNotifier(appContext)
+
+    /** Mobile data counters from Android. Works only after the person turns on "Usage access" for the app. */
+    val dataUsage = com.jarvis.ai.android.device.AndroidDataUsage(appContext)
+
+    /** Keeps each routine's daily reminder in step with an automation. The registry is asked for only when a reminder is saved, long after start-up. */
+    val routineReminders = com.jarvis.ai.routines.RoutineReminders(automations, { registry }, { java.time.ZoneId.systemDefault() })
     val status = AndroidStatus(appContext)
 
     /**
@@ -382,6 +392,8 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
             OfflineTools.create { library.encyclopedia() } +
             listOf(com.jarvis.ai.update.CheckForUpdatesTool(updateClient, appVersion)) +
             ProductivityTools.create(productivity, wake, notifier) +
+            com.jarvis.ai.routines.RoutineTools.create(routines, routineReminders, notifier) +
+            listOf(com.jarvis.ai.datausage.DataUsageTool(dataUsage, SystemTimeSource)) +
             WebTools.create(
                 weather = WeatherClient(transport),
                 wiki = WikipediaClient(transport),
@@ -445,7 +457,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
 
     val nightlyReview = com.jarvis.ai.android.schedule.NightlyReviewJob(settings, audit, updateClient, notifier, appVersion, findings = ::scheduleFindings)
 
-    val schedule = ScheduleEngine(productivity, automations, automationRunner, notifier, wake, SystemTimeSource, onWake = { settings.lastWakeMs = it }, nightly = nightlyReview)
+    val schedule = ScheduleEngine(productivity, automations, automationRunner, notifier, wake, SystemTimeSource, onWake = { settings.lastWakeMs = it }, nightly = nightlyReview, retryOnWake = listOf(routines, shortcuts))
 
     /** "Run now" from the Automations screen. Runs the same restricted way, and never moves the schedule. */
     suspend fun runAutomationNow(id: String) = automationRunner.runNow(id)
@@ -496,6 +508,8 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
             if (memory.saveFailed) add("memory")
             if (productivity.saveFailed) add("planner")
             if (automations.saveFailed) add("automations")
+            if (routines.saveFailed) add("routines")
+            if (shortcuts.saveFailed) add("shortcuts")
             if (agents.saveFailed) add("agents")
         }
         return SecurityReview.review(

@@ -104,9 +104,10 @@ enum class AccessKey(
         "Settings > Apps > Special access > Display over other apps.",
     ),
     USAGE_ACCESS(
-        "Usage access", AccessKind.SPECIAL, Manifest.permission.PACKAGE_USAGE_STATS, false,
-        "For a data and screen-time monitor. That monitor is not built yet.",
-        "Which apps you use and for how long. Powerful, so leave it off until the monitor exists unless you want it.",
+        "Usage access", AccessKind.SPECIAL, Manifest.permission.PACKAGE_USAGE_STATS, true,
+        "For the mobile data monitor: \"how much data did I use today?\" and which apps used the most.",
+        "Android gives one switch for data counts and screen time. Jarvis reads only the mobile data counts (how many bytes each app used). " +
+            "It does not read what was sent, which sites, or how long any app was on screen.",
         "Settings > Apps > Special access > Usage access.",
     ),
     ACCESSIBILITY(

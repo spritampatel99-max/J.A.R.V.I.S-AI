@@ -20,6 +20,12 @@ import kotlinx.coroutines.sync.withLock
  * The next wake-up is asked for BEFORE the longer work (automations, nightly review) and again at the end, and in a `finally`, so no failure or
  * cut-off in any stage can leave Android with no wake-up scheduled. Each stage, and each reminder, fails on its own: one broken item never stops the rest.
  */
+/** Something that keeps a file and can write it again after a failed write. */
+interface RetrySave {
+    val saveFailed: Boolean
+    fun retrySave(): Boolean
+}
+
 class ScheduleEngine(
     private val productivity: ProductivityStore,
     private val automations: AutomationStore,
@@ -33,6 +39,8 @@ class ScheduleEngine(
     private val nightly: NightlyHook? = null,
     /** The zone the phone is in right now, asked each time because it can change while the app is alive. */
     private val zone: () -> ZoneId = { ZoneId.systemDefault() },
+    /** Anything else whose last write failed and should be written again on each wake-up (the routines, for example). */
+    private val retryOnWake: List<RetrySave> = emptyList(),
 ) {
     private val lock = Mutex()
 
@@ -65,6 +73,7 @@ class ScheduleEngine(
                 // A write that failed earlier is tried again here, so a disk that has room again saves what was only in memory.
                 if (productivity.saveFailed) productivity.retrySave()
                 if (automations.saveFailed) automations.retrySave()
+                for (r in retryOnWake) if (r.saveFailed) r.retrySave()
             } catch (e: Exception) {
                 failed("Saving again", e)
             }

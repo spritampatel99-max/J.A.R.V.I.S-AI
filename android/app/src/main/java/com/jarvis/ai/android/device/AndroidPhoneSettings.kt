@@ -193,7 +193,7 @@ class AndroidAccessReporter(context: Context) : AccessReporter {
             AccessKey.ANSWER_CALLS to "I cannot answer or hang up a call",
             AccessKey.EXACT_ALARMS to "reminders may arrive a few minutes late",
             AccessKey.OVERLAY to "I cannot open apps while JARVIS is not on screen",
-            AccessKey.USAGE_ACCESS to "no usage monitor is built, so nothing depends on it",
+            AccessKey.USAGE_ACCESS to "I cannot tell you how much mobile data was used",
             AccessKey.ACCESSIBILITY to "I cannot read the screen, scroll, press buttons or go back and home",
             AccessKey.BLUETOOTH to "I cannot notice a Bluetooth headset connecting",
             AccessKey.WRITE_SETTINGS to "I cannot change the brightness",

@@ -117,6 +117,8 @@ fun JarvisApp(vm: AgentViewModel, container: AppContainer, onRunSetupAgain: () -
                         subPage == SubPage.MEMORY -> MemoryScreen(container)
                         subPage == SubPage.PLANNER -> PlannerScreen(container)
                         subPage == SubPage.AUTOMATIONS -> AutomationsScreen(container)
+                        subPage == SubPage.ROUTINES -> RoutinesScreen(container)
+                        subPage == SubPage.DATA_MONITOR -> DataMonitorScreen(container)
                         subPage == SubPage.NIGHTLY -> NightlyReviewScreen(container, onNavigate = { sub = it })
                         subPage == SubPage.OFFLINE -> OfflineScreen(container)
                         subPage == SubPage.SECURITY -> SecurityScreen(container)

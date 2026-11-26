@@ -54,6 +54,8 @@ enum class SubPage(val title: String) {
     MEMORY("Memory"),
     PLANNER("Planner"),
     AUTOMATIONS("Automations"),
+    ROUTINES("Routines"),
+    DATA_MONITOR("Mobile data"),
     NIGHTLY("Nightly review"),
     OFFLINE("Offline and readiness"),
     SECURITY("Security review"),
@@ -194,6 +196,10 @@ fun PrefsScreen(vm: AgentViewModel, appVersion: String, onOpen: (SubPage) -> Uni
             NavRow("Planner", "Tasks, notes and reminders.", Glyph.CALENDAR) { onOpen(SubPage.PLANNER) }
             HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Automations", "Small jobs that run on a schedule: add a task, add a note or show a notification.", Glyph.BOLT) { onOpen(SubPage.AUTOMATIONS) }
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
+            NavRow("Routines", "Morning or evening steps Jarvis reads out, with an optional daily reminder.", Glyph.CHECK_CIRCLE) { onOpen(SubPage.ROUTINES) }
+            HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
+            NavRow("Mobile data", "How much mobile data the phone and each app used today, this week and this month.", Glyph.WAVE) { onOpen(SubPage.DATA_MONITOR) }
             HorizontalDivider(color = JarvisColors.Edge.copy(alpha = 0.08f))
             NavRow("Nightly review", "At 10 pm, suggests fixes and new versions. You choose what to apply.", Glyph.BELL) { onOpen(SubPage.NIGHTLY) }
         }

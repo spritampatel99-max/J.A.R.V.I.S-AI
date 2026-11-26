@@ -170,6 +170,9 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
     /** True while a spoken request is being answered, so its reply is read aloud. Typed requests never are. */
     private var requestViaVoice = false
 
+    /** The words of the request being handled now, kept so a finished run can be counted for the home-screen shortcuts. */
+    private var requestText = ""
+
     /** When the request being run was sent, to show how long the answer took. */
     private var requestStartedAtMs = 0L
 
@@ -210,6 +213,7 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
         if (text.isEmpty() || chat.value.running) return
         requestViaVoice = viaVoice
         requestStartedAtMs = System.currentTimeMillis()
+        requestText = text
         origin = if (viaVoice) RequestOrigin.ASSISTANT_PLANNED else RequestOrigin.TYPED
 
         val interrupted = VoiceControls.interruptionStillRelevant(interruptedAtMs, System.currentTimeMillis())
@@ -339,6 +343,9 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     // ---- look and voice preferences -----------------------------------------------------------------------
+
+    /** The home screen's shortcuts: what the person asks for most, counted on this phone only. */
+    val shortcuts get() = container.shortcuts
 
     val uiPrefs: StateFlow<UiPrefs> = container.settings.ui
 
@@ -554,6 +561,12 @@ class AgentViewModel(private val container: AppContainer) : ViewModel() {
         }
         val report = container.executor.execute(plan, listener)
         if (report.succeededCount > 0) conversationId?.let { container.history.recordToolRun(it) }
+        // Counted for the home-screen shortcuts, on this phone only. Failed, refused or private requests are never counted (ShortcutRules).
+        try {
+            container.shortcuts.record(requestText, report)
+        } catch (e: Exception) {
+            // Counting is a convenience; it must never get in the way of the reply.
+        }
         // The report is built from recorded outcomes only; no model summarises it.
         // A call that was just placed is not read out: the phone's call screen is taking over and the line may be ringing.
         val placedCall = report.outcomes.any { it.status == StepStatus.SUCCEEDED && it.step.tool in CALL_TOOLS }

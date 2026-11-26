@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +20,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -125,11 +130,54 @@ fun HomeScreen(
             GlassChip("Call…", onClick = { onPrefill("Call ") }, glyph = Glyph.CALL)
         }
 
+        ShortcutsCard(vm, onRun)
+
         lastReply?.let { reply ->
             GlassCard(Modifier.clickable(role = Role.Button, onClick = onOpenChat), accent = if (reply.sender == Sender.SYSTEM) MaterialTheme.colorScheme.error else null) {
                 Text("LAST REPLY", style = MaterialTheme.typography.labelSmall, color = JarvisColors.Muted)
                 Text(reply.text, style = MaterialTheme.typography.bodyMedium, color = JarvisColors.Ink, maxLines = 5, overflow = TextOverflow.Ellipsis)
             }
+        }
+    }
+}
+
+/**
+ * The things the person asks for most, as one-tap shortcuts. They are counted on this phone only, and a shortcut sends the same words as typing them,
+ * so every permission check and confirmation still applies. It can be switched off and cleared here.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ShortcutsCard(vm: AgentViewModel, onRun: (String) -> Unit) {
+    val learning by vm.shortcuts.learning.collectAsStateWithLifecycle()
+    val items by vm.shortcuts.all.collectAsStateWithLifecycle()
+    // Recomputed whenever the counts change.
+    val top = remember(items) { vm.shortcuts.top() }
+    var confirmClear by remember { mutableStateOf(false) }
+    if (top.isEmpty() && learning) return
+
+    GlassCard {
+        Text("YOUR SHORTCUTS", style = MaterialTheme.typography.labelSmall, color = JarvisColors.Muted)
+        if (top.isNotEmpty()) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (shortcut in top) GlassChip(shortcut.text, onClick = { onRun(shortcut.text) })
+            }
+        }
+        Text(
+            if (learning) "Counted on this phone only, from requests that worked. Tapping one sends the same words as typing them."
+            else "Learning is off, so nothing new is counted.",
+            style = MaterialTheme.typography.bodySmall,
+            color = JarvisColors.Muted,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            GlassChip(if (learning) "Stop learning" else "Start learning", onClick = { vm.shortcuts.setLearning(!learning) })
+            if (items.isNotEmpty()) GlassChip(if (confirmClear) "Tap again to clear" else "Clear", onClick = {
+                if (confirmClear) {
+                    vm.shortcuts.clear()
+                    confirmClear = false
+                } else {
+                    confirmClear = true
+                }
+            }, glyph = Glyph.TRASH)
         }
     }
 }

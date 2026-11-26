@@ -31,6 +31,7 @@ class FeatureCatalogTest {
         FeatureId.HANDS_FREE, FeatureId.APPLICATION_LAUNCHER, FeatureId.NOTIFICATION_INTELLIGENCE,
         FeatureId.WHATSAPP_ASSISTANT, FeatureId.SMS_ASSISTANT, FeatureId.RESEARCH_WEB, FeatureId.OFFLINE_KNOWLEDGE,
         FeatureId.MULTILINGUAL_ASSISTANT, FeatureId.BLUETOOTH_COMPANION,
+        FeatureId.PERSONAL_ROUTINES, FeatureId.ADAPTIVE_DASHBOARD, FeatureId.MOBILE_DATA_MONITOR,
     )
 
     /** Same catalogue with every feature treated as built, to exercise dependency rules that matter once the phases land. */

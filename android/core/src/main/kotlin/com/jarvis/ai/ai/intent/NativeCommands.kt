@@ -77,7 +77,7 @@ object NativeCommands {
 
     private fun onPhone(text: String): One? =
         calculator(text) ?: convertUnits(text) ?: randomPick(text) ?: brightness(text) ?: soundMode(text) ?: settingsPage(text)
-            ?: dismissAlarm(text) ?: paymentMode(text) ?: maps(text) ?: countApps(text) ?: accessCheck(text) ?: clipboard(text)
+            ?: dismissAlarm(text) ?: paymentMode(text) ?: routines(text) ?: maps(text) ?: countApps(text) ?: accessCheck(text) ?: clipboard(text)
 
     private val CALC_VERB = Regex("""^(?:calculate|compute|work out|solve|what(?:'s| is)|whats|how much is) (.{1,150})$""", RegexOption.IGNORE_CASE)
 
@@ -279,6 +279,28 @@ object NativeCommands {
 
     private fun paymentMode(text: String): One? =
         if (PAYMENT_MODE.matches(text)) One.Step("payment_mode", "Switch off screen control so a payment app can run", JsonObject(emptyMap())) else null
+
+    // "Start my morning routine" reads a saved routine's steps; "list my routines" names them. Whole sentences only. "Open" is left out on purpose,
+    // so "open <app>" is never taken for a routine. Making a routine is left to the assistant, which knows the create_routine tool.
+    private val ROUTINE_READ = listOf(
+        Regex("""^(?:start|begin|run|read|do|go through|read out|read me|give me) (?:me )?(?:my |the )?([\p{L}\p{N}][\p{L}\p{N} '-]{1,30}?) routine$""", RegexOption.IGNORE_CASE),
+        Regex("""^what(?:'s| is) in (?:my |the )([\p{L}\p{N}][\p{L}\p{N} '-]{1,30}?) routine$""", RegexOption.IGNORE_CASE),
+        Regex("""^what are the steps (?:of|in) (?:my |the )([\p{L}\p{N}][\p{L}\p{N} '-]{1,30}?) routine$""", RegexOption.IGNORE_CASE),
+    )
+    private val ROUTINE_LIST = Regex(
+        """^(?:(?:list|show|read|tell me|what are|what's) (?:me )?(?:all )?(?:of )?my routines|which routines do i have|do i have any routines)$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private fun routines(text: String): One? {
+        if (ROUTINE_LIST.matches(text)) return One.Step("list_routines", "List your routines", JsonObject(emptyMap()))
+        for (p in ROUTINE_READ) {
+            val name = p.matchEntire(text)?.groupValues?.get(1)?.trim() ?: continue
+            if (com.jarvis.ai.routines.RoutineText.key(name).isEmpty()) continue // "do the routine": no actual name
+            return One.Step("read_routine", "Read the ${name.take(30)} routine", buildJsonObject { put("name", name) })
+        }
+        return null
+    }
 
     private val DIRECTIONS = listOf(
         Regex("""^(?:navigate|drive|walk|route|guide) (?:me )?(?:to|for) (?:the )?(.{2,100})$""", RegexOption.IGNORE_CASE),

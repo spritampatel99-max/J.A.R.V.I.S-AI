@@ -84,7 +84,7 @@ object PermissionCatalog {
         PermissionInfo(
             PermissionId.USAGE_ACCESS, "Usage access", PermissionKind.SPECIAL_ACCESS,
             "Showing how much mobile data the phone and each app used.",
-            "Per-app usage statistics. Without it only whole-phone totals are possible.",
+            "How many bytes of mobile data each app used. Android uses the same switch for screen time, but Jarvis does not read that. Without it, no numbers can be read.",
             "Settings > Apps > Special app access > Usage access (the location varies by manufacturer).",
         ),
         PermissionInfo(
