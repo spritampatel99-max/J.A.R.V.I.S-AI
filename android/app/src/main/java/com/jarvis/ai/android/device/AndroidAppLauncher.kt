@@ -18,6 +18,8 @@ import kotlinx.coroutines.withContext
 class AndroidAppLauncher(
     context: Context,
     private val foreground: ForegroundTracker,
+    /** Told the package just before an app is opened, so the floating card can be taken off a payment app before it starts. */
+    private val beforeLaunch: (String) -> Unit = {},
 ) : AppLauncher {
 
     private val context = context.applicationContext
@@ -56,6 +58,7 @@ class AndroidAppLauncher(
     override fun launch(packageName: String): LaunchResult {
         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
             ?: return LaunchResult.NoHandler(packageName)
+        beforeLaunch(packageName)
         return startActivitySafely(context, foreground, intent, packageName)
     }
 

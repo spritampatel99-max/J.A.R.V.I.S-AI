@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.jarvis.ai.JarvisApplication
 import com.jarvis.ai.ai.tools.screen.FrontApp
 import com.jarvis.ai.ai.tools.screen.RawBox
 import com.jarvis.ai.ai.tools.screen.RawResult
@@ -31,7 +32,10 @@ class JarvisAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Nothing is collected from events. The window is read on request, never in the background.
+        // Nothing is collected from events and nothing is stored. A window change only lets the floating card get out of the way
+        // of a payment app (the card asks which app is in front by package name; no text is read).
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        (application as? JarvisApplication)?.container?.overlayShield?.recheck()
     }
 
     override fun onInterrupt() = Unit

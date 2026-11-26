@@ -9,6 +9,7 @@ import com.jarvis.ai.ai.fallback.FallbackLlmClient
 import com.jarvis.ai.ai.local.LocalEngine
 import com.jarvis.ai.ai.router.RoutedLlmClient
 import com.jarvis.ai.ai.router.RoutingSettings
+import com.jarvis.ai.ai.tools.screen.OverlayShield
 import com.jarvis.ai.android.local.LocalEngines
 import com.jarvis.ai.ai.fallback.RetryPolicy
 import com.jarvis.ai.ai.planner.Planner
@@ -59,6 +60,7 @@ import com.jarvis.ai.android.screen.AndroidNotificationPort
 import com.jarvis.ai.android.screen.AndroidRawScreen
 import com.jarvis.ai.android.schedule.AndroidNotifier
 import com.jarvis.ai.android.schedule.AndroidWakeScheduler
+import com.jarvis.ai.android.screen.ScreenHub
 import com.jarvis.ai.automation.ScheduleEngine
 import com.jarvis.ai.automation.AutomationRunner
 import com.jarvis.ai.automation.AutomationStore
@@ -290,7 +292,7 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
         deviceInfo = AndroidDeviceInfoReader(appContext),
         contacts = AndroidContactsPort(appContext),
         calls = AndroidCallPort(appContext, foreground),
-        apps = AndroidAppLauncher(appContext, foreground),
+        apps = AndroidAppLauncher(appContext, foreground, beforeLaunch = { overlayShield.noteLaunch(it) }),
         messaging = AndroidMessagingPort(appContext, foreground),
         timers = AndroidTimerLauncher(appContext, foreground),
         media = AndroidMediaKeys(appContext),
@@ -366,6 +368,12 @@ class AppContainer(context: Context, val foreground: ForegroundTracker) {
      * list are never read, and system settings and permission dialogs are never acted on.
      */
     private val screenGuard = ScreenGuard(appContext.packageName) { settings.screenBlocklist }
+
+    /**
+     * Keeps the floating hands-free card off payment, banking and password apps, which often close themselves when something is
+     * drawn over them. It only ever sees package names.
+     */
+    val overlayShield: OverlayShield = OverlayShield(screenGuard, front = { ScreenHub.accessibility?.frontPackage() })
 
     /** Decides what is read aloud when a notification arrives while Bluetooth audio is connected. Uses the same guard, so banking and password apps stay silent. */
     val announcer = com.jarvis.ai.voice.NotificationAnnouncer(screenGuard) { System.currentTimeMillis() }

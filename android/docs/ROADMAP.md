@@ -1,7 +1,7 @@
 # Roadmap and status
 
 Ten phases, taken from the master prompt. "Done" means written *and* verified; the verification actually
-performed is described in `testing/BUILD_AND_TEST_REPORT.md`. The `:core` module's tests pass in an offline harness (1142 tests) and in GitHub Actions. The `:app` module (Android code and screens) compiles there too (debug build only; run 45815957725, 2026-11-26). An earlier version of the debug app was built and shown running on the owner's phone (screenshots, 2026-11-08); **nothing written since has been run on a phone**, and no release build exists. See `STATUS.md`.
+performed is described in `testing/BUILD_AND_TEST_REPORT.md`. The `:core` module's tests pass in an offline harness (1161 tests) and in GitHub Actions. The `:app` module (Android code and screens) compiles there too (debug build only; run 45815957725, 2026-11-26). An earlier version of the debug app was built and shown running on the owner's phone (screenshots, 2026-11-08); **nothing written since has been run on a phone**, and no release build exists. See `STATUS.md`.
 
 | # | Phase | Status |
 |---|---|---|

@@ -20,7 +20,11 @@ import androidx.core.graphics.toColorInt
  *
  * Must be used on the main thread.
  */
-class HandsFreeOverlay(context: Context) {
+class HandsFreeOverlay(
+    context: Context,
+    /** Asked before every show; false for a payment, banking or password app in front or being opened. */
+    private val mayShow: () -> Boolean = { true },
+) {
 
     private val context = context.applicationContext
     private val windows = this.context.getSystemService(WindowManager::class.java)
@@ -36,6 +40,11 @@ class HandsFreeOverlay(context: Context) {
 
     fun show(text: String, cancellable: Boolean) {
         if (!isAllowed) return
+        // Never over a payment, banking or password app (or while one is opening): many of them close themselves when something is drawn over them.
+        if (!mayShow()) {
+            hide()
+            return
+        }
         val card = root ?: build()?.also { root = it } ?: return
         message?.text = text
         cancel?.visibility = if (cancellable) View.VISIBLE else View.GONE

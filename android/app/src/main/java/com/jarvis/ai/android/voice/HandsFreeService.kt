@@ -113,7 +113,10 @@ class HandsFreeService : Service() {
         }
         wake = detector
 
-        overlay = HandsFreeOverlay(this).also { card -> card.onCancel = { cancelPending() } }
+        val shield = container.overlayShield
+        overlay = HandsFreeOverlay(this, mayShow = shield::mayShow).also { card -> card.onCancel = { cancelPending() } }
+        // A payment app opening (or coming to the front) takes the card down at once. May be called from any thread.
+        shield.onBlocked = { scope.launch { hideJob?.cancel(); overlay?.hide() } }
         startController()
         status.value = HandsFreeStatus.Waiting
         return START_NOT_STICKY
@@ -358,6 +361,7 @@ class HandsFreeService : Service() {
         pauseWake()
         wake?.release()
         wake = null
+        if (::container.isInitialized) container.overlayShield.onBlocked = null
         overlay?.hide()
         container.voice.cancelListening()
         if (status.value !is HandsFreeStatus.Problem) status.value = HandsFreeStatus.Off

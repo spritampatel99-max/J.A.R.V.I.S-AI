@@ -3,7 +3,7 @@
 Read this before building. It says what is finished, what was only compiled, and what was not done. If another document disagrees with this one, check the code; this file was written last.
 
 ## Checked here
-- `:core` (the logic: tools, safety rules, planner, router, screen guard, phone operator, voice controls, offline library reader, routines, data-usage maths, shortcuts and the rest) compiles and passes **1142 tests**, run on a PC-style JVM in the workspace (`kotlinc` + JUnit, not Gradle), and the same tests pass in GitHub Actions.
+- `:core` (the logic: tools, safety rules, planner, router, screen guard, phone operator, voice controls, offline library reader, routines, data-usage maths, shortcuts and the rest) compiles and passes **1161 tests**, run on a PC-style JVM in the workspace (`kotlinc` + JUnit, not Gradle), and the same tests pass in GitHub Actions.
 - Safety rules were also checked by deliberately breaking them (mutation checks). This round: **30 deliberate breaks** of the new logic (replanning history, clock and time-zone rule, routines, data-usage maths, shortcuts) and **all 30 are caught by a test**. Earlier rounds covered the money-button refusal, the risky-label refusal, the operator's "never" class, the interruption window, the scroll / tap guards, call safety and the automation scheduler. The mutation list is not a proof that nothing is wrong; it shows that those specific mistakes would be noticed.
 
 ## Compiled on GitHub, but NEVER run on a phone (`:app`, the Android part)
@@ -23,7 +23,7 @@ This workspace cannot reach Google's Android build servers, so the app is built 
 - **New built-in commands (no AI needed):** brightness, silent / vibrate / normal mode (silent needs Do Not Disturb access), 30 Settings pages, cancel / dismiss an alarm, clipboard, count apps, Maps / directions, permission check, calculator, unit converter, random pick.
 - **Contacts:** a name that is not found offers the closest similar names instead of failing.
 - **Phone operator** ("do it for me in any app"): off until you switch it on in Prefs > Access > Phone operator (also needs Accessibility and "press buttons and type"). See `docs/PHONE_OPERATOR.md`. **It sends the text on the screen to your AI provider.**
-- **Payment mode** ("payment mode", "I am going to pay"): asks Android to switch the accessibility service off and stops listening before you open a payment app. The cause of payment apps closing is **not confirmed**; this is a mitigation, not a fix.
+- **Payment apps** (see `docs/PAYMENT_APPS.md`): "payment mode" asks Android to switch the accessibility service off and stops listening before you open a payment app; and since 2026-11-27 the floating hands-free card is kept off payment, banking and password apps and taken down before JARVIS opens one. The cause of payment apps closing is **not confirmed**; these are mitigations, not a fix. The accessibility service being on is a possible cause that no code change can hide.
 
 ## Automation reliability (2026-11-24, clock rule 2026-11-26)
 See CHANGELOG. Core tested; compiled in CI. Nothing has run on a phone. The question of which automation you made and what it did on your phone is still open (see below).
@@ -51,7 +51,7 @@ It cannot mean everything. Android blocks apps from some things by design, and J
 ## Still open, and why
 | What | Why |
 |---|---|
-| Anything that needs a phone | WhatsApp count, YouTube press, barge-in, operator, ElevenLabs, Bluetooth tap, light theme, offline listening with the new Vosk, data monitor numbers, routine reminders arriving, the payment-app cause. I cannot run the app. |
+| Anything that needs a phone | WhatsApp count, YouTube press, barge-in, operator, ElevenLabs, Bluetooth tap, light theme, offline listening with the new Vosk, data monitor numbers, routine reminders arriving, the payment-app cause (the test steps are in `docs/PAYMENT_APPS.md`). I cannot run the app. |
 | File Manager, Document Intelligence | Need screens I cannot see; not faked. |
 | Library / AGP / targetSdk upgrades | Deliberately left until after a phone test (see above). |
 | Play Store policy for battery exemption | Only matters for a Play Store release. |

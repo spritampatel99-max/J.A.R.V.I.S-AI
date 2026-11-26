@@ -3,7 +3,7 @@
 A standalone personal AI assistant for Android 11+ (API 30). It is built to run on the phone itself: no
 desktop companion, no Ollama server, no computer pairing. Cloud AI is optional.
 
-**Status: early foundation, no release build.** Read `STATUS.md` first; it is the current truth. `:core` is tested offline (1142 tests) and compiled and tested by GitHub Actions on branch `ci/android-build`; `:app` compiles there too (debug APK only). **Nothing in the latest rounds has been run on a phone.** An earlier version of the debug app was built, installed and shown running on the owner's phone (2026-11-08). How this project is built: `docs/BUILD_ON_GITHUB.md`.
+**Status: early foundation, no release build.** Read `STATUS.md` first; it is the current truth. `:core` is tested offline (1161 tests) and compiled and tested by GitHub Actions on branch `ci/android-build`; `:app` compiles there too (debug APK only). **Nothing in the latest rounds has been run on a phone.** An earlier version of the debug app was built, installed and shown running on the owner's phone (2026-11-08). How this project is built: `docs/BUILD_ON_GITHUB.md`.
 [`docs/testing/BUILD_AND_TEST_REPORT.md`](docs/testing/BUILD_AND_TEST_REPORT.md) for exactly what was and was not run, and
 [`docs/ROADMAP.md`](docs/ROADMAP.md) for the ten-phase plan.
 
@@ -84,6 +84,6 @@ settings through `~/.gradle/gradle.properties` or environment variables, add a `
 
 [`docs/PROJECT_AUDIT.md`](docs/PROJECT_AUDIT.md) · [`docs/ROADMAP.md`](docs/ROADMAP.md) · [`docs/setup/ONBOARDING.md`](docs/setup/ONBOARDING.md) ·
 [`docs/ai/CLOUD_PROVIDERS.md`](docs/ai/CLOUD_PROVIDERS.md) · [`docs/ai/LOCAL_MODELS.md`](docs/ai/LOCAL_MODELS.md) · [`docs/setup/ACCESS.md`](docs/setup/ACCESS.md) · [`docs/security/SECURITY.md`](docs/security/SECURITY.md) ·
-[`docs/ai/MEMORY_AND_PLANNER.md`](docs/ai/MEMORY_AND_PLANNER.md) · [`docs/AUTOMATIONS.md`](docs/AUTOMATIONS.md) · [`docs/ROUTINES_DATA_SHORTCUTS.md`](docs/ROUTINES_DATA_SHORTCUTS.md) · [`docs/ai/CUSTOM_AGENTS.md`](docs/ai/CUSTOM_AGENTS.md) ·
+[`docs/ai/MEMORY_AND_PLANNER.md`](docs/ai/MEMORY_AND_PLANNER.md) · [`docs/AUTOMATIONS.md`](docs/AUTOMATIONS.md) · [`docs/ROUTINES_DATA_SHORTCUTS.md`](docs/ROUTINES_DATA_SHORTCUTS.md) · [`docs/PAYMENT_APPS.md`](docs/PAYMENT_APPS.md) · [`docs/ai/CUSTOM_AGENTS.md`](docs/ai/CUSTOM_AGENTS.md) ·
 [`docs/security/OFFLINE_AND_SECURITY_REVIEW.md`](docs/security/OFFLINE_AND_SECURITY_REVIEW.md) · [`docs/release/RELEASE_CHECKLIST.md`](docs/release/RELEASE_CHECKLIST.md) ·
 [`docs/testing/BUILD_AND_TEST_REPORT.md`](docs/testing/BUILD_AND_TEST_REPORT.md) · [`CHANGELOG.md`](CHANGELOG.md)

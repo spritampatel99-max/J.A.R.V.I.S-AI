@@ -229,6 +229,17 @@ class ScreenGuard(
 ) {
     fun mayRead(packageName: String): Boolean = !neverTouched(packageName)
 
+    /**
+     * False when JARVIS's floating card must not be drawn over this app: payment, banking and password apps and the person's
+     * own list. Many of those apps close themselves when another app draws over them. JARVIS's own screens and an unknown
+     * (blank) package are fine to draw over; a card there cannot do this kind of harm.
+     */
+    fun mayDrawOver(packageName: String): Boolean {
+        val name = packageName.trim().lowercase(Locale.ROOT)
+        if (name.isEmpty() || name == ownPackage.lowercase(Locale.ROOT)) return true
+        return !neverTouched(packageName)
+    }
+
     fun mayAct(packageName: String): Boolean {
         if (neverTouched(packageName)) return false
         return packageName.lowercase(Locale.ROOT) !in NO_ACTION

@@ -122,3 +122,9 @@ Android 14+ move (`minSdk` 34, target 35) and the owner's second list. `:core` p
 - Mutation checks: 30 deliberate breaks of the new logic (replanning history, clock rule, routines, data usage, shortcuts), all caught by a test.
 - Docs: `STATUS.md` rewritten, `docs/AUDIT_2026-11-25.md` statuses updated, `docs/AUTOMATIONS.md` clock rules, `docs/setup/ACCESS.md` Usage access row, `docs/ROUTINES_DATA_SHORTCUTS.md` new.
 - Not done: File Manager and Document Intelligence (need screens I cannot check), library / AGP / targetSdk upgrades (left until after a phone test), anything that needs the app to run on a phone.
+
+## 2026-11-27 (payment apps: keep the floating card off them)
+- Cause of payment apps closing still **not confirmed**. Two likely causes: the accessibility service being on, and the hands-free card drawn over the app. `docs/PAYMENT_APPS.md` has the whole picture and a five-minute test to find which.
+- New: the hands-free card is never shown over a payment, banking or password app or an app on your own list, and is taken down before JARVIS opens one for you (held off for 45 s). New core pieces `OverlayShield` and `ScreenGuard.mayDrawOver`. Only package names are used.
+- Window changes now tell the shield to re-check (the accessibility service already received window-change events; it still reads and stores nothing from them).
+- `:core` 1161 tests (19 new). 12 deliberate breaks of the shield and the guard rule, all caught by a test. The Android wiring has never been run on a phone.
