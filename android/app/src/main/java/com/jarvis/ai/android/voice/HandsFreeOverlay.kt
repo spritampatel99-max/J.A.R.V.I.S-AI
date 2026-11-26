@@ -11,6 +11,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.graphics.toColorInt
 
 /**
  * A small floating card that shows what Jarvis is doing while another app is on screen ("Listening…", the answer, the
@@ -59,7 +60,7 @@ class HandsFreeOverlay(context: Context) {
 
         val title = TextView(context).apply {
             text = "JARVIS 3.0"
-            setTextColor(Color.parseColor("#4FD8FF"))
+            setTextColor("#4FD8FF".toColorInt())
             textSize = 11f
             letterSpacing = 0.15f
         }
@@ -77,9 +78,9 @@ class HandsFreeOverlay(context: Context) {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(14), dp(18), dp(14))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#F00D1222"))
+                setColor("#F00D1222".toColorInt())
                 cornerRadius = dp(22).toFloat()
-                setStroke(dp(1), Color.parseColor("#664FD8FF"))
+                setStroke(dp(1), "#664FD8FF".toColorInt())
             }
             addView(title)
             addView(body)

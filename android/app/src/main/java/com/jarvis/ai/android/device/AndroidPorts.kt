@@ -11,7 +11,6 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
@@ -21,6 +20,7 @@ import android.os.StatFs
 import android.provider.AlarmClock
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.jarvis.ai.ai.tools.builtin.AlarmLauncher
 import com.jarvis.ai.ai.tools.builtin.DeviceInfo
 import com.jarvis.ai.ai.tools.builtin.DeviceInfoReader
@@ -175,7 +175,7 @@ class AndroidUrlOpener(
 ) : UrlOpener {
 
     override fun open(url: String): LaunchResult {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
         return startActivitySafely(context, foreground, intent, "web links")
     }
 }

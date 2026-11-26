@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.MediaStore
 import android.view.KeyEvent
+import androidx.core.net.toUri
 import com.jarvis.ai.ai.tools.builtin.CameraLauncher
 import com.jarvis.ai.ai.tools.builtin.EmailPort
 import com.jarvis.ai.ai.tools.builtin.LaunchResult
@@ -77,7 +78,7 @@ class AndroidEmailPort(
     private val context = context.applicationContext
 
     override fun compose(to: String?, subject: String, body: String): MessageHandoff {
-        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))
+        val intent = Intent(Intent.ACTION_SENDTO, "mailto:".toUri())
         if (to != null) intent.putExtra(Intent.EXTRA_EMAIL, arrayOf(to))
         if (subject.isNotEmpty()) intent.putExtra(Intent.EXTRA_SUBJECT, subject)
         if (body.isNotEmpty()) intent.putExtra(Intent.EXTRA_TEXT, body)

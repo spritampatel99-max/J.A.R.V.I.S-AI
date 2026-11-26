@@ -64,7 +64,7 @@ internal object NodeReader {
                 val area = rect.width().toLong() * rect.height().toLong()
                 if (area > bestArea) {
                     best?.let { recycle(it) }
-                    best = AccessibilityNodeInfo.obtain(node)
+                    best = AccessibilityNodeInfo(node)
                     bestArea = area
                 }
             }
@@ -95,7 +95,7 @@ internal object NodeReader {
         val budget = intArrayOf(MAX_NODES)
 
         fun target(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-            if (node.isClickable) return AccessibilityNodeInfo.obtain(node)
+            if (node.isClickable) return AccessibilityNodeInfo(node)
             var parent = node.parent
             var hops = 0
             while (parent != null && hops < 4) {
@@ -167,7 +167,7 @@ internal object NodeReader {
                 node.getBoundsInScreen(rect)
                 if (rect.top > bestTop) {
                     best?.let { recycle(it) }
-                    best = AccessibilityNodeInfo.obtain(node)
+                    best = AccessibilityNodeInfo(node)
                     bestTop = rect.top
                 }
             }
@@ -238,13 +238,13 @@ internal object NodeReader {
 
     /** What to press for a list item: the item itself if it can be pressed, else its first pressable part. The caller recycles the result. */
     fun clickTarget(item: AccessibilityNodeInfo): AccessibilityNodeInfo {
-        if (item.isClickable) return AccessibilityNodeInfo.obtain(item)
+        if (item.isClickable) return AccessibilityNodeInfo(item)
         val budget = intArrayOf(MAX_ROW_NODES)
         fun find(node: AccessibilityNodeInfo, depth: Int): AccessibilityNodeInfo? {
             if (budget[0] <= 0 || depth > MAX_DEPTH) return null
             budget[0]--
             if (!node.isVisibleToUser || node.isPassword || node.isEditable) return null
-            if (depth > 0 && node.isClickable) return AccessibilityNodeInfo.obtain(node)
+            if (depth > 0 && node.isClickable) return AccessibilityNodeInfo(node)
             for (i in 0 until node.childCount) {
                 val child = node.getChild(i) ?: continue
                 try {
@@ -255,7 +255,7 @@ internal object NodeReader {
             }
             return null
         }
-        return find(item, 0) ?: AccessibilityNodeInfo.obtain(item)
+        return find(item, 0) ?: AccessibilityNodeInfo(item)
     }
 
     @Suppress("DEPRECATION")

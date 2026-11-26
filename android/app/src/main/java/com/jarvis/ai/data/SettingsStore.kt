@@ -2,6 +2,7 @@ package com.jarvis.ai.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import com.jarvis.ai.ai.providers.ProviderDefaults
 import com.jarvis.ai.ai.providers.ProviderId
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +30,7 @@ class SettingsStore(context: Context) {
             return saved + ProviderId.DEFAULT_ORDER.filter { it !in saved }
         }
         set(value) {
-            prefs.edit().putString(KEY_ORDER, value.distinct().joinToString(",") { it.name }).apply()
+            prefs.edit { putString(KEY_ORDER, value.distinct().joinToString(",") { it.name }) }
         }
 
     /** Where answers come from: this phone, the cloud, or both. Manual is not offered, so a saved Manual falls back to the default. */
@@ -37,25 +38,21 @@ class SettingsStore(context: Context) {
         get() = com.jarvis.ai.ai.router.AiMode.entries.firstOrNull { it.name == prefs.getString(KEY_AI_MODE, null) && it != com.jarvis.ai.ai.router.AiMode.MANUAL }
             ?: com.jarvis.ai.ai.router.AiMode.LOCAL_FIRST
         set(value) {
-            prefs.edit().putString(KEY_AI_MODE, value.name).apply()
+            prefs.edit { putString(KEY_AI_MODE, value.name) }
         }
 
     fun model(id: ProviderId): String =
         prefs.getString(modelKey(id), null)?.takeIf { it.isNotBlank() } ?: ProviderDefaults.modelFor(id)
 
     fun setModel(id: ProviderId, model: String) {
-        val editor = prefs.edit()
-        if (model.isBlank()) editor.remove(modelKey(id)) else editor.putString(modelKey(id), model.trim())
-        editor.apply()
+        prefs.edit { if (model.isBlank()) remove(modelKey(id)) else putString(modelKey(id), model.trim()) }
     }
 
     /** The https address typed for the "own endpoint" provider. Only that provider reads it; it is not a secret, a token belongs in the key field. */
     fun endpoint(id: ProviderId): String = prefs.getString(endpointKey(id), null).orEmpty()
 
     fun setEndpoint(id: ProviderId, value: String) {
-        val editor = prefs.edit()
-        if (value.isBlank()) editor.remove(endpointKey(id)) else editor.putString(endpointKey(id), value.trim())
-        editor.apply()
+        prefs.edit { if (value.isBlank()) remove(endpointKey(id)) else putString(endpointKey(id), value.trim()) }
     }
 
     private val uiFlow = MutableStateFlow(readUi())
@@ -65,24 +62,24 @@ class SettingsStore(context: Context) {
 
     fun updateUi(change: (UiPrefs) -> UiPrefs) {
         val next = change(uiFlow.value).sanitised()
-        prefs.edit()
-            .putBoolean(KEY_AMBIENT, next.ambient)
-            .putBoolean(KEY_REDUCE_MOTION, next.reduceMotion)
-            .putFloat(KEY_FLARE, next.flare)
-            .putBoolean(KEY_SPEAK, next.speakReplies)
-            .putFloat(KEY_RATE, next.speechRate)
-            .putBoolean(KEY_ON_DEVICE_ONLY, next.onDeviceSpeechOnly)
-            .putString(KEY_THEME, next.themeMode.name)
-            .putBoolean(KEY_DYNAMIC, next.dynamicColor)
-            .putBoolean(KEY_ELEVEN_ON, next.elevenEnabled)
-            .putBoolean(KEY_ANNOUNCE, next.announceNotifications)
-            .putBoolean(KEY_ANNOUNCE_TEXT, next.announceReadText)
-            .putBoolean(KEY_ANNOUNCE_LOCKED, next.announceLockedText)
-            .putBoolean(KEY_BARGE_IN, next.bargeIn)
-            .apply { if (next.elevenVoiceId == null) remove(KEY_ELEVEN_VOICE) else putString(KEY_ELEVEN_VOICE, next.elevenVoiceId) }
-            .apply { if (next.elevenVoiceName == null) remove(KEY_ELEVEN_VOICE_NAME) else putString(KEY_ELEVEN_VOICE_NAME, next.elevenVoiceName) }
-            .apply { if (next.voiceName == null) remove(KEY_VOICE) else putString(KEY_VOICE, next.voiceName) }
-            .apply()
+        prefs.edit {
+            putBoolean(KEY_AMBIENT, next.ambient)
+            putBoolean(KEY_REDUCE_MOTION, next.reduceMotion)
+            putFloat(KEY_FLARE, next.flare)
+            putBoolean(KEY_SPEAK, next.speakReplies)
+            putFloat(KEY_RATE, next.speechRate)
+            putBoolean(KEY_ON_DEVICE_ONLY, next.onDeviceSpeechOnly)
+            putString(KEY_THEME, next.themeMode.name)
+            putBoolean(KEY_DYNAMIC, next.dynamicColor)
+            putBoolean(KEY_ELEVEN_ON, next.elevenEnabled)
+            putBoolean(KEY_ANNOUNCE, next.announceNotifications)
+            putBoolean(KEY_ANNOUNCE_TEXT, next.announceReadText)
+            putBoolean(KEY_ANNOUNCE_LOCKED, next.announceLockedText)
+            putBoolean(KEY_BARGE_IN, next.bargeIn)
+            if (next.elevenVoiceId == null) remove(KEY_ELEVEN_VOICE) else putString(KEY_ELEVEN_VOICE, next.elevenVoiceId)
+            if (next.elevenVoiceName == null) remove(KEY_ELEVEN_VOICE_NAME) else putString(KEY_ELEVEN_VOICE_NAME, next.elevenVoiceName)
+            if (next.voiceName == null) remove(KEY_VOICE) else putString(KEY_VOICE, next.voiceName)
+        }
         uiFlow.value = next
     }
 
@@ -112,7 +109,7 @@ class SettingsStore(context: Context) {
     var useMemoryInChat: Boolean
         get() = prefs.getBoolean(KEY_USE_MEMORY, true)
         set(value) {
-            prefs.edit().putBoolean(KEY_USE_MEMORY, value).apply()
+            prefs.edit { putBoolean(KEY_USE_MEMORY, value) }
         }
 
     /**
@@ -122,7 +119,7 @@ class SettingsStore(context: Context) {
     var handsFreeOn: Boolean
         get() = prefs.getBoolean(KEY_HANDS_FREE, false)
         set(value) {
-            prefs.edit().putBoolean(KEY_HANDS_FREE, value).apply()
+            prefs.edit { putBoolean(KEY_HANDS_FREE, value) }
         }
 
     /**
@@ -132,7 +129,7 @@ class SettingsStore(context: Context) {
     var screenBlocklist: Set<String>
         get() = prefs.getStringSet(KEY_SCREEN_BLOCKLIST, emptySet())?.toSet().orEmpty()
         set(value) {
-            prefs.edit().putStringSet(KEY_SCREEN_BLOCKLIST, value.toSet()).apply()
+            prefs.edit { putStringSet(KEY_SCREEN_BLOCKLIST, value.toSet()) }
         }
 
     /**
@@ -142,7 +139,7 @@ class SettingsStore(context: Context) {
     var tapAndTypeOn: Boolean
         get() = prefs.getBoolean(KEY_TAP_TYPE, false)
         set(value) {
-            prefs.edit().putBoolean(KEY_TAP_TYPE, value).apply()
+            prefs.edit { putBoolean(KEY_TAP_TYPE, value) }
         }
 
     /**
@@ -152,7 +149,7 @@ class SettingsStore(context: Context) {
     var whatsappSendOn: Boolean
         get() = prefs.getBoolean(KEY_WA_SEND, false)
         set(value) {
-            prefs.edit().putBoolean(KEY_WA_SEND, value).apply()
+            prefs.edit { putBoolean(KEY_WA_SEND, value) }
         }
 
     /**
@@ -163,7 +160,7 @@ class SettingsStore(context: Context) {
     var phoneOperatorOn: Boolean
         get() = prefs.getBoolean(KEY_PHONE_OPERATOR, false)
         set(value) {
-            prefs.edit().putBoolean(KEY_PHONE_OPERATOR, value).apply()
+            prefs.edit { putBoolean(KEY_PHONE_OPERATOR, value) }
         }
 
     /**
@@ -174,52 +171,52 @@ class SettingsStore(context: Context) {
     var nightlyOn: Boolean
         get() = prefs.getBoolean(KEY_NIGHTLY, false)
         set(value) {
-            val editor = prefs.edit().putBoolean(KEY_NIGHTLY, value)
-            if (value && !prefs.getBoolean(KEY_NIGHTLY, false)) editor.putLong(KEY_NIGHTLY_LAST, System.currentTimeMillis())
-            editor.apply()
+            val wasOn = prefs.getBoolean(KEY_NIGHTLY, false)
+            prefs.edit {
+                putBoolean(KEY_NIGHTLY, value)
+                if (value && !wasOn) putLong(KEY_NIGHTLY_LAST, System.currentTimeMillis())
+            }
         }
 
     var nightlyLastRunMs: Long
         get() = prefs.getLong(KEY_NIGHTLY_LAST, 0L)
         set(value) {
-            prefs.edit().putLong(KEY_NIGHTLY_LAST, value).apply()
+            prefs.edit { putLong(KEY_NIGHTLY_LAST, value) }
         }
 
     /** When the release page was last read successfully, or null if never. */
     var updateLastCheckMs: Long?
         get() = prefs.getLong(KEY_UPDATE_CHECK, -1L).takeIf { it >= 0 }
         set(value) {
-            val editor = prefs.edit()
-            if (value == null) editor.remove(KEY_UPDATE_CHECK) else editor.putLong(KEY_UPDATE_CHECK, value)
-            editor.apply()
+            prefs.edit { if (value == null) remove(KEY_UPDATE_CHECK) else putLong(KEY_UPDATE_CHECK, value) }
         }
 
     /** The newest release found, as stored by ReleaseStore. */
     var knownRelease: String?
         get() = prefs.getString(KEY_KNOWN_RELEASE, null)
         set(value) {
-            prefs.edit().putString(KEY_KNOWN_RELEASE, value).apply()
+            prefs.edit { putString(KEY_KNOWN_RELEASE, value) }
         }
 
     /** The suggestions from the last review that the person has not answered yet, as stored by NightlyReview. */
     var nightlyProposals: String?
         get() = prefs.getString(KEY_PROPOSALS, null)
         set(value) {
-            prefs.edit().putString(KEY_PROPOSALS, value).apply()
+            prefs.edit { putString(KEY_PROPOSALS, value) }
         }
 
     /** Suggestion ids the person answered "leave as it is" to; they are not suggested again. */
     var leftAsIs: Set<String>
         get() = prefs.getStringSet(KEY_LEFT_AS_IS, emptySet())?.toSet().orEmpty()
         set(value) {
-            prefs.edit().putStringSet(KEY_LEFT_AS_IS, value.toSet()).apply()
+            prefs.edit { putStringSet(KEY_LEFT_AS_IS, value.toSet()) }
         }
 
     /** When on, MEDIUM-risk actions (for example setting an alarm) also ask first. HIGH always asks. */
     var confirmMediumActions: Boolean
         get() = prefs.getBoolean(KEY_CONFIRM_MEDIUM, false)
         set(value) {
-            prefs.edit().putBoolean(KEY_CONFIRM_MEDIUM, value).apply()
+            prefs.edit { putBoolean(KEY_CONFIRM_MEDIUM, value) }
         }
 
     /**
@@ -229,25 +226,26 @@ class SettingsStore(context: Context) {
      */
     private fun dropRetiredDefaults() {
         if (prefs.getBoolean(KEY_RETIRED_DROPPED, false)) return
-        val editor = prefs.edit()
-        for (id in ProviderId.entries) {
-            val saved = prefs.getString(modelKey(id), null) ?: continue
-            if (ProviderDefaults.isRetiredDefault(id, saved)) editor.remove(modelKey(id))
+        prefs.edit {
+            for (id in ProviderId.entries) {
+                val saved = prefs.getString(modelKey(id), null) ?: continue
+                if (ProviderDefaults.isRetiredDefault(id, saved)) remove(modelKey(id))
+            }
+            putBoolean(KEY_RETIRED_DROPPED, true)
         }
-        editor.putBoolean(KEY_RETIRED_DROPPED, true).apply()
     }
 
     /** The last time the app woke to do scheduled work (reminders and automations), or null. Used only to explain missed runs. */
     var lastWakeMs: Long?
         get() = prefs.getLong(KEY_LAST_WAKE, -1L).takeIf { it >= 0 }
         set(value) {
-            if (value != null) prefs.edit().putLong(KEY_LAST_WAKE, value).apply()
+            if (value != null) prefs.edit { putLong(KEY_LAST_WAKE, value) }
         }
 
     /** Which detector listens for "Jarvis". Vosk needs no account; Porcupine needs the person's own Picovoice AccessKey. */
     var wakeEngine: WakeEngine
         get() = WakeEngine.entries.firstOrNull { it.name == prefs.getString(KEY_WAKE_ENGINE, null) } ?: WakeEngine.VOSK
-        set(value) = prefs.edit().putString(KEY_WAKE_ENGINE, value.name).apply()
+        set(value) = prefs.edit { putString(KEY_WAKE_ENGINE, value.name) }
 
     /**
      * Names of the Bluetooth audio devices JARVIS reacts to. Empty means any Bluetooth audio device. Names only, kept on this phone.
@@ -255,14 +253,14 @@ class SettingsStore(context: Context) {
     var bluetoothDevices: Set<String>
         get() = prefs.getStringSet(KEY_BT_DEVICES, emptySet())?.toSet().orEmpty()
         set(value) {
-            prefs.edit().putStringSet(KEY_BT_DEVICES, value.map { it.trim().take(60) }.filter { it.isNotEmpty() }.toSet()).apply()
+            prefs.edit { putStringSet(KEY_BT_DEVICES, value.map { it.trim().take(60) }.filter { it.isNotEmpty() }.toSet()) }
         }
 
     /** The folder the person chose for auto-saving conversations (an Android document-tree address), or null when auto-save is off. */
     var archiveFolder: String?
         get() = prefs.getString(KEY_ARCHIVE, null)?.takeIf { it.isNotBlank() }
         set(value) {
-            if (value.isNullOrBlank()) prefs.edit().remove(KEY_ARCHIVE).apply() else prefs.edit().putString(KEY_ARCHIVE, value).apply()
+            prefs.edit { if (value.isNullOrBlank()) remove(KEY_ARCHIVE) else putString(KEY_ARCHIVE, value) }
         }
 
     private fun modelKey(id: ProviderId) = "model_${id.name}"

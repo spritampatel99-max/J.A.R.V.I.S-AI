@@ -6,9 +6,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
-import android.net.Uri
 import android.provider.AlarmClock
 import android.provider.Settings
+import androidx.core.net.toUri
 import com.jarvis.ai.ai.tools.builtin.AccessLine
 import com.jarvis.ai.ai.tools.builtin.AccessReporter
 import com.jarvis.ai.ai.tools.builtin.BrightnessResult
@@ -95,7 +95,7 @@ class AndroidPhoneSettings(context: Context, private val foreground: ForegroundT
     }
 
     private fun intentFor(page: SettingsPage): Intent {
-        val packageUri = Uri.parse("package:${context.packageName}")
+        val packageUri = "package:${context.packageName}".toUri()
         return when (page) {
             SettingsPage.WIFI -> Intent(Settings.ACTION_WIFI_SETTINGS)
             SettingsPage.BLUETOOTH -> Intent(Settings.ACTION_BLUETOOTH_SETTINGS)

@@ -2,7 +2,6 @@ package com.jarvis.ai.ui
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.jarvis.ai.AppContainer
 import com.jarvis.ai.update.NightlyReview
 import com.jarvis.ai.update.ProposalAction
@@ -90,7 +90,7 @@ fun NightlyReviewScreen(container: AppContainer, onNavigate: (SubPage) -> Unit) 
                     when (val action = proposal.action) {
                         is ProposalAction.OpenDownload -> GlowButton("Apply: open download page", onClick = {
                             try {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(action.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                context.startActivity(Intent(Intent.ACTION_VIEW, action.url.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                             } catch (e: ActivityNotFoundException) {
                                 status = "No app on this phone can open the download page."
                             }

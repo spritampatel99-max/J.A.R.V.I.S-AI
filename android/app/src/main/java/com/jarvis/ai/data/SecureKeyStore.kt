@@ -6,6 +6,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
+import androidx.core.content.edit
 import java.security.GeneralSecurityException
 import java.security.KeyStore
 import java.util.concurrent.ConcurrentHashMap
@@ -44,7 +45,7 @@ class SecureKeyStore(context: Context) {
             val encrypted = cipher.doFinal(trimmed.toByteArray(Charsets.UTF_8))
             val packed = Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + SEPARATOR +
                 Base64.encodeToString(encrypted, Base64.NO_WRAP)
-            prefs.edit().putString(name, packed).apply()
+            prefs.edit { putString(name, packed) }
             cache[name] = trimmed
             true
         } catch (e: GeneralSecurityException) {
@@ -92,7 +93,7 @@ class SecureKeyStore(context: Context) {
 
     fun remove(name: String) {
         cache.remove(name)
-        prefs.edit().remove(name).apply()
+        prefs.edit { remove(name) }
     }
 
     private fun getOrCreateKey(): SecretKey {

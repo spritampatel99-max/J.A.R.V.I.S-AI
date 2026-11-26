@@ -28,6 +28,8 @@ class AndroidDataUsage(private val context: Context) : DataUsagePort {
 
     override fun hasAccess(): Boolean = AccessChecks.state(context, AccessKey.USAGE_ACCESS) == AccessState.ALLOWED
 
+    // NetworkStatsManager still takes the old ConnectivityManager.TYPE_MOBILE constant as its network type; Android offers no other way to ask for mobile data.
+    @Suppress("DEPRECATION")
     override fun read(period: UsagePeriod, range: UsageRange, appLimit: Int): DataUsageResult {
         if (!hasAccess()) return DataUsageResult.NeedsAccess
         val manager = context.getSystemService(Context.NETWORK_STATS_SERVICE) as? NetworkStatsManager

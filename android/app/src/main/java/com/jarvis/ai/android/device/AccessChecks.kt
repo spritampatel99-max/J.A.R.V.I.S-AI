@@ -9,12 +9,13 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.PowerManager
 import android.os.Process
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.core.net.toUri
 import com.jarvis.ai.android.screen.JarvisAccessibilityService
 
 enum class AccessKind {
@@ -207,7 +208,7 @@ object AccessChecks {
 
     /** The Settings screen for a special access, or null when this Android version has none. */
     fun settingsIntent(context: Context, key: AccessKey): Intent? {
-        val packageUri = Uri.parse("package:${context.packageName}")
+        val packageUri = "package:${context.packageName}".toUri()
         return when (key) {
             AccessKey.BATTERY -> Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, packageUri)
             AccessKey.EXACT_ALARMS -> Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri)
@@ -224,7 +225,7 @@ object AccessChecks {
 
     /** This app's own page in Settings, where any permission can be changed. */
     fun appSettingsIntent(context: Context): Intent =
-        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri())
 
     // Android does not say whether a denied permission can still be asked for. After two denials the dialog is silently
     // skipped, so the app remembers that it has asked and, if Android no longer wants to explain, sends the user to Settings.
@@ -232,7 +233,7 @@ object AccessChecks {
     fun wasAsked(context: Context, key: AccessKey): Boolean = prefs(context).getBoolean(key.name, false)
 
     fun markAsked(context: Context, key: AccessKey) {
-        prefs(context).edit().putBoolean(key.name, true).apply()
+        prefs(context).edit { putBoolean(key.name, true) }
     }
 
     /** True when asking again would show nothing, so the only route is the app's Settings page. */

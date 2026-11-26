@@ -98,7 +98,8 @@ class AndroidCallPort(context: Context, private val foreground: ForegroundTracke
         }
     }
 
-    @Suppress("MissingPermission")
+    // acceptRingingCall is deprecated, but the replacement (an InCallService) exists only for the default phone app; this app is not one.
+    @Suppress("MissingPermission", "DEPRECATION")
     override fun answerRinging(): AnswerResult {
         if (!context.has(Manifest.permission.ANSWER_PHONE_CALLS)) {
             return AnswerResult.Failed("Allow \"Answer and end calls\" in the Prefs tab first.")
@@ -113,7 +114,8 @@ class AndroidCallPort(context: Context, private val foreground: ForegroundTracke
         }
     }
 
-    @Suppress("MissingPermission")
+    // Same reason as above: endCall has no replacement for an app that is not the default phone app.
+    @Suppress("MissingPermission", "DEPRECATION")
     override fun endCall(): EndCallResult {
         if (!context.has(Manifest.permission.ANSWER_PHONE_CALLS)) {
             return EndCallResult.Failed("Allow \"Answer and end calls\" in the Prefs tab first.")

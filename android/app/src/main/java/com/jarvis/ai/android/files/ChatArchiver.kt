@@ -3,6 +3,7 @@ package com.jarvis.ai.android.files
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import androidx.core.net.toUri
 import com.jarvis.ai.data.SettingsStore
 import com.jarvis.ai.history.Conversation
 import com.jarvis.ai.history.ConversationExport
@@ -40,7 +41,7 @@ class ChatArchiver(
     /** A one-line result of the last automatic save, for the Logs screen. */
     val message: StateFlow<String?> = status.asStateFlow()
 
-    val folder: Uri? get() = settings.archiveFolder?.let { Uri.parse(it) }
+    val folder: Uri? get() = settings.archiveFolder?.toUri()
 
     /** Call after anything is added to the history. Does nothing unless an auto-save folder is chosen. */
     fun onHistoryChanged() {
