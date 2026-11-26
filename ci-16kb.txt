@@ -1,0 +1,16 @@
+== ci-16kb (last 60 lines)
+OK  lib/arm64-v8a/libandroidx.graphics.path.so
+OK  lib/arm64-v8a/libdatastore_shared_counter.so
+OK  lib/arm64-v8a/libjnidispatch.so
+OK  lib/arm64-v8a/libpv_porcupine.so
+OK  lib/arm64-v8a/libvosk.so
+OK  lib/arm64-v8a/libzstd-jni-1.5.7-12.so
+OK  lib/x86_64/libandroidx.graphics.path.so
+OK  lib/x86_64/libdatastore_shared_counter.so
+OK  lib/x86_64/libjnidispatch.so
+OK  lib/x86_64/libpv_porcupine.so
+OK  lib/x86_64/libvosk.so
+OK  lib/x86_64/libzstd-jni-1.5.7-12.so
+12 libraries checked, 0 problem(s).
+
+== ci-16kb problems
