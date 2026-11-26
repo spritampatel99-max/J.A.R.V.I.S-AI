@@ -20,7 +20,7 @@ The floating card is now kept off payment, banking and password apps (and apps o
 - If **you ask JARVIS to open** such an app ("open PhonePe"), the card is taken down **before** the app starts and stays off for 45 seconds, so it cannot be on screen while the app starts. This works even when the accessibility service is off.
 - If such an app is **already in front** (JARVIS asks Android only for its package name, never the text on screen), the card is not shown, and a card that is up is taken down when the window changes. This needs the accessibility service to be on; with it off, JARVIS cannot tell which app is in front.
 - JARVIS's own screens are still fine to draw over.
-- Tested in `:core` (the rule and its timing). The wiring in the app compiles in GitHub Actions but **has never been run on a phone**, and I could not check whether this was the cause.
+- Tested in `:core` (the rule and its timing). The wiring in the app compiles in GitHub Actions (run 45899555324) but **has never been run on a phone**, and I could not check whether this was the cause.
 
 ## What JARVIS cannot fix (point 1), and what to do
 - **Payment mode** ("payment mode" or "I am going to pay"): JARVIS asks Android to switch its accessibility service off and stops hands-free listening. Android lets an app switch its own service off, but only you can switch it back on: Settings > Accessibility > JARVIS 3.0.
